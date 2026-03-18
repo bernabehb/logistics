@@ -2,6 +2,7 @@ import { Search, RotateCcw } from "lucide-react";
 import { StatusCircle } from "./StatusIndicator";
 import { cn } from "@/lib/utils";
 import { SingleDatePicker } from "./DateRangePicker";
+import { InvoiceType } from "../hooks/useLogisticsPageState";
 
 type Status = 'pending' | 'in-progress' | 'ready' | 'none';
 
@@ -15,6 +16,8 @@ interface LogisticsFiltersProps {
   onClearFilters: () => void;
   activeStatusFilters: Status[];
   onToggleStatusFilter: (status: Status) => void;
+  invoiceTypeFilter: InvoiceType;
+  onInvoiceTypeChange: (type: InvoiceType) => void;
 }
 
 export function LogisticsFilters({
@@ -26,14 +29,18 @@ export function LogisticsFilters({
   onToDateChange,
   onClearFilters,
   activeStatusFilters,
-  onToggleStatusFilter
+  onToggleStatusFilter,
+  invoiceTypeFilter,
+  onInvoiceTypeChange
 }: LogisticsFiltersProps) {
   const hasActiveFilters = searchQuery || fromDate || toDate;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 w-full mb-6 relative z-10">
-      {/* Left side: Search & Dates */}
-      <div className="flex flex-wrap items-center gap-6 w-full xl:w-auto">
+    <div className="flex flex-col gap-4 w-full relative z-10">
+      
+      <div className="flex flex-wrap items-center justify-between gap-4 w-full">
+        {/* Left side: Search, Dates & Type Toggle */}
+        <div className="flex flex-wrap items-center gap-6 w-full xl:w-auto">
         {/* Search Input */}
         <div className="relative group w-full md:w-auto">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 size-4.5 transition-colors group-focus-within:text-blue-500" />
@@ -46,18 +53,40 @@ export function LogisticsFilters({
           />
         </div>
 
-        {/* Date Pickers Group */}
-        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto overflow-x-auto no-scrollbar">
-          <SingleDatePicker 
-            label="De"
-            date={fromDate} 
-            setDate={onFromDateChange} 
-          />
-          <SingleDatePicker 
-            label="A"
-            date={toDate} 
-            setDate={onToDateChange} 
-          />
+        {/* Date Pickers Group and Type Filters */}
+        <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <SingleDatePicker 
+              label="De"
+              date={fromDate} 
+              setDate={onFromDateChange} 
+            />
+            <SingleDatePicker 
+              label="A"
+              date={toDate} 
+              setDate={onToDateChange} 
+            />
+          </div>
+
+          <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
+
+          {/* Type Filter */}
+          <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700/50">
+            {(['normal', 'anticipada'] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => onInvoiceTypeChange(type)}
+                className={cn(
+                  "px-4 py-1.5 text-[13px] font-semibold rounded-lg transition-all",
+                  invoiceTypeFilter === type
+                    ? "bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-600"
+                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transparent"
+                )}
+              >
+                {type === 'normal' ? 'Normales' : 'Anticipadas'}
+              </button>
+            ))}
+          </div>
         </div>
 
           {hasActiveFilters && (
@@ -112,6 +141,7 @@ export function LogisticsFilters({
           <StatusCircle status="ready" />
           <span>Listo</span>
         </button>
+      </div>
       </div>
     </div>
   );

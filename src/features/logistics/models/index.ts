@@ -9,6 +9,11 @@ export interface LogisticsRow {
   vidrio: 'pending' | 'in-progress' | 'ready' | 'none';
   herrajes: 'pending' | 'in-progress' | 'ready' | 'none';
   estadoGeneral: 'pending' | 'in-progress' | 'ready' | 'none';
+  type?: 'normal' | 'anticipada';
+  totalDeliveries?: number;
+  completedDeliveries?: number;
+  assignedDriverId?: string;
+  address?: string;
 }
 
 export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
@@ -23,18 +28,22 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     vidrio: "pending",
     herrajes: "pending",
     estadoGeneral: "pending",
+    type: "normal",
   },
   {
     id: "1024",
-    isUrgent: true,
+    isUrgent: false,
     date: "24 de febrero 2026",
     clientInitials: "CS",
     clientName: "Cliente 2",
     clientColor: "bg-[#EBF8FF] text-[#3182CE]",
     aluminio: "ready",
     vidrio: "in-progress",
-    herrajes: "pending",
-    estadoGeneral: "in-progress",
+    herrajes: "none",
+    estadoGeneral: "pending",
+    type: "anticipada",
+    totalDeliveries: 4,
+    completedDeliveries: 3,
   },
   {
     id: "1023",
@@ -47,6 +56,7 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     vidrio: "ready",
     herrajes: "ready",
     estadoGeneral: "ready",
+    type: "normal",
   },
   {
     id: "1021",
@@ -55,10 +65,13 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     clientInitials: "UD",
     clientName: "Cliente 4",
     clientColor: "bg-[#EBF4FF] text-[#4C51BF]",
-    aluminio: "ready",
-    vidrio: "ready",
-    herrajes: "ready",
-    estadoGeneral: "ready",
+    aluminio: "pending",
+    vidrio: "none",
+    herrajes: "pending",
+    estadoGeneral: "pending",
+    type: "anticipada",
+    totalDeliveries: 3,
+    completedDeliveries: 0,
   },
   {
     id: "1019",
@@ -71,6 +84,7 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     vidrio: "ready",
     herrajes: "none",
     estadoGeneral: "in-progress",
+    type: "normal",
   },
   // Extra data for pagination testing
   {
@@ -80,10 +94,11 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     clientInitials: "TS",
     clientName: "Cliente 6",
     clientColor: "bg-[#FED7D7] text-[#C53030]",
-    aluminio: "ready",
+    aluminio: "none",
     vidrio: "ready",
     herrajes: "ready",
     estadoGeneral: "ready",
+    type: "normal",
   },
   {
     id: "1017",
@@ -96,6 +111,9 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     vidrio: "in-progress",
     herrajes: "ready",
     estadoGeneral: "in-progress",
+    type: "anticipada",
+    totalDeliveries: 2,
+    completedDeliveries: 0,
   },
   {
     id: "1025",
@@ -104,9 +122,9 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     clientInitials: "JR",
     clientName: "Cliente 8",
     clientColor: "bg-[#FEEBC8] text-[#DD6B20]",
-    aluminio: "pending",
+    aluminio: "none",
     vidrio: "pending",
-    herrajes: "pending",
+    herrajes: "none",
     estadoGeneral: "pending",
   },
   {
@@ -128,10 +146,11 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     clientInitials: "PL",
     clientName: "Cliente 10",
     clientColor: "bg-[#C6F6D5] text-[#38A169]",
-    aluminio: "ready",
-    vidrio: "ready",
+    aluminio: "none",
+    vidrio: "none",
     herrajes: "ready",
     estadoGeneral: "ready",
+    address: "Calle Aramberri 456, Centro, Monterrey",
   },
   {
     id: "1028",
@@ -140,9 +159,9 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     clientInitials: "RS",
     clientName: "Cliente 11",
     clientColor: "bg-[#EBF4FF] text-[#4C51BF]",
-    aluminio: "pending",
+    aluminio: "none",
     vidrio: "pending",
-    herrajes: "none",
+    herrajes: "pending",
     estadoGeneral: "pending",
   },
   {
@@ -152,9 +171,9 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     clientInitials: "TK",
     clientName: "Cliente 12",
     clientColor: "bg-[#E9D8FD] text-[#805AD5]",
-    aluminio: "ready",
-    vidrio: "in-progress",
-    herrajes: "ready",
+    aluminio: "in-progress",
+    vidrio: "none",
+    herrajes: "none",
     estadoGeneral: "in-progress",
   },
   {
@@ -168,6 +187,10 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     vidrio: "ready",
     herrajes: "ready",
     estadoGeneral: "ready",
+    type: "anticipada",
+    totalDeliveries: 3,
+    completedDeliveries: 2,
+    address: "Blvd. Puerta del Sol 789, San Pedro",
   },
   {
     id: "1031",

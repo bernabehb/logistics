@@ -4,6 +4,7 @@ import { isAfter, isBefore, startOfDay, endOfDay, parse } from "date-fns";
 import { es } from "date-fns/locale";
 
 type Status = 'pending' | 'in-progress' | 'ready' | 'none';
+export type InvoiceType = 'normal' | 'anticipada';
 
 interface UseLogisticsPageStateResult {
   searchQuery: string;
@@ -17,6 +18,8 @@ interface UseLogisticsPageStateResult {
   toggleStatusFilter: (status: Status) => void;
   filteredRows: LogisticsRow[];
   pendingCount: number;
+  invoiceTypeFilter: InvoiceType;
+  setInvoiceTypeFilter: (type: InvoiceType) => void;
 }
 
 // Helper to parse Spanish date "12 de marzo 2026"
@@ -33,6 +36,7 @@ export function useLogisticsPageState(): UseLogisticsPageStateResult {
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
   const [statusFilters, setStatusFilters] = useState<Status[]>([]);
+  const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<InvoiceType>('normal');
 
   const toggleStatusFilter = (status: Status) => {
     setStatusFilters((prev) => 
@@ -55,6 +59,8 @@ export function useLogisticsPageState(): UseLogisticsPageStateResult {
       );
     }
 
+    result = result.filter(row => (row.type || 'normal') === invoiceTypeFilter);
+
     if (statusFilters.length > 0) {
       result = result.filter((row) => statusFilters.includes(row.estadoGeneral as Status));
     }
@@ -76,12 +82,13 @@ export function useLogisticsPageState(): UseLogisticsPageStateResult {
     }
 
     return result;
-  }, [searchQuery, fromDate, toDate, statusFilters]);
+  }, [searchQuery, fromDate, toDate, statusFilters, invoiceTypeFilter]);
 
   const clearFilters = () => {
     setSearchQuery("");
     setFromDate(undefined);
     setToDate(undefined);
+    setInvoiceTypeFilter('normal');
   };
 
   // Count pending for header
@@ -100,6 +107,8 @@ export function useLogisticsPageState(): UseLogisticsPageStateResult {
     statusFilters,
     toggleStatusFilter,
     filteredRows,
-    pendingCount
+    pendingCount,
+    invoiceTypeFilter,
+    setInvoiceTypeFilter
   };
 }

@@ -118,7 +118,7 @@ function KanbanCard({
           cardBorderClass
         )}
       >
-        {row.isUrgent && (
+        {row.isUrgent && row.type !== 'anticipada' && (
           <div className="absolute -top-2 right-3 bg-red-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 tracking-tight uppercase scale-105 border border-red-400/30">
             <AlertTriangle className="w-2.5 h-2.5" />
             Client. sucursal
@@ -143,6 +143,21 @@ function KanbanCard({
           <p className="text-[14px] text-slate-400 dark:text-slate-500 font-medium mb-3">
             {row.date}
           </p>
+        )}
+
+        {row.type === 'anticipada' && row.totalDeliveries !== undefined && row.completedDeliveries !== undefined && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-xs font-semibold mb-1">
+              <span className="text-slate-500 dark:text-slate-400 uppercase tracking-wide">Progreso</span>
+              <span className="text-slate-600 dark:text-slate-300">{row.completedDeliveries} / {row.totalDeliveries} entregas</span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 dark:bg-slate-700/50 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-slate-500 dark:bg-slate-400 rounded-full transition-all duration-500"
+                style={{ width: `${(row.completedDeliveries / row.totalDeliveries) * 100}%` }}
+              />
+            </div>
+          </div>
         )}
 
         {materials.length > 0 && <div className="border-t border-slate-100 dark:border-slate-700 mb-3" />}
