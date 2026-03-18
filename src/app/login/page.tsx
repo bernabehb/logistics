@@ -33,25 +33,25 @@ export default function LoginPage() {
 
         <form action={handleSubmit} className="space-y-6">
           <div className="space-y-4">
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <div className="relative group">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-slate-700 dark:group-focus-within:text-slate-300 transition-colors" />
               <Input
                 name="username"
                 type="text"
                 placeholder="Usuario"
                 required
-                className="pl-10 bg-slate-50 dark:bg-slate-900/50"
+                className="pl-12 h-14 text-[15px] font-semibold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 focus-visible:ring-[3px] focus-visible:ring-slate-300/50 dark:focus-visible:ring-slate-600/50 shadow-sm"
               />
             </div>
             
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-slate-700 dark:group-focus-within:text-slate-300 transition-colors" />
               <Input
                 name="password"
                 type="password"
                 placeholder="Contraseña"
                 required
-                className="pl-10 bg-slate-50 dark:bg-slate-900/50"
+                className="pl-12 h-14 text-[15px] font-bold tracking-wider text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 focus-visible:ring-[3px] focus-visible:ring-slate-300/50 dark:focus-visible:ring-slate-600/50 shadow-sm"
               />
             </div>
             
@@ -64,14 +64,14 @@ export default function LoginPage() {
 
           <Button 
             type="submit" 
-            className="w-full font-medium"
+            className="w-full h-14 rounded-xl text-[15px] font-semibold shadow-md active:scale-[0.98] transition-all"
             disabled={isPending}
           >
             {isPending ? "Iniciando sesión..." : "Iniciar Sesión"}
           </Button>
 
           <div className="text-center text-sm text-slate-500 dark:text-slate-400 mt-6">
-            <p><strong>Cuentas demo:</strong></p>
+            <p><strong>Cuentas de prueba:</strong></p>
             <p className="mt-1">Logística: logistica / 123</p>
             <p>Chofer: chofer / 123</p>
           </div>

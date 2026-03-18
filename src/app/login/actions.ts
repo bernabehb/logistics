@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import users from "@/lib/users.json";
 
 export async function loginAction(formData: FormData) {
-  const username = formData.get("username")?.toString();
-  const password = formData.get("password")?.toString();
+  const username = formData.get("username")?.toString().trim();
+  const password = formData.get("password")?.toString().trim();
 
   if (!username || !password) {
     return { error: "Por favor, ingresa usuario y contraseña" };
