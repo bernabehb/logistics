@@ -195,7 +195,7 @@ function KanbanColumn({ col, rows }: { col: (typeof COLUMNS)[0]; rows: Logistics
   return (
     <div
       className={cn(
-        "flex flex-col rounded-2xl border min-h-[600px] h-[calc(100vh-220px)]",
+        "flex flex-col rounded-2xl border min-h-[500px] md:min-h-[600px] h-[500px] md:h-[calc(100vh-220px)]",
         col.accent.column,
         "shadow-sm dark:shadow-black/20 overflow-hidden"
       )}
@@ -257,7 +257,7 @@ export function KanbanBoard({ rows }: KanbanBoardProps) {
   const columnData = useMemo(
     () =>
       COLUMNS.map((col) => {
-        const columnCards = rows.filter((r) => r.estadoGeneral === col.id);
+        const columnCards = rows.filter((r) => r.estadoGeneral === col.id && !r.assignedDriverId);
         // Sort: Urgent items first
         const sortedCards = [...columnCards].sort((a, b) => {
           if (a.isUrgent && !b.isUrgent) return -1;

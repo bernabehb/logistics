@@ -204,15 +204,15 @@ export function ChoferTable({
       </div>
 
       {/* Pagination Footer */}
-      <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-[14px] text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 hidden md:flex">
+      <div className="px-3 md:px-6 py-3 md:py-4 border-t border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-0 md:justify-between text-[13px] md:text-[14px] text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800">
         <div>
           Mostrando <span className="font-semibold text-slate-900 dark:text-slate-100">{currentCount}</span> de <span className="font-semibold text-slate-900 dark:text-slate-100">{totalItems}</span> asignaciones
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto justify-between md:justify-start">
           <div className="text-slate-500 dark:text-slate-400 text-xs font-medium">
             Página {currentPage} de {totalPages}
           </div>
-          <div className="flex gap-2.5">
+          <div className="flex gap-2">
             <button
               onClick={onPrevPage}
               disabled={currentPage === 1}

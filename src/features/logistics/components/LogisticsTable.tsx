@@ -26,7 +26,7 @@ export function LogisticsTable({
   return (
     <div className="bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.5)] overflow-hidden transition-all duration-300">
       <div className="overflow-x-auto">
-        <div className="min-w-0 md:min-w-[1024px]">
+        <div className="min-w-[900px] lg:min-w-[1024px]">
           {/* Table Header */}
       <div className="grid grid-cols-8 md:grid-cols-6 items-end px-2 py-3 md:p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-[#1E293B] text-[13px] font-bold text-slate-500 dark:text-slate-400 tracking-[0.05em] uppercase">
         <div className="col-span-2 md:col-span-1 pl-1 md:pl-4">Factura #</div>

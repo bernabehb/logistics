@@ -21,6 +21,32 @@ function OrderCard({
   const rootBlockIndex = parseInt(invoice.id.replace(/\D/g, '') || '0', 10);
   const assignedBlock = assignedDriver?.block || BLOCKS[rootBlockIndex % BLOCKS.length];
 
+  const addressByBlock: Record<string, string[]> = {
+    "Aztlan": [
+      "Av. Aztlán 4560, San Bernabé, Monterrey",
+      "Av. Cabezada 800, Barrio Solidaridad, Monterrey",
+      "Julio A. Roca 102, Fomerrey, Monterrey"
+    ],
+    "Felix U. Gomez": [
+      "Av. Félix U. Gómez 1500, Terminal, Monterrey",
+      "Carlos Salazar 300, Centro, Monterrey",
+      "Av. Colón 1200, Centro, Monterrey"
+    ],
+    "General Escobedo": [
+      "Av. Raúl Salinas Lozano 800, Gral. Escobedo",
+      "Av. Sendero Divisorio 1001, Gral. Escobedo",
+      "Av. Juárez 300, Centro, Gral. Escobedo"
+    ],
+    "Camino Real": [
+      "Av. Camino Real 401, Barrio del Parque, Mty",
+      "Calle Nueva 123, Fomerrey, Monterrey",
+      "Blvd. Camino Real 900, Pedregal, Monterrey"
+    ]
+  };
+  
+  const blockAddresses = addressByBlock[assignedBlock] || ["Av. de los Leones 123, Monterrey"];
+  const fallbackAddress = blockAddresses[rootBlockIndex % blockAddresses.length];
+
   let calculatedWeight = 0;
   if (invoice.aluminio !== 'none') calculatedWeight += (rootBlockIndex * 17 % 290) + 10;
   if (invoice.vidrio !== 'none') calculatedWeight += (rootBlockIndex * 13 % 750) + 50;
@@ -105,7 +131,7 @@ function OrderCard({
         <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
         <div>
           <span className="font-bold text-slate-700 dark:text-slate-200 block mb-0.5">Ubicación de Entrega:</span>
-          <span>{invoice.address || "Av. de los Leones 123, Cumbres, Monterrey"}</span>
+          <span>{invoice.address || fallbackAddress}</span>
         </div>
       </div>
 
@@ -235,6 +261,12 @@ export default function AsignarRutaPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleAssignDriver = (id: string, driverId: string) => {
+    // Modifica el estado "global" del mock en memoria para sincronización entre vistas (solo prototipo, sin persistencia remota).
+    const globalInvoice = MOCK_LOGISTICS_DATA.find(inv => inv.id === id);
+    if (globalInvoice) {
+      globalInvoice.assignedDriverId = driverId;
+    }
+
     setInvoices((prev) =>
       prev.map((inv) => (inv.id === id ? { ...inv, assignedDriverId: driverId } : inv))
     );

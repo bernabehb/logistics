@@ -150,7 +150,6 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     vidrio: "none",
     herrajes: "ready",
     estadoGeneral: "ready",
-    address: "Calle Aramberri 456, Centro, Monterrey",
   },
   {
     id: "1028",
@@ -190,7 +189,6 @@ export const MOCK_LOGISTICS_DATA: LogisticsRow[] = [
     type: "anticipada",
     totalDeliveries: 3,
     completedDeliveries: 2,
-    address: "Blvd. Puerta del Sol 789, San Pedro",
   },
   {
     id: "1031",
