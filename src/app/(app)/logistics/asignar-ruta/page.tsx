@@ -254,7 +254,7 @@ function OrderCard({
 
 export default function AsignarRutaPage() {
   const [invoices, setInvoices] = useState<LogisticsRow[]>(
-    MOCK_LOGISTICS_DATA.filter((r) => r.estadoGeneral === "ready")
+    MOCK_LOGISTICS_DATA.filter((r) => r.estadoGeneral === "ready" && !(r.isUrgent && r.type !== 'anticipada'))
   );
 
   const [filter, setFilter] = useState<'todos' | 'pendientes' | 'asignados'>('todos');
