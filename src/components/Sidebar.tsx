@@ -44,7 +44,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       roles: ["Logistica"],
     },
     {
-      name: "Mis pedidos",
+      name: "Mis entregas",
       href: "/chofer",
       icon: Truck,
       roles: ["Chofer"],
