@@ -321,7 +321,8 @@ function MetricCard({ title, icon, details }: { title: string, icon: React.React
       </div>
 
       {showMap && title === 'Aluminio' && (
-        <div className="w-full flex flex-col items-center mb-3 bg-slate-50/50 dark:bg-[#0F172A]/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+        <div className="w-full flex flex-col items-center mb-3 bg-slate-50/50 dark:bg-[#0F172A]/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700 relative">
+          <span className="text-[10px] uppercase font-bold text-slate-400 absolute top-3 right-3 tracking-widest">Árbol</span>
           <div className="flex flex-col w-44 relative mt-2 text-slate-300 dark:text-slate-600">
             {/* Poste central vertical */}
             <div className="absolute top-0 left-[50%] w-1 h-full bg-current -ml-[2px] rounded-t-sm z-0"></div>
