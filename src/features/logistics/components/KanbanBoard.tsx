@@ -124,11 +124,13 @@ function KanbanCard({
             Client. sucursal
           </div>
         )}
+        {row.type === 'anticipada' && row.completedDeliveries !== undefined && (
+          <div className="absolute -top-2 right-3 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full shadow-md flex items-center gap-1.5 tracking-widest uppercase scale-105 border border-blue-200 dark:border-blue-500/30">
+            Entregado: {row.completedDeliveries}
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-3">
-          <div className={cn("flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold shadow-sm", row.clientColor)}>
-            {row.clientInitials}
-          </div>
           <div className="flex flex-col min-w-0 flex-1">
             <span className="font-bold text-slate-900 dark:text-slate-100 text-[17px] leading-tight">
               #{row.id}
@@ -145,20 +147,7 @@ function KanbanCard({
           </p>
         )}
 
-        {row.type === 'anticipada' && row.totalDeliveries !== undefined && row.completedDeliveries !== undefined && (
-          <div className="mb-4">
-            <div className="flex items-center justify-between text-xs font-semibold mb-1">
-              <span className="text-slate-500 dark:text-slate-400 uppercase tracking-wide">Progreso</span>
-              <span className="text-slate-600 dark:text-slate-300">{row.completedDeliveries} / {row.totalDeliveries} entregas</span>
-            </div>
-            <div className="h-2 w-full bg-slate-100 dark:bg-slate-700/50 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-slate-500 dark:bg-slate-400 rounded-full transition-all duration-500"
-                style={{ width: `${(row.completedDeliveries / row.totalDeliveries) * 100}%` }}
-              />
-            </div>
-          </div>
-        )}
+
 
         {materials.length > 0 && <div className="border-t border-slate-100 dark:border-slate-700 mb-3" />}
 

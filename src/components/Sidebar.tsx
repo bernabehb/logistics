@@ -44,6 +44,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       roles: ["Logistica"],
     },
     {
+      name: "Asignación de unidades",
+      href: "/logistics/asignar-unidades",
+      icon: Truck,
+      roles: ["Logistica"],
+    },
+    {
       name: "Mis entregas",
       href: "/chofer",
       icon: Truck,

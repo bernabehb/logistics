@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { MOCK_LOGISTICS_DATA, LogisticsRow } from "@/features/logistics/models";
 import { MOCK_DRIVERS, DriverBlock } from "@/features/logistics/models/drivers";
-import { Truck, PackageCheck, AlertTriangle, Calendar, User, CheckCircle2, Pencil, MapPin, Grid3x3, LayoutGrid, PaintbrushVertical, Scale, Search } from "lucide-react";
+import { Truck, PackageCheck, AlertTriangle, Calendar, User, CheckCircle2, Pencil, MapPin, Grid3x3, LayoutGrid, PaintbrushVertical, Scale, Search, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BLOCKS: DriverBlock[] = ["Aztlan", "Felix U. Gomez", "General Escobedo", "Camino Real"];
@@ -83,37 +83,39 @@ function OrderCard({
 
   return (
     <div className={cn(
-      "flex flex-col bg-white dark:bg-[#1E293B] rounded-2xl p-5 border transition-all",
+      "flex flex-col bg-white dark:bg-[#1E293B] rounded-2xl p-5 border transition-all h-full",
       isAssigned && !isEditing
         ? "border-emerald-200 dark:border-emerald-900/50 shadow-sm"
         : "border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md"
     )}>
       {/* Info Header */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm shadow-sm", invoice.clientColor)}>
-          {invoice.clientInitials}
-        </div>
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2 mb-0.5">
-            <span className="text-xl font-bold text-slate-800 dark:text-slate-100 uppercase">
-              #{invoice.id}
-            </span>
-            {invoice.type === 'anticipada' && (
-              <span className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-slate-200 dark:border-slate-700">
+      <div className="flex flex-col mb-4 overflow-hidden">
+        <div className="flex items-center gap-1.5 mb-1 whitespace-nowrap overflow-hidden">
+          <span className="text-xl font-bold text-slate-800 dark:text-slate-100 uppercase shrink-0">
+            #{invoice.id}
+          </span>
+          {invoice.type === 'anticipada' && (
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase border border-slate-200 dark:border-slate-700">
                 Anticipada
               </span>
-            )}
-            {isAssigned && !isEditing && (
-              <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-[10px] font-black tracking-widest bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-500/20">
-                <CheckCircle2 className="w-3 h-3" />
-                <span>ASIGNADO</span>
-              </div>
-            )}
-          </div>
-          <span className="text-slate-500 dark:text-slate-400 font-medium text-sm">
-            {invoice.clientName}
-          </span>
+              {invoice.completedDeliveries != null && (
+                <span className="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase border border-blue-200 dark:border-blue-500/20 shadow-sm">
+                  Entregado: {invoice.completedDeliveries}
+                </span>
+              )}
+            </div>
+          )}
+          {isAssigned && !isEditing && (
+            <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-[10px] font-black bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-500/20 shrink-0">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>ASIGNADO</span>
+            </div>
+          )}
         </div>
+        <span className="text-slate-500 dark:text-slate-400 font-medium text-[15px] truncate block leading-none">
+          {invoice.clientName}
+        </span>
       </div>
 
       <div className="flex items-center justify-between mb-2">
@@ -148,26 +150,6 @@ function OrderCard({
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Anticipada Progress */}
-      {invoice.type === 'anticipada' && invoice.totalDeliveries && invoice.completedDeliveries != null && (
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-1.5">
-            <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              Entregas completadas
-            </span>
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-              {invoice.completedDeliveries} / {invoice.totalDeliveries}
-            </span>
-          </div>
-          <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-slate-500 dark:bg-slate-400 rounded-full transition-all duration-500"
-              style={{ width: `${(invoice.completedDeliveries / invoice.totalDeliveries) * 100}%` }}
-            />
-          </div>
         </div>
       )}
 
@@ -251,6 +233,7 @@ function OrderCard({
     </div>
   );
 }
+
 
 export default function AsignarRutaPage() {
   const [invoices, setInvoices] = useState<LogisticsRow[]>(
@@ -376,7 +359,7 @@ export default function AsignarRutaPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
           {filteredInvoices.map((invoice) => (
             <OrderCard key={invoice.id} invoice={invoice} onAssign={handleAssignDriver} />
           ))}
