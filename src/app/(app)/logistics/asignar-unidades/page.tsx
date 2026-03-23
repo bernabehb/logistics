@@ -251,14 +251,16 @@ export default function AsignarUnidadesPage() {
           <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
             Asignación de Unidades
           </h1>
-          <div className="relative group w-full md:w-[320px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 size-4.5 transition-colors group-focus-within:text-blue-500" />
+          <div className="relative flex-1 group">
+            <label htmlFor="unit-search" className="sr-only">Buscar unidad</label>
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 group-focus-within:text-slate-500 transition-colors" />
             <input
+              id="unit-search"
               type="text"
+              placeholder="Buscar por nombre de la unidad..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por eco o placas..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 text-sm md:text-[15px] text-slate-800 dark:text-slate-100 shadow-sm transition-all placeholder:text-slate-400 font-medium"
+              className="w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 h-13 text-sm focus:outline-none focus:ring-4 focus:ring-slate-500/5 focus:border-slate-400 dark:focus:border-slate-700 transition-all shadow-sm placeholder:text-slate-400"
             />
           </div>
         </div>
