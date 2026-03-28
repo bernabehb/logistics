@@ -1,0 +1,3007 @@
+[
+  {
+    "id": "T-JP-001",
+    "driverId": "DEP-1001",
+    "driverName": "Juan Pérez",
+    "date": "2025-01-14",
+    "status": "delivered",
+    "clientName": "Vidriería Ríos",
+    "address": "Calle Ruperto Martinez 801, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2501A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Batiente 1400",
+                "quantity": "10 pzas"
+              },
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "8 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "12 hojas"
+              },
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "6 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2501B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Jaladera Embutida 4010",
+                "quantity": "15 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "2 rollos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "FELIX U. GOMEZ",
+    "deliveryDate": "2025-01-17T16:15:00"
+  },
+  {
+    "id": "T-JP-002",
+    "driverId": "DEP-1001",
+    "driverName": "Juan Pérez",
+    "date": "2025-02-20",
+    "status": "delivered",
+    "clientName": "Aluminios del Norte",
+    "address": "Av. Rodrigo Gómez 1639, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2502A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "25 m"
+              },
+              {
+                "name": "Ángulo 1\" x 1\"",
+                "quantity": "40 pzas"
+              },
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "12 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2502B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 6mm",
+                "quantity": "15 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "5 hojas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura 1260",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Carretilla 4010",
+                "quantity": "10 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 1",
+    "deliveryDate": "2025-02-22T14:01:00"
+  },
+  {
+    "id": "T-JP-003",
+    "driverId": "DEP-1001",
+    "driverName": "Juan Pérez",
+    "date": "2025-04-08",
+    "status": "delivered",
+    "clientName": "Ferremax SA",
+    "address": "Av. Rodrigo Gómez 1639, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2503A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "50 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "24 pzas"
+              },
+              {
+                "name": "Bisagra de Presión No. 1",
+                "quantity": "18 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2503B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "30 m"
+              },
+              {
+                "name": "Escuadra de Alineación No. 1",
+                "quantity": "60 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2503C",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 4mm Claro",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 1",
+    "deliveryDate": "2025-04-09T09:08:00"
+  },
+  {
+    "id": "T-JP-004",
+    "driverId": "DEP-1001",
+    "driverName": "Juan Pérez",
+    "date": "2025-06-17",
+    "status": "delivered",
+    "clientName": "Construcciones García",
+    "address": "Av. Rodrigo Gómez 1639, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2504A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "15 pzas"
+              },
+              {
+                "name": "Tubo Cedula 40 2\"",
+                "quantity": "8 tramos"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Manija H 40cm",
+                "quantity": "12 pzas"
+              },
+              {
+                "name": "Jaladera H 40cm",
+                "quantity": "12 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2504B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 12mm",
+                "quantity": "6 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "4 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 1",
+    "deliveryDate": "2025-06-18T11:45:00"
+  },
+  {
+    "id": "T-JP-005",
+    "driverId": "DEP-1001",
+    "driverName": "Juan Pérez",
+    "date": "2025-08-05",
+    "status": "delivered",
+    "clientName": "Grupo Vitro MTY",
+    "address": "Av. Rodrigo Gómez 1639, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2505A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 4mm",
+                "quantity": "20 hojas"
+              },
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "4 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2505B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "35 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Tornillo Inoxidable 2\"",
+                "quantity": "500 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "3 rollos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 1",
+    "deliveryDate": "2025-08-06T10:37:00"
+  },
+  {
+    "id": "T-JP-006",
+    "driverId": "DEP-1001",
+    "driverName": "Juan Pérez",
+    "date": "2025-10-22",
+    "status": "delivered",
+    "clientName": "Herrajes Industriales MX",
+    "address": "Av. Rodrigo Gómez 1639, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2506A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "40 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Carretilla 4010",
+                "quantity": "15 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2506B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "10 pzas"
+              },
+              {
+                "name": "Batiente 1400",
+                "quantity": "8 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 1",
+    "deliveryDate": "2025-10-25T11:56:00"
+  },
+  {
+    "id": "T-JP-007",
+    "driverId": "DEP-1001",
+    "driverName": "Juan Pérez",
+    "date": "2025-12-10",
+    "status": "delivered",
+    "clientName": "Inmobiliaria Altamira",
+    "address": "Av. Rodrigo Gómez 1639, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2507A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "18 hojas"
+              },
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "10 hojas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Jaladera Embutida 4010",
+                "quantity": "20 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2507B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "22 pzas"
+              },
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "45 m"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 1",
+    "deliveryDate": "2025-12-13T17:30:00"
+  },
+  {
+    "id": "T-JP-008",
+    "driverId": "DEP-1001",
+    "driverName": "Juan Pérez",
+    "date": "2026-02-03",
+    "status": "delivered",
+    "clientName": "Construrama Escobedo",
+    "address": "Av. Rodrigo Gómez 1639, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2601A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "25 pzas"
+              },
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "20 m"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2601B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 6mm",
+                "quantity": "12 hojas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "24 pzas"
+              },
+              {
+                "name": "Manija H 40cm",
+                "quantity": "10 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 1",
+    "deliveryDate": "2026-02-05T14:56:00"
+  },
+  {
+    "id": "T-RG-001",
+    "driverId": "DEP-2002",
+    "driverName": "Ricardo Gomez",
+    "date": "2025-01-28",
+    "status": "delivered",
+    "clientName": "Distribuidora Apex",
+    "address": "Niño Artillero 444, Monterrey",
+    "invoices": [
+      {
+        "id": "FAC-2508A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 4mm Claro",
+                "quantity": "14 hojas"
+              },
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Satinado 4mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2508B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra de Presión No. 1",
+                "quantity": "16 pzas"
+              },
+              {
+                "name": "Jaladera H 40cm",
+                "quantity": "16 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "2 rollos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "NIÑO ARTILLERO",
+    "deliveryDate": "2025-01-31T12:47:00"
+  },
+  {
+    "id": "T-RG-002",
+    "driverId": "DEP-2002",
+    "driverName": "Ricardo Gomez",
+    "date": "2025-03-15",
+    "status": "delivered",
+    "clientName": "Grupo Constructora Regia",
+    "address": "Av. La Esperanza 1274, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2509A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "30 m"
+              },
+              {
+                "name": "Ángulo 1\" x 1\"",
+                "quantity": "35 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Duovent 18mm",
+                "quantity": "6 hojas"
+              },
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2509B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "40 pzas"
+              },
+              {
+                "name": "Cerradura 1260",
+                "quantity": "18 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "CAMINO REAL 2",
+    "deliveryDate": "2025-03-17T09:09:00"
+  },
+  {
+    "id": "T-RG-003",
+    "driverId": "DEP-2002",
+    "driverName": "Ricardo Gomez",
+    "date": "2025-05-22",
+    "status": "delivered",
+    "clientName": "Cristalería Martínez",
+    "address": "Av. Cristina Larralde 1564, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2510A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 12mm",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "6 hojas"
+              },
+              {
+                "name": "Satinado 6mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2510B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Tubo Cedula 40 2\"",
+                "quantity": "6 tramos"
+              },
+              {
+                "name": "Escuadra de Alineación No. 1",
+                "quantity": "50 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2510C",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "22 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS CRISTINA LARRALDE",
+    "deliveryDate": "2025-05-24T16:49:00"
+  },
+  {
+    "id": "T-RG-004",
+    "driverId": "DEP-2002",
+    "driverName": "Ricardo Gomez",
+    "date": "2025-07-11",
+    "status": "delivered",
+    "clientName": "Aceros y Metales del NE",
+    "address": "Av. La Esperanza 1274, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2511A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "18 pzas"
+              },
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "14 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "25 pzas"
+              },
+              {
+                "name": "Carretilla 4010",
+                "quantity": "12 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "CAMINO REAL 2",
+    "deliveryDate": "2025-07-14T10:10:00"
+  },
+  {
+    "id": "T-RG-005",
+    "driverId": "DEP-2002",
+    "driverName": "Ricardo Gomez",
+    "date": "2025-09-18",
+    "status": "delivered",
+    "clientName": "Alumex Monterrey",
+    "address": "Av. La Esperanza 1274, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2512A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "40 pzas"
+              },
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "50 m"
+              },
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "20 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2512B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "15 hojas"
+              },
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "5 hojas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Tornillo Inoxidable 2\"",
+                "quantity": "300 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "2 rollos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "CAMINO REAL 2",
+    "deliveryDate": "2025-09-19T11:00:00"
+  },
+  {
+    "id": "T-RG-006",
+    "driverId": "DEP-2002",
+    "driverName": "Ricardo Gomez",
+    "date": "2025-11-27",
+    "status": "delivered",
+    "clientName": "Vidrio Arte Monterrey",
+    "address": "Av. La Esperanza 1274, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2513A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 4mm",
+                "quantity": "18 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2513B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Manija H 40cm",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Jaladera Embutida 4010",
+                "quantity": "25 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Batiente 1400",
+                "quantity": "16 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "CAMINO REAL 2",
+    "deliveryDate": "2025-11-29T17:38:00"
+  },
+  {
+    "id": "T-RG-007",
+    "driverId": "DEP-2002",
+    "driverName": "Ricardo Gomez",
+    "date": "2026-01-20",
+    "status": "delivered",
+    "clientName": "Ferretería El Clavo",
+    "address": "Av. La Esperanza 1274, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2602A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "60 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Bisagra de Presión No. 1",
+                "quantity": "20 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2602B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "15 m"
+              },
+              {
+                "name": "Ángulo 1\" x 1\"",
+                "quantity": "25 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "CAMINO REAL 2",
+    "deliveryDate": "2026-01-23T09:11:00"
+  },
+  {
+    "id": "T-ML-001",
+    "driverId": "DEP-3003",
+    "driverName": "Mario Lopez",
+    "date": "2025-01-09",
+    "status": "delivered",
+    "clientName": "Impermeabilizantes del Norte",
+    "address": "Colonia La Aurora 1678, Santa Catarina, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2514A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "80 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "40 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2514B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "25 pzas"
+              },
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "18 pzas"
+              },
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "60 m"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "LA AURORA",
+    "deliveryDate": "2025-01-12T15:26:00"
+  },
+  {
+    "id": "T-ML-002",
+    "driverId": "DEP-3003",
+    "driverName": "Mario Lopez",
+    "date": "2025-02-25",
+    "status": "delivered",
+    "clientName": "Cristal y Aluminio JR",
+    "address": "Mirasur 333, Escobedo",
+    "invoices": [
+      {
+        "id": "FAC-2515A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio Templado 12mm",
+                "quantity": "12 hojas"
+              },
+              {
+                "name": "Satinado 4mm",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "4 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2515B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Batiente 1400",
+                "quantity": "10 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura 1260",
+                "quantity": "15 pzas"
+              },
+              {
+                "name": "Jaladera Embutida 4010",
+                "quantity": "15 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "MIRASUR",
+    "deliveryDate": "2025-02-26T15:20:00"
+  },
+  {
+    "id": "T-ML-003",
+    "driverId": "DEP-3003",
+    "driverName": "Mario Lopez",
+    "date": "2025-04-14",
+    "status": "delivered",
+    "clientName": "Construrama Escobedo",
+    "address": "Colonia La Aurora 1678, Santa Catarina, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2516A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Escuadra de Alineación No. 1",
+                "quantity": "50 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2516B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Carretilla 4010",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "3 rollos"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "30 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2516C",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "20 hojas"
+              },
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "LA AURORA",
+    "deliveryDate": "2025-04-16T13:44:00"
+  },
+  {
+    "id": "T-ML-004",
+    "driverId": "DEP-3003",
+    "driverName": "Mario Lopez",
+    "date": "2025-06-30",
+    "status": "delivered",
+    "clientName": "Grupo Vitro MTY",
+    "address": "Colonia La Aurora 1678, Santa Catarina, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2517A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 6mm",
+                "quantity": "22 hojas"
+              },
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "12 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "6 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2517B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "40 m"
+              },
+              {
+                "name": "Tubo Cedula 40 2\"",
+                "quantity": "10 tramos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "LA AURORA",
+    "deliveryDate": "2025-07-01T16:44:00"
+  },
+  {
+    "id": "T-ML-005",
+    "driverId": "DEP-3003",
+    "driverName": "Mario Lopez",
+    "date": "2025-09-03",
+    "status": "delivered",
+    "clientName": "Herrajes Finos del Norte",
+    "address": "Colonia La Aurora 1678, Santa Catarina, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2518A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "50 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Tornillo Inoxidable 2\"",
+                "quantity": "400 pzas"
+              },
+              {
+                "name": "Manija H 40cm",
+                "quantity": "25 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2518B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "15 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 4mm Claro",
+                "quantity": "10 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "LA AURORA",
+    "deliveryDate": "2025-09-06T13:42:00"
+  },
+  {
+    "id": "T-ML-006",
+    "driverId": "DEP-3003",
+    "driverName": "Mario Lopez",
+    "date": "2025-11-12",
+    "status": "delivered",
+    "clientName": "Ferremax SA",
+    "address": "Colonia La Aurora 1678, Santa Catarina, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2519A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Ángulo 1\" x 1\"",
+                "quantity": "45 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "60 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "25 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2519B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Duovent 18mm",
+                "quantity": "8 hojas"
+              },
+              {
+                "name": "Satinado 4mm",
+                "quantity": "14 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "LA AURORA",
+    "deliveryDate": "2025-11-14T17:54:00"
+  },
+  {
+    "id": "T-ML-007",
+    "driverId": "DEP-3003",
+    "driverName": "Mario Lopez",
+    "date": "2026-01-08",
+    "status": "delivered",
+    "clientName": "Distribuidora Apex",
+    "address": "Niño Artillero 444, Monterrey",
+    "invoices": [
+      {
+        "id": "FAC-2603A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Jaladera H 40cm",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Bisagra de Presión No. 1",
+                "quantity": "24 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "2 rollos"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2603B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "55 m"
+              },
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "28 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2603C",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 12mm",
+                "quantity": "8 hojas"
+              },
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "10 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "NIÑO ARTILLERO",
+    "deliveryDate": "2026-01-10T15:19:00"
+  },
+  {
+    "id": "T-RT-001",
+    "driverId": "DEP-4004",
+    "driverName": "Roberto Torres",
+    "date": "2025-01-21",
+    "status": "delivered",
+    "clientName": "Vidriería Ríos",
+    "address": "Barragan 555, San Nicolas",
+    "invoices": [
+      {
+        "id": "FAC-2520A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "16 hojas"
+              },
+              {
+                "name": "Satinado 6mm",
+                "quantity": "10 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2520B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "22 pzas"
+              },
+              {
+                "name": "Batiente 1400",
+                "quantity": "12 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Carretilla 4010",
+                "quantity": "10 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS MANUEL BARRAGAN",
+    "deliveryDate": "2025-01-23T09:47:00"
+  },
+  {
+    "id": "T-RT-002",
+    "driverId": "DEP-4004",
+    "driverName": "Roberto Torres",
+    "date": "2025-03-29",
+    "status": "delivered",
+    "clientName": "Aluminios del Norte",
+    "address": "Av. Cristina Larralde 1564, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2521A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "25 pzas"
+              },
+              {
+                "name": "Escuadra de Alineación No. 1",
+                "quantity": "80 pzas"
+              },
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "35 m"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2521B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura 1260",
+                "quantity": "25 pzas"
+              },
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "35 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS CRISTINA LARRALDE",
+    "deliveryDate": "2025-03-30T16:29:00"
+  },
+  {
+    "id": "T-RT-003",
+    "driverId": "DEP-4004",
+    "driverName": "Roberto Torres",
+    "date": "2025-05-16",
+    "status": "delivered",
+    "clientName": "Inmobiliaria Altamira",
+    "address": "Av. Cristina Larralde 1564, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2522A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "14 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "5 hojas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Manija H 40cm",
+                "quantity": "15 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2522B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "18 pzas"
+              },
+              {
+                "name": "Tubo Cedula 40 2\"",
+                "quantity": "7 tramos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS CRISTINA LARRALDE",
+    "deliveryDate": "2025-05-18T15:14:00"
+  },
+  {
+    "id": "T-RT-004",
+    "driverId": "DEP-4004",
+    "driverName": "Roberto Torres",
+    "date": "2025-08-19",
+    "status": "delivered",
+    "clientName": "Construcciones García",
+    "address": "Av. Cristina Larralde 1564, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2523A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "45 pzas"
+              },
+              {
+                "name": "Ángulo 1\" x 1\"",
+                "quantity": "60 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2523B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 4mm",
+                "quantity": "16 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "5 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2523C",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra de Presión No. 1",
+                "quantity": "28 pzas"
+              },
+              {
+                "name": "Jaladera Embutida 4010",
+                "quantity": "28 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "2 rollos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS CRISTINA LARRALDE",
+    "deliveryDate": "2025-08-20T15:54:00"
+  },
+  {
+    "id": "T-RT-005",
+    "driverId": "DEP-4004",
+    "driverName": "Roberto Torres",
+    "date": "2025-10-07",
+    "status": "delivered",
+    "clientName": "Grupo Constructora Regia",
+    "address": "Av. Rodrigo Gómez 1639, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2524A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "35 pzas"
+              },
+              {
+                "name": "Tornillo Inoxidable 2\"",
+                "quantity": "600 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "40 m"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 1",
+    "deliveryDate": "2025-10-08T10:49:00"
+  },
+  {
+    "id": "T-RT-006",
+    "driverId": "DEP-4004",
+    "driverName": "Roberto Torres",
+    "date": "2025-12-16",
+    "status": "delivered",
+    "clientName": "Ferretería El Clavo",
+    "address": "Av. Cristina Larralde 1564, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2525A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "70 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "25 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2525B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 4mm Claro",
+                "quantity": "18 hojas"
+              },
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "9 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS CRISTINA LARRALDE",
+    "deliveryDate": "2025-12-18T17:25:00"
+  },
+  {
+    "id": "T-RT-007",
+    "driverId": "DEP-4004",
+    "driverName": "Roberto Torres",
+    "date": "2026-02-11",
+    "status": "delivered",
+    "clientName": "Herrajes Industriales MX",
+    "address": "Av. Cristina Larralde 1564, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2604A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura 1260",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Jaladera H 40cm",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Carretilla 4010",
+                "quantity": "18 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2604B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "15 pzas"
+              },
+              {
+                "name": "Escuadra de Alineación No. 1",
+                "quantity": "45 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 6mm",
+                "quantity": "10 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS CRISTINA LARRALDE",
+    "deliveryDate": "2026-02-13T11:10:00"
+  },
+  {
+    "id": "T-LR-001",
+    "driverId": "DEP-5005",
+    "driverName": "Luis Ramírez",
+    "date": "2025-01-17",
+    "status": "delivered",
+    "clientName": "Aceros y Metales del NE",
+    "address": "Av. Diego Díaz de Berlanga 2032, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2526A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "28 m"
+              },
+              {
+                "name": "Ángulo 1\" x 1\"",
+                "quantity": "50 pzas"
+              },
+              {
+                "name": "Tubo Cedula 40 2\"",
+                "quantity": "9 tramos"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2526B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra de Presión No. 1",
+                "quantity": "22 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "20 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "14 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS SANTO DOMINGO",
+    "deliveryDate": "2025-01-19T10:27:00"
+  },
+  {
+    "id": "T-LR-002",
+    "driverId": "DEP-5005",
+    "driverName": "Luis Ramírez",
+    "date": "2025-03-06",
+    "status": "delivered",
+    "clientName": "Alumex Monterrey",
+    "address": "Niño Artillero 444, Monterrey",
+    "invoices": [
+      {
+        "id": "FAC-2527A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "16 pzas"
+              },
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "50 m"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2527B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 12mm",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Satinado 4mm",
+                "quantity": "12 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "4 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "NIÑO ARTILLERO",
+    "deliveryDate": "2025-03-07T12:45:00"
+  },
+  {
+    "id": "T-LR-003",
+    "driverId": "DEP-5005",
+    "driverName": "Luis Ramírez",
+    "date": "2025-05-28",
+    "status": "delivered",
+    "clientName": "Vidrio Arte Monterrey",
+    "address": "Av. Diego Díaz de Berlanga 2032, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2528A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Satinado 6mm",
+                "quantity": "15 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2528B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Manija H 40cm",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "18 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2528C",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "22 pzas"
+              },
+              {
+                "name": "Batiente 1400",
+                "quantity": "14 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS SANTO DOMINGO",
+    "deliveryDate": "2025-05-30T12:46:00"
+  },
+  {
+    "id": "T-LR-004",
+    "driverId": "DEP-5005",
+    "driverName": "Luis Ramírez",
+    "date": "2025-07-24",
+    "status": "delivered",
+    "clientName": "Grupo Vitro MTY",
+    "address": "Calle Aztlan 222, Monterrey",
+    "invoices": [
+      {
+        "id": "FAC-2529A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "16 hojas"
+              },
+              {
+                "name": "Vidrio 4mm Claro",
+                "quantity": "12 hojas"
+              },
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2529B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "35 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "50 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "3 rollos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 2",
+    "deliveryDate": "2025-07-27T17:32:00"
+  },
+  {
+    "id": "T-LR-005",
+    "driverId": "DEP-5005",
+    "driverName": "Luis Ramírez",
+    "date": "2025-10-14",
+    "status": "delivered",
+    "clientName": "Construrama Escobedo",
+    "address": "Miguel Aleman 666, San Nicolas",
+    "invoices": [
+      {
+        "id": "FAC-2530A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "28 pzas"
+              },
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "32 m"
+              },
+              {
+                "name": "Escuadra de Alineación No. 1",
+                "quantity": "70 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2530B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura 1260",
+                "quantity": "22 pzas"
+              },
+              {
+                "name": "Jaladera Embutida 4010",
+                "quantity": "22 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS MIGUEL ALEMAN",
+    "deliveryDate": "2025-10-17T16:20:00"
+  },
+  {
+    "id": "T-LR-006",
+    "driverId": "DEP-5005",
+    "driverName": "Luis Ramírez",
+    "date": "2025-12-02",
+    "status": "delivered",
+    "clientName": "Herrajes Finos del Norte",
+    "address": "Camino Real 111, Monterrey",
+    "invoices": [
+      {
+        "id": "FAC-2531A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "45 pzas"
+              },
+              {
+                "name": "Tornillo Inoxidable 2\"",
+                "quantity": "500 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "35 pzas"
+              },
+              {
+                "name": "Carretilla 4010",
+                "quantity": "20 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2531B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "20 hojas"
+              },
+              {
+                "name": "Satinado 4mm",
+                "quantity": "10 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "CAMINO REAL 1",
+    "deliveryDate": "2025-12-05T17:57:00"
+  },
+  {
+    "id": "T-LR-007",
+    "driverId": "DEP-5005",
+    "driverName": "Luis Ramírez",
+    "date": "2026-02-18",
+    "status": "delivered",
+    "clientName": "Cristalería Martínez",
+    "address": "Av. Diego Díaz de Berlanga 2032, San Nicolás de los Garza, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2605A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 12mm",
+                "quantity": "14 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "7 hojas"
+              },
+              {
+                "name": "Satinado 6mm",
+                "quantity": "10 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2605B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Manija H 40cm",
+                "quantity": "18 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "28 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Batiente 1400",
+                "quantity": "18 pzas"
+              },
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "10 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS SANTO DOMINGO",
+    "deliveryDate": "2026-02-21T14:31:00"
+  },
+  {
+    "id": "T-JF-001",
+    "driverId": "DEP-6006",
+    "driverName": "Javier Flores",
+    "date": "2025-01-31",
+    "status": "delivered",
+    "clientName": "Ferremax SA",
+    "address": "Av. La Esperanza 1274, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2532A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "90 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "45 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2532B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "20 m"
+              },
+              {
+                "name": "Ángulo 1\" x 1\"",
+                "quantity": "30 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 4mm Claro",
+                "quantity": "15 hojas"
+              },
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "CAMINO REAL 2",
+    "deliveryDate": "2025-02-03T17:04:00"
+  },
+  {
+    "id": "T-JF-002",
+    "driverId": "DEP-6006",
+    "driverName": "Javier Flores",
+    "date": "2025-04-03",
+    "status": "delivered",
+    "clientName": "Distribuidora Apex",
+    "address": "Calle Aztlan 222, Monterrey",
+    "invoices": [
+      {
+        "id": "FAC-2533A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "16 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "6 hojas"
+              },
+              {
+                "name": "Satinado 4mm",
+                "quantity": "14 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2533B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "18 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2533C",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra de Presión No. 1",
+                "quantity": "25 pzas"
+              },
+              {
+                "name": "Jaladera H 40cm",
+                "quantity": "25 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "3 rollos"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "AZTLAN 2",
+    "deliveryDate": "2025-04-06T14:19:00"
+  },
+  {
+    "id": "T-JF-003",
+    "driverId": "DEP-6006",
+    "driverName": "Javier Flores",
+    "date": "2025-06-11",
+    "status": "delivered",
+    "clientName": "Inmobiliaria Altamira",
+    "address": "Miguel Aleman 666, San Nicolas",
+    "invoices": [
+      {
+        "id": "FAC-2534A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "26 pzas"
+              },
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "65 m"
+              },
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "30 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2534B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "40 pzas"
+              },
+              {
+                "name": "Manija H 40cm",
+                "quantity": "22 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SAN NICOLAS MIGUEL ALEMAN",
+    "deliveryDate": "2025-06-14T15:03:00"
+  },
+  {
+    "id": "T-JF-004",
+    "driverId": "DEP-6006",
+    "driverName": "Javier Flores",
+    "date": "2025-08-26",
+    "status": "delivered",
+    "clientName": "Constructora Los Pinos",
+    "address": "Centro, Santa Catarina",
+    "invoices": [
+      {
+        "id": "FAC-2535A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "22 hojas"
+              },
+              {
+                "name": "Cristal Templado 12mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "28 pzas"
+              },
+              {
+                "name": "Carretilla 4010",
+                "quantity": "12 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2535B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Batiente 1400",
+                "quantity": "20 pzas"
+              },
+              {
+                "name": "Escuadra de Alineación No. 1",
+                "quantity": "55 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SANTA CATARINA",
+    "deliveryDate": "2025-08-29T17:54:00"
+  },
+  {
+    "id": "T-JF-005",
+    "driverId": "DEP-6006",
+    "driverName": "Javier Flores",
+    "date": "2025-11-04",
+    "status": "delivered",
+    "clientName": "Grupo Constructora Regia",
+    "address": "Colonia La Aurora 1678, Santa Catarina, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2536A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Tornillo Inoxidable 2\"",
+                "quantity": "700 pzas"
+              },
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "55 pzas"
+              },
+              {
+                "name": "Cerradura 1260",
+                "quantity": "28 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2536B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Tubo Cedula 40 2\"",
+                "quantity": "11 tramos"
+              },
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "38 m"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "LA AURORA",
+    "deliveryDate": "2025-11-07T09:25:00"
+  },
+  {
+    "id": "T-JF-006",
+    "driverId": "DEP-6006",
+    "driverName": "Javier Flores",
+    "date": "2026-01-29",
+    "status": "delivered",
+    "clientName": "Vidriería Ríos",
+    "address": "Centro, General Escobedo",
+    "invoices": [
+      {
+        "id": "FAC-2606A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 6mm",
+                "quantity": "18 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "9 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "5 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2606B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Jaladera Embutida 4010",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "35 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "25 pzas"
+              },
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "12 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "GENERAL ESCOBEDO",
+    "deliveryDate": "2026-02-01T12:03:00"
+  },
+  {
+    "id": "T-PM-001",
+    "driverId": "DEP-7007",
+    "driverName": "Pedro Méndez",
+    "date": "2025-02-06",
+    "status": "delivered",
+    "clientName": "Cristal y Aluminio JR",
+    "address": "Av. La Esperanza 1274, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2537A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "20 hojas"
+              },
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "12 hojas"
+              },
+              {
+                "name": "Satinado 4mm",
+                "quantity": "10 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2537B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "28 pzas"
+              },
+              {
+                "name": "Batiente 1400",
+                "quantity": "16 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "32 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "32 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "CAMINO REAL 2",
+    "deliveryDate": "2025-02-07T13:38:00"
+  },
+  {
+    "id": "T-PM-002",
+    "driverId": "DEP-7007",
+    "driverName": "Pedro Méndez",
+    "date": "2025-04-17",
+    "status": "delivered",
+    "clientName": "Construcciones García",
+    "address": "Calle Ruperto Martinez 801, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2538A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "32 pzas"
+              },
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "70 m"
+              },
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "40 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2538B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "65 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "35 pzas"
+              },
+              {
+                "name": "Vinil No. 11 Negro",
+                "quantity": "3 rollos"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2538C",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "12 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "7 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "FELIX U. GOMEZ",
+    "deliveryDate": "2025-04-18T16:57:00"
+  },
+  {
+    "id": "T-PM-003",
+    "driverId": "DEP-7007",
+    "driverName": "Pedro Méndez",
+    "date": "2025-06-24",
+    "status": "delivered",
+    "clientName": "Herrajes Industriales MX",
+    "address": "Calle Ruperto Martinez 801, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2539A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Tornillo Inoxidable 2\"",
+                "quantity": "800 pzas"
+              },
+              {
+                "name": "Cerradura 1260",
+                "quantity": "35 pzas"
+              },
+              {
+                "name": "Carretilla 4010",
+                "quantity": "22 pzas"
+              },
+              {
+                "name": "Jaladera H 40cm",
+                "quantity": "28 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2539B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "42 m"
+              },
+              {
+                "name": "Ángulo 1\" x 1\"",
+                "quantity": "65 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "FELIX U. GOMEZ",
+    "deliveryDate": "2025-06-25T10:06:00"
+  },
+  {
+    "id": "T-PM-004",
+    "driverId": "DEP-7007",
+    "driverName": "Pedro Méndez",
+    "date": "2025-08-13",
+    "status": "delivered",
+    "clientName": "Ferremax SA",
+    "address": "Calle Ruperto Martinez 801, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2540A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Marco Perimetral Panorama",
+                "quantity": "24 pzas"
+              },
+              {
+                "name": "Tubo Cedula 40 2\"",
+                "quantity": "10 tramos"
+              }
+            ]
+          },
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 12mm",
+                "quantity": "12 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "8 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2540B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Bisagra de Presión No. 1",
+                "quantity": "30 pzas"
+              },
+              {
+                "name": "Manija H 40cm",
+                "quantity": "26 pzas"
+              },
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "45 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "FELIX U. GOMEZ",
+    "deliveryDate": "2025-08-14T14:16:00"
+  },
+  {
+    "id": "T-PM-005",
+    "driverId": "DEP-7007",
+    "driverName": "Pedro Méndez",
+    "date": "2025-10-30",
+    "status": "delivered",
+    "clientName": "Alumex Monterrey",
+    "address": "Calle Ruperto Martinez 801, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2541A",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "35 pzas"
+              },
+              {
+                "name": "Escuadra de Alineación No. 1",
+                "quantity": "90 pzas"
+              },
+              {
+                "name": "Batiente 1400",
+                "quantity": "22 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2541B",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 6mm",
+                "quantity": "20 hojas"
+              },
+              {
+                "name": "Vidrio 4mm Claro",
+                "quantity": "15 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "FELIX U. GOMEZ",
+    "deliveryDate": "2025-10-31T10:09:00"
+  },
+  {
+    "id": "T-PM-006",
+    "driverId": "DEP-7007",
+    "driverName": "Pedro Méndez",
+    "date": "2025-12-19",
+    "status": "delivered",
+    "clientName": "Impermeabilizantes del Norte",
+    "address": "Centro, Santa Catarina",
+    "invoices": [
+      {
+        "id": "FAC-2542A",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Silicon 100% Acético",
+                "quantity": "100 pzas"
+              },
+              {
+                "name": "Sellador Acético Transparente",
+                "quantity": "50 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2542B",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "80 m"
+              },
+              {
+                "name": "Zoclo Panorama 1400 Natural",
+                "quantity": "38 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Reflectasol Gris 6mm",
+                "quantity": "14 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "SANTA CATARINA",
+    "deliveryDate": "2025-12-22T16:08:00"
+  },
+  {
+    "id": "T-PM-007",
+    "driverId": "DEP-7007",
+    "driverName": "Pedro Méndez",
+    "date": "2026-02-25",
+    "status": "delivered",
+    "clientName": "Grupo Vitro MTY",
+    "address": "Calle Ruperto Martinez 801, Monterrey, N.L.",
+    "invoices": [
+      {
+        "id": "FAC-2607A",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Satinado 4mm",
+                "quantity": "22 hojas"
+              },
+              {
+                "name": "Duovent 18mm",
+                "quantity": "8 hojas"
+              },
+              {
+                "name": "Luna Espejo 4mm",
+                "quantity": "10 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2607B",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "38 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi No. 1",
+                "quantity": "28 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-2607C",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Eurovent Serie 70",
+                "quantity": "28 pzas"
+              },
+              {
+                "name": "Canal U 1/2\"",
+                "quantity": "36 m"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "block": "FELIX U. GOMEZ",
+    "deliveryDate": "2026-02-27T15:57:00"
+  }
+]

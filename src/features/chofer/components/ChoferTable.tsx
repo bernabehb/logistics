@@ -3,7 +3,32 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChoferRow, MaterialDetail } from "../models";
-import { ChevronDown, MapPin, Grid3x3, LayoutGrid, PaintbrushVertical, Package, Weight, Phone, Check, Eye, Pencil } from "lucide-react";
+import {
+  ChevronDown,
+  MapPin,
+  Grid3x3,
+  LayoutGrid,
+  PaintbrushVertical,
+  Package,
+  Weight,
+  Phone,
+  Check,
+  Eye,
+  Pencil,
+  AlertTriangle,
+  Minus,
+  Plus
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { StatusCircle } from "@/features/logistics/components/StatusIndicator";
 
 interface ChoferTableProps {
@@ -40,8 +65,8 @@ export function ChoferTable({
 
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.5)] overflow-hidden transition-all duration-300">
-      <div className="overflow-x-auto">
-        <div className="min-w-full lg:min-w-[1024px]">
+      <div className="overflow-x-auto custom-scrollbar">
+        <div className="min-w-full">
           {/* Table Header - Only visible on large screens */}
           <div className="hidden lg:grid grid-cols-12 items-end p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-[13px] font-bold text-slate-500 dark:text-slate-400 tracking-[0.05em] uppercase">
             <div className="col-span-2 pl-4">Factura #</div>
@@ -141,13 +166,13 @@ export function ChoferTable({
                         isExpanded ? "max-h-[2000px] lg:max-h-[2000px] opacity-100 border-t border-slate-100 dark:border-slate-700/50" : "max-h-0 opacity-0"
                       )}
                     >
-                      <div className="p-6">
+                      <div className="p-4 sm:p-6">
                         <h4 className="text-base font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
                           <Package className="size-4 text-blue-500" />
                           Detalles de Carga por Almacén
                         </h4>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-3 sm:gap-4">
 
                           {/* Aluminio Card */}
                           <MetricCard
@@ -171,12 +196,12 @@ export function ChoferTable({
                           />
 
                           {/* Total Card */}
-                          <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-500/20 rounded-xl p-4 flex flex-col transition-all duration-300">
-                            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-semibold mb-2">
-                              <Weight className="size-5" />
+                          <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-500/20 rounded-xl p-3 sm:p-4 flex flex-col transition-all duration-300 shadow-sm">
+                            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-semibold mb-2 text-sm sm:text-base">
+                              <Weight className="size-4.5 sm:size-5" />
                               <span>Peso total del pedido</span>
                             </div>
-                            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">
+                            <div className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1 sm:mt-2">
                               {totalWeight.toFixed(2)} kg
                             </div>
                           </div>
@@ -239,6 +264,8 @@ function MetricCard({ title, icon, details }: { title: string, icon: React.React
   const [showMap, setShowMap] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [missingQuantities, setMissingQuantities] = useState<Record<number, number>>({});
+  const [reportingIdx, setReportingIdx] = useState<number | null>(null);
 
   const mockSlot = details.length > 0 ? (details[0].name.length % (title === 'Aluminio' ? 12 : 2)) + 1 : 1;
 
@@ -267,18 +294,24 @@ function MetricCard({ title, icon, details }: { title: string, icon: React.React
 
   const totalCategoryWeight = details.reduce((acc, curr) => acc + curr.weight, 0);
 
-  return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors shadow-sm">
-      <div className="flex flex-nowrap items-center justify-between mb-3 pb-3 border-b border-slate-100 dark:border-slate-700 gap-1.5 overflow-hidden">
-        <div className="flex items-center gap-1.5 min-w-0 shrink">
+   return (
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 sm:p-4 flex flex-col hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors shadow-sm">
+      <div className="flex flex-wrap items-center justify-between mb-2 sm:mb-3 pb-2 sm:pb-3 border-b border-slate-100 dark:border-slate-700 gap-y-2 gap-x-1.5 overflow-hidden">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <div className="shrink-0">{icon}</div>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">{title}</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate text-sm sm:text-base">{title}</span>
           {isVerified && (
             <div className="flex items-center shrink-0">
-              <span className="flex items-center justify-center p-1 md:px-1.5 md:py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50" title="Verificado">
-                <Check className="w-3.5 h-3.5 shrink-0" strokeWidth={3} />
-                <span className="hidden 2xl:inline-block ml-1 text-[9px] font-bold uppercase tracking-widest truncate">Verificado</span>
-              </span>
+              {Object.keys(missingQuantities).length > 0 ? (
+                <span className="flex items-center justify-center p-1.5 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200/50" title="Reportado">
+                  <AlertTriangle className="w-3.5 h-3.5" strokeWidth={3} />
+                </span>
+              ) : (
+                <span className="flex items-center justify-center p-1 md:px-2 md:py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50" title="Verificado">
+                  <Check className="w-3.5 h-3.5 shrink-0" strokeWidth={3} />
+                  <span className="hidden sm:inline-block ml-1 text-[9px] font-black uppercase tracking-widest truncate">Verificado</span>
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -302,16 +335,25 @@ function MetricCard({ title, icon, details }: { title: string, icon: React.React
               {isVerified ? <Pencil className="w-3.5 h-3.5" /> : 'Verificar'}
             </button>
           ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsVerifying(false);
-                setIsVerified(checkedItems.size === details.length && details.length > 0);
-              }}
-              className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-sm active:scale-95 shrink-0"
-            >
-              Guardar
-            </button>
+            <div className="flex items-center gap-2">
+              {Object.keys(missingQuantities).length > 0 && (
+                <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-1 rounded-md border border-amber-200/50 flex items-center gap-1.5 animate-pulse">
+                  <AlertTriangle className="size-3" />
+                  CON REPORTE
+                </span>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsVerifying(false);
+                  const allCovered = details.every((_, i) => checkedItems.has(i) || missingQuantities[i] > 0);
+                  setIsVerified(allCovered);
+                }}
+                className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-sm active:scale-95 shrink-0"
+              >
+                {Object.keys(missingQuantities).length > 0 ? 'Guardar Reporte' : 'Guardar'}
+              </button>
+            </div>
           )}
 
           <span className="text-[10px] uppercase tracking-wide whitespace-nowrap font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2.5 py-1.5 rounded-lg shrink-0">
@@ -381,42 +423,157 @@ function MetricCard({ title, icon, details }: { title: string, icon: React.React
       <div className="flex flex-col gap-1 mt-1 transition-opacity duration-300">
         {details.map((item, idx) => {
           const isChecked = checkedItems.has(idx);
+          const isMissing = !!missingQuantities[idx];
           return (
             <div
               key={idx}
-              onClick={() => isVerifying && toggleCheck(idx)}
               className={cn(
-                "flex items-start gap-3 p-2.5 rounded-lg transition-all border select-none",
+                "flex items-start gap-3 p-2 sm:p-2.5 rounded-lg transition-all border select-none",
                 isVerifying ? "cursor-pointer" : "cursor-default",
                 isChecked
                   ? "bg-emerald-50/50 dark:bg-emerald-500/10 border-emerald-200/50 dark:border-emerald-500/20 shadow-sm"
-                  : isVerifying ? "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30" : "border-transparent"
+                  : isMissing ? "bg-amber-50/50 dark:bg-amber-500/10 border-amber-200/50 dark:border-amber-500/20" : isVerifying ? "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30" : "border-transparent"
               )}
             >
               <div
+                onClick={() => isVerifying && !isMissing && toggleCheck(idx)}
                 className={cn(
                   "mt-0.5 shrink-0 flex items-center justify-center w-5 h-5 rounded-md border transition-all duration-300",
                   isChecked
                     ? "bg-emerald-500 border-emerald-500 text-white scale-110"
                     : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-transparent",
-                  !isVerifying && !isChecked && "opacity-0 invisible" // Ocultar checkbox si no está en modo verificar y no ha sido marcado
+                  !isVerifying && !isChecked && "opacity-0 invisible"
                 )}
               >
                 <Check className="w-3.5 h-3.5" strokeWidth={3} />
               </div>
-              <div className={cn("flex-1 flex flex-col gap-1.5 text-[15px] transition-transform duration-300", !isVerifying && !isChecked ? "-ml-6" : "")}>
+              <div className={cn("flex-1 flex flex-col gap-1 sm:gap-1.5 text-sm sm:text-[15px] transition-transform duration-300", !isVerifying && !isChecked && !isMissing ? "-ml-6" : "")}>
                 <div className="flex justify-between items-start">
-                  <span className={cn("font-medium pr-2 transition-colors", isChecked ? "text-emerald-900/70 dark:text-emerald-100/70 line-through" : "text-slate-700 dark:text-slate-300")}>{item.name}</span>
+                  <span className={cn("font-medium pr-2 transition-colors", isChecked ? "text-emerald-900/70 dark:text-emerald-100/70 line-through" : isMissing ? "text-amber-900 dark:text-amber-100" : "text-slate-700 dark:text-slate-300")}>{item.name}</span>
+                  {isVerifying && !isChecked && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setReportingIdx(idx); }}
+                      className={cn(
+                        "p-2 rounded-xl transition-all shrink-0 shadow-sm border",
+                        isMissing 
+                          ? "bg-amber-500 text-white border-amber-600 scale-105 active:scale-95" 
+                          : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20"
+                      )}
+                      title="Reportar faltante"
+                    >
+                      <AlertTriangle className={cn("size-4", isMissing && "animate-pulse")} />
+                    </button>
+                  )}
                 </div>
-                <div className={cn("flex justify-between text-sm transition-colors", isChecked ? "text-emerald-600/70 dark:text-emerald-400/70" : "text-slate-500 dark:text-slate-400")}>
+                <div className={cn("flex items-center gap-2 text-sm transition-colors", isChecked ? "text-emerald-600/70 dark:text-emerald-400/70" : isMissing ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400")}>
                   <span>{item.quantity} {item.quantity === 1 ? 'unidad' : 'unidades'}</span>
-                  <span className="font-semibold">{item.weight.toFixed(2)} kg</span>
+                  {isMissing && (
+                    <span className="font-black uppercase tracking-tighter bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded text-[10px]">
+                      FALTANTE: {missingQuantities[idx]}
+                    </span>
+                  )}
+                  <span className="font-semibold ml-auto">{item.weight.toFixed(2)} kg</span>
                 </div>
               </div>
             </div>
           )
         })}
       </div>
+
+      <Dialog open={reportingIdx !== null} onOpenChange={(open) => !open && setReportingIdx(null)}>
+        <DialogContent className="sm:max-w-[425px] rounded-3xl bg-white dark:bg-slate-900 border-none shadow-2xl">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400 uppercase tracking-tight text-lg font-black">
+              <AlertTriangle className="size-5" />
+              Reportar Faltante
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
+              Indica la cantidad de piezas que faltan para:
+              <strong className="block text-slate-900 dark:text-slate-100 mt-1 font-bold">{reportingIdx !== null ? details[reportingIdx].name : ''}</strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center justify-center py-6 gap-6">
+            <div className="flex items-center gap-8">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all active:scale-90"
+                onClick={() => {
+                  if (reportingIdx === null) return;
+                  const current = missingQuantities[reportingIdx] || 0;
+                  if (current > 0) {
+                    const newMissing = { ...missingQuantities };
+                    if (current === 1) {
+                      delete newMissing[reportingIdx];
+                    } else {
+                      newMissing[reportingIdx] = current - 1;
+                    }
+                    setMissingQuantities(newMissing);
+                  }
+                }}
+              >
+                <Minus className="size-6 text-slate-600 dark:text-slate-300" />
+              </Button>
+
+              <div className="flex flex-col items-center min-w-[80px]">
+                <span className="text-5xl font-black text-slate-800 dark:text-slate-100 tracking-tighter">
+                  {reportingIdx !== null ? (missingQuantities[reportingIdx] || 0) : 0}
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Piezas Faltantes</span>
+              </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all active:scale-90"
+                onClick={() => {
+                  if (reportingIdx === null) return;
+                  const current = missingQuantities[reportingIdx] || 0;
+                  if (current < details[reportingIdx].quantity) {
+                    setMissingQuantities({ ...missingQuantities, [reportingIdx]: current + 1 });
+                    // Si reportamos faltante, quitamos el check si lo tenía
+                    const newChecked = new Set(checkedItems);
+                    newChecked.delete(reportingIdx);
+                    setCheckedItems(newChecked);
+                  }
+                }}
+              >
+                <Plus className="size-6 text-slate-600 dark:text-slate-300" />
+              </Button>
+            </div>
+
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium italic text-center px-6 leading-relaxed">
+              * El reporte será enviado a logística para revisión con almacén y ajuste de inventario.
+            </p>
+          </div>
+
+          <DialogFooter className="flex-row gap-2 sm:gap-2">
+            <Button
+              variant="ghost"
+              className="flex-1 rounded-2xl font-bold uppercase tracking-widest text-[11px] h-12 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95"
+              onClick={() => {
+                if (reportingIdx !== null) {
+                  const newMissing = { ...missingQuantities };
+                  delete newMissing[reportingIdx];
+                  setMissingQuantities(newMissing);
+                }
+                setReportingIdx(null);
+              }}
+            >
+              Limpiar
+            </Button>
+            <Button
+              variant="logistics-action"
+              size="logistics-card"
+              onClick={() => setReportingIdx(null)}
+              className="flex-[2] py-6"
+            >
+              Confirmar Reporte
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

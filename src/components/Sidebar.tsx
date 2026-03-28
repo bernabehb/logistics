@@ -1,9 +1,10 @@
 "use client";
 
-import { Package, Truck, LogOut, ClipboardList } from "lucide-react";
+import { Package, Truck, LogOut, ClipboardList, DollarSign, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/login/actions";
 
@@ -38,6 +39,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       roles: ["Logistica"],
     },
     {
+      name: "Cajas",
+      href: "/cajas",
+      icon: DollarSign,
+      roles: ["Cajas"],
+    },
+    {
       name: "Asignación de pedidos",
       href: "/logistics/asignar-ruta",
       icon: ClipboardList,
@@ -48,6 +55,18 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       href: "/logistics/asignar-unidades",
       icon: Truck,
       roles: ["Logistica"],
+    },
+    {
+      name: "Autorizar salida",
+      href: "/logistics/autorizar-salida",
+      icon: ClipboardList,
+      roles: ["Logistica", "Guardia"],
+    },
+    {
+      name: "Panel de Control",
+      href: "/admin",
+      icon: ShieldCheck,
+      roles: ["Admin"],
     },
     {
       name: "Mis entregas",
@@ -63,8 +82,14 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
     )}>
       {/* Brand Header */}
-      <div className="flex items-center px-6 h-16 border-b border-slate-200 dark:border-slate-800">
-        <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-200">COMPERS</h1>
+      <div className="flex items-center px-6 h-20 border-b border-slate-200 dark:border-slate-800">
+        <Image 
+          src="/logo.png" 
+          alt="COMPERS Logo" 
+          width={160} 
+          height={60} 
+          className="object-contain dark:brightness-0 dark:invert" 
+        />
       </div>
 
       {/* Navigation */}

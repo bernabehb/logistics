@@ -6,7 +6,7 @@ export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Protect all main application routes
-  const isProtectedPath = path.startsWith('/logistics') || path.startsWith('/chofer');
+  const isProtectedPath = path.startsWith('/logistics') || path.startsWith('/chofer') || path.startsWith('/cajas') || path.startsWith('/admin');
 
   // If not logged in and accessing protected route, send to /login
   if (!authToken && isProtectedPath) {
@@ -21,6 +21,12 @@ export function middleware(request: NextRequest) {
       if (path === '/login' || path === '/') {
         if (session.role === 'Chofer') {
           return NextResponse.redirect(new URL('/chofer', request.url));
+        } else if (session.role === 'Guardia') {
+          return NextResponse.redirect(new URL('/logistics/autorizar-salida', request.url));
+        } else if (session.role === 'Cajas') {
+          return NextResponse.redirect(new URL('/cajas', request.url));
+        } else if (session.role === 'Admin') {
+          return NextResponse.redirect(new URL('/admin', request.url));
         } else {
           return NextResponse.redirect(new URL('/logistics', request.url));
         }
@@ -31,8 +37,24 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/chofer', request.url));
       }
       
-      if (session.role === 'Logistica' && path.startsWith('/chofer')) {
+      if (session.role === 'Logistica' && (path.startsWith('/chofer') || path.startsWith('/cajas'))) {
         return NextResponse.redirect(new URL('/logistics', request.url));
+      }
+
+      if (session.role === 'Guardia' && (path === '/logistics' || (path.startsWith('/logistics') && path !== '/logistics/autorizar-salida') || path.startsWith('/cajas'))) {
+        return NextResponse.redirect(new URL('/logistics/autorizar-salida', request.url));
+      }
+
+      if (session.role === 'Cajas' && (path.startsWith('/logistics') || path.startsWith('/chofer'))) {
+        return NextResponse.redirect(new URL('/cajas', request.url));
+      }
+
+      if (session.role === 'Admin' && !path.startsWith('/admin')) {
+        return NextResponse.redirect(new URL('/admin', request.url));
+      }
+
+      if (session.role !== 'Admin' && path.startsWith('/admin')) {
+        return NextResponse.redirect(new URL('/login', request.url));
       }
 
     } catch (e) {

@@ -36,6 +36,10 @@ export async function loginAction(formData: FormData) {
 
   if (user.role === "Chofer") {
     redirect("/chofer");
+  } else if (user.role === "Cajas") {
+    redirect("/cajas");
+  } else if (user.role === "Admin") {
+    redirect("/admin");
   } else {
     redirect("/logistics");
   }

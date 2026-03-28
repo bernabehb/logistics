@@ -2,7 +2,7 @@
 
 import { useChoferPageState } from "@/features/chofer/hooks/useChoferPageState";
 import { ChoferTable } from "@/features/chofer/components/ChoferTable";
-import { Search, Weight } from "lucide-react";
+import { Search, Weight, Truck } from "lucide-react";
 
 export default function ChoferPage() {
   const {
@@ -22,19 +22,30 @@ export default function ChoferPage() {
     <div className="w-full flex flex-col">
       {/* Header Info */}
       <div className="mb-6 flex flex-col gap-2">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
-            Pedidos Asignadas
-          </h1>
-          <div className="flex items-center gap-2">
-            <span className="bg-blue-100 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-blue-400 font-semibold px-2.5 py-1 text-xs rounded-lg transition-colors">
-              {assignedCount} Viaje{assignedCount !== 1 && 's'}
-            </span>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors leading-none">
+              Pedidos Asignadas
+            </h1>
+            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 text-blue-700 dark:text-blue-400 font-bold px-3.5 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-2">
+              <span className="text-lg leading-none font-black">{assignedCount}</span>
+              <span className="opacity-70 uppercase tracking-widest text-[10px] font-black whitespace-nowrap">Pedidos</span>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 font-bold px-5 py-2.5 rounded-2xl shadow-sm transition-all flex items-center gap-4">
+            <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl shadow-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              <Truck className="size-5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-slate-900 dark:text-slate-100 uppercase tracking-[0.15em] text-[9px] font-black mb-1">Vehículo Asignado</span>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold text-slate-700 dark:text-slate-300 leading-none">Unidad 5</span>
+                <span className="text-[10px] font-bold text-slate-900 dark:text-slate-100 uppercase tracking-tighter bg-slate-100 dark:bg-slate-700/50 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600/50">3.5 TON.</span>
+              </div>
+            </div>
           </div>
         </div>
-        <p className="text-slate-500 dark:text-slate-400 font-medium text-[15px] transition-colors">
-          Consulta los detalles de recolección y pesos por almacén para tus pedidos asignados.
-        </p>
       </div>
 
       {/* Basic Search Toolbar */}

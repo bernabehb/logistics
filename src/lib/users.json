@@ -12,5 +12,26 @@
     "password": "123",
     "name": "Chofer Principal",
     "role": "Chofer"
+  },
+  {
+    "id": 3,
+    "username": "guardia",
+    "password": "123",
+    "name": "Guardia de Caseta",
+    "role": "Guardia"
+  },
+  {
+    "id": 4,
+    "username": "cajas",
+    "password": "123",
+    "name": "Cajero",
+    "role": "Cajas"
+  },
+  {
+    "id": 5,
+    "username": "admin",
+    "password": "123",
+    "name": "Administrador",
+    "role": "Admin"
   }
 ]

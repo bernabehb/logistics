@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import Image from "next/image";
 import { Menu, X } from "lucide-react";
 
 export default function AppLayout({
@@ -15,7 +16,13 @@ export default function AppLayout({
     <div className="min-h-screen flex flex-col md:flex-row bg-[#F8FAFC] dark:bg-[#0F172A]">
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] z-40 relative">
-        <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-200">COMPERS</h1>
+        <Image 
+          src="/logo.png" 
+          alt="COMPERS Logo" 
+          width={120} 
+          height={40} 
+          className="object-contain dark:brightness-0 dark:invert" 
+        />
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
@@ -28,7 +35,7 @@ export default function AppLayout({
       <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
       
       {/* Main Content Area */}
-      <main className="flex-1 md:ml-[240px] p-4 md:p-8 animate-in fade-in duration-500 flex flex-col items-center w-full overflow-x-hidden">
+      <main className="flex-1 md:ml-[240px] p-4 md:px-8 md:pt-8 md:pb-2 animate-in fade-in duration-500 flex flex-col items-center w-full overflow-x-hidden">
         <div className="w-full max-w-[1600px]">
           {children}
         </div>
