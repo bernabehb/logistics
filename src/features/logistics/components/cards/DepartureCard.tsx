@@ -58,6 +58,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isAuthorizedSuccess, setIsAuthorizedSuccess] = useState(false);
 
   // Derived state
   const isTripComplete = verifiedInvoiceIds.length === departure.invoices.length;
@@ -142,7 +143,6 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
       setIsError(true);
     }
   };
-
   const resetAuth = () => {
     setAuthStep("method_select");
     setSelectedMethod(null);
@@ -150,6 +150,15 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     setCurrentInvoiceId(null);
     setInvoiceInput("");
     setIsError(false);
+    setIsAuthorizedSuccess(false);
+  };
+
+  const handleFinalAuthorization = () => {
+    setIsAuthorizedSuccess(true);
+    // Add a delay for the animation before closing
+    setTimeout(() => {
+      onAuthorize(departure.id);
+    }, 1000);
   };
 
   return (
@@ -357,7 +366,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
                         <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">
-                            Siguiente pendiente: <span className="text-slate-900 dark:text-slate-100 font-black tracking-normal">{remainingInvoices[0]?.id}</span>
+                            Factura de prueba: <span className="text-slate-900 dark:text-slate-100 font-black tracking-normal">{remainingInvoices[0]?.id}</span>
                           </p>
                         </div>
 
@@ -465,37 +474,51 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
 
                   {authStep === "trip_verified" && (
-                    <div className="space-y-8 py-4 animate-in zoom-in-95 duration-300 text-center">
-                      <div className="flex justify-center">
-                        <div className="p-5 sm:p-6 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle className="size-16 sm:size-20" />
-                        </div>
-                      </div>
+                    <div className="space-y-8 py-4 text-center">
+                      {!isAuthorizedSuccess ? (
+                        <div className="animate-in zoom-in-95 duration-300 space-y-8">
+                          <div className="flex justify-center">
+                            <div className="p-5 sm:p-6 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-4 border-emerald-50 dark:border-emerald-500/10 shadow-lg">
+                              <CheckCircle className="size-16 sm:size-20" />
+                            </div>
+                          </div>
 
-                      <div className="space-y-2 px-2">
-                        <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">¡Carga Validada!</h3>
-                        <p className="text-slate-500 dark:text-slate-400">
-                          Se han verificado las {departure.invoices.length} facturas correctamente.
-                        </p>
-                      </div>
+                          <div className="space-y-2 px-2">
+                            <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">¡Carga Validada!</h3>
+                            <p className="text-slate-500 dark:text-slate-400 font-medium">
+                              Se han verificado las <span className="text-emerald-600 dark:text-emerald-400 font-black">{departure.invoices.length}</span> facturas correctamente.
+                            </p>
+                          </div>
 
-                      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-slate-400 uppercase tracking-widest">Unidad</span>
-                          <span className="font-black text-slate-700 dark:text-slate-200">{departure.unitName}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                          <span className="font-bold text-slate-400 uppercase tracking-widest">Chofer</span>
-                          <span className="font-black text-slate-700 dark:text-slate-200">{departure.driverName}</span>
-                        </div>
-                      </div>
+                          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-inner group">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-slate-400 uppercase tracking-widest">Unidad</span>
+                              <span className="font-black text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 transition-colors">{departure.unitName}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
+                              <span className="font-bold text-slate-400 uppercase tracking-widest">Chofer</span>
+                              <span className="font-black text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 transition-colors uppercase">{departure.driverName}</span>
+                            </div>
+                          </div>
 
-                      <Button
-                        className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"
-                        onClick={() => onAuthorize(departure.id)}
-                      >
-                        Autorizar Salida Ahora
-                      </Button>
+                          <Button
+                            className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] transition-all active:scale-[0.98] hover:translate-y-[-2px]"
+                            onClick={handleFinalAuthorization}
+                          >
+                            Autorizar Salida Ahora
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-12 animate-in fade-in zoom-in duration-500">
+                          <div className="p-10 bg-emerald-600 rounded-full text-white shadow-2xl shadow-emerald-500/40">
+                            <CheckCircle className="size-24" />
+                          </div>
+                          
+                          <div className="mt-12 text-center animate-in slide-in-from-bottom-4 duration-700 delay-200">
+                            <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">¡SALIDA AUTORIZADA!</h2>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -47,11 +47,23 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 
   --animate-scan-line: scan-line 2s linear infinite;
+  --animate-bounce-short: bounce-short 0.5s ease-out;
+  --animate-confetti-fake: confetti-fake 3s ease-out forwards;
 
   @keyframes scan-line {
     0% { top: 0%; }
     50% { top: 100%; }
     100% { top: 0%; }
+  }
+
+  @keyframes bounce-short {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+  }
+
+  @keyframes confetti-fake {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
   }
 }
 
