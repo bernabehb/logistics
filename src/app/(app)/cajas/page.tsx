@@ -97,27 +97,36 @@ export default function CajasPage() {
     });
   };
 
-  const handleReconcileDriver = (driverId: string) => {
+  const handleReconcileInvoice = (driverId: string, invoiceId: string) => {
     setDriversData((prev) =>
       prev.map((drv) => {
         if (drv.id !== driverId) return drv;
+        const updatedInvoices = drv.invoices.map((inv) =>
+          inv.id === invoiceId ? { ...inv, status: "entregado" as const } : inv
+        );
+        const allCashReceived = updatedInvoices.every(
+          (inv) => inv.paymentMethod !== "efectivo" || inv.status === "entregado"
+        );
         return {
           ...drv,
-          status: "entregado",
-          invoices: drv.invoices.map((inv) => ({ ...inv, status: "entregado" })),
+          status: allCashReceived ? ("entregado" as const) : ("pendiente" as const),
+          invoices: updatedInvoices,
         };
       })
     );
   };
 
-  const handleEditDriver = (driverId: string) => {
+  const handleRevertInvoice = (driverId: string, invoiceId: string) => {
     setDriversData((prev) =>
       prev.map((drv) => {
         if (drv.id !== driverId) return drv;
+        const updatedInvoices = drv.invoices.map((inv) =>
+          inv.id === invoiceId ? { ...inv, status: "pendiente" as const } : inv
+        );
         return {
           ...drv,
-          status: "pendiente",
-          invoices: drv.invoices.map((inv) => ({ ...inv, status: "pendiente" })),
+          status: "pendiente" as const,
+          invoices: updatedInvoices,
         };
       })
     );
@@ -127,9 +136,14 @@ export default function CajasPage() {
     setDriversData((prev) => {
       const updated = prev.map((drv) => {
         if (drv.id === driverId) {
+          const updatedInvoices = drv.invoices.filter((inv) => inv.id !== invoiceId);
+          const allCashReceived = updatedInvoices.every(
+            (inv) => inv.paymentMethod !== "efectivo" || inv.status === "entregado"
+          );
           return {
             ...drv,
-            invoices: drv.invoices.filter((inv) => inv.id !== invoiceId),
+            status: allCashReceived ? ("entregado" as const) : ("pendiente" as const),
+            invoices: updatedInvoices,
           };
         }
         return drv;
@@ -256,8 +270,12 @@ export default function CajasPage() {
                 <div className="divide-y divide-slate-100 dark:divide-slate-700">
                   {filteredDrivers.map((drv, index) => {
                     const isExpanded = expandedRows.has(drv.id);
-                    const expectedTotalCash = drv.invoices
+                    const totalCashExpected = drv.invoices
                       .filter((inv) => inv.paymentMethod === "efectivo")
+                      .reduce((sum, current) => sum + current.totalAmount, 0);
+
+                    const pendingCash = drv.invoices
+                      .filter((inv) => inv.paymentMethod === "efectivo" && inv.status === "pendiente")
                       .reduce((sum, current) => sum + current.totalAmount, 0);
 
                     return (
@@ -288,7 +306,7 @@ export default function CajasPage() {
                           <div className="w-full lg:col-span-2 flex justify-between lg:justify-end lg:pr-6 items-center">
                             <span className="lg:hidden text-xs font-bold text-slate-400 uppercase tracking-wider">A recibir</span>
                             <span className="font-black text-[17px] text-emerald-600 dark:text-emerald-400 tracking-tight">
-                              {formatCurrency(expectedTotalCash)}
+                              {formatCurrency(totalCashExpected)}
                             </span>
                           </div>
 
@@ -309,79 +327,12 @@ export default function CajasPage() {
                           <div className="w-full lg:col-span-3 flex justify-end items-center mt-2 lg:mt-0 pt-3 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0 text-slate-400">
                             <div className="flex items-center gap-3 pr-2">
                               {drv.status === "pendiente" ? (
-                                <div onClick={(e) => e.stopPropagation()}>
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button
-                                        className="bg-slate-100 hover:bg-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 hover:text-white dark:text-slate-400 dark:hover:text-white rounded-lg font-bold text-xs uppercase tracking-wider transition-all border border-slate-400/80 dark:border-slate-500 hover:border-slate-600 active:scale-95 shadow-sm h-8 px-3 shrink-0"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        Recibir Efectivo
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent onClick={(e) => e.stopPropagation()}>
-                                      <DialogHeader>
-                                        <DialogTitle>¿Confirmar recepción de efectivo?</DialogTitle>
-                                        <DialogDescription>
-                                          Estás a punto de registrar la entrada de <strong>{formatCurrency(expectedTotalCash)}</strong> entregados por <strong>{drv.driverName}</strong>. Esta acción pasará sus facturas a "Recibidos". ¿Deseas continuar?
-                                        </DialogDescription>
-                                      </DialogHeader>
-                                      <DialogFooter>
-                                        <DialogClose asChild>
-                                          <Button variant="outline" className="cursor-pointer" onClick={(e) => e.stopPropagation()}>Cancelar</Button>
-                                        </DialogClose>
-                                        <DialogClose asChild>
-                                          <Button
-                                            className="cursor-pointer"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleReconcileDriver(drv.id);
-                                            }}
-                                          >
-                                            Sí, Recibir Efectivo
-                                          </Button>
-                                        </DialogClose>
-                                      </DialogFooter>
-                                    </DialogContent>
-                                  </Dialog>
+                                <div className="text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-500 dark:bg-amber-900/10 dark:text-amber-400 px-2 py-1 rounded-md border border-amber-100/50 dark:border-amber-800/20">
+                                  {pendingCash > 0 ? `Por recibir: ${formatCurrency(pendingCash)}` : "Sin efectivo pendiente"}
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                  <Dialog>
-                                    <DialogTrigger asChild>
-                                      <Button
-                                        className="bg-slate-100 hover:bg-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 hover:text-white dark:text-slate-400 dark:hover:text-white rounded-lg font-bold text-xs uppercase tracking-wider transition-all border border-slate-400/80 dark:border-slate-500 hover:border-slate-600 active:scale-95 shadow-sm h-8 px-3 shrink-0"
-                                        title="Revertir y mandar a pendientes"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        Revertir
-                                      </Button>
-                                    </DialogTrigger>
-                                    <DialogContent onClick={(e) => e.stopPropagation()}>
-                                      <DialogHeader>
-                                        <DialogTitle>¿Revertir conciliación?</DialogTitle>
-                                        <DialogDescription>
-                                          ¿Estás seguro de que deseas enviar el viaje de <strong>{drv.driverName}</strong> nuevamente a la lista de "Pendientes"? El dinero correspondiente dejará de estar verificado.
-                                        </DialogDescription>
-                                      </DialogHeader>
-                                      <DialogFooter>
-                                        <DialogClose asChild>
-                                          <Button variant="outline" className="cursor-pointer" onClick={(e) => e.stopPropagation()}>Mantener Entregado</Button>
-                                        </DialogClose>
-                                        <DialogClose asChild>
-                                          <Button
-                                            className="cursor-pointer"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleEditDriver(drv.id);
-                                            }}
-                                          >
-                                            Sí, Enviar a Pendientes
-                                          </Button>
-                                        </DialogClose>
-                                      </DialogFooter>
-                                    </DialogContent>
-                                  </Dialog>
+                                <div className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-500 dark:bg-emerald-900/10 dark:text-amber-400 px-2 py-1 rounded-md border border-emerald-100/50 dark:border-amber-800/20">
+                                  Todo Recibido
                                 </div>
                               )}
                               <ChevronDown className={cn("size-5 transition-transform duration-300", isExpanded && "rotate-180")} />
@@ -428,9 +379,7 @@ export default function CajasPage() {
                                     <th className="px-5 py-3 whitespace-normal">Dirección de Entrega</th>
                                     <th className="px-5 py-3">Método</th>
                                     <th className="px-5 py-3 text-right">Monto a Cobrar (Cajas)</th>
-                                    {drv.status === "pendiente" && editingDrivers.has(drv.id) && (
-                                      <th className="px-5 py-3 text-right">Acción</th>
-                                    )}
+                                    <th className="px-5 py-3 text-right shrink-0">Acción</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -470,50 +419,135 @@ export default function CajasPage() {
                                             </span>
                                           )}
                                         </td>
-                                        {drv.status === "pendiente" && editingDrivers.has(drv.id) && (
-                                          <td className="px-5 py-3 text-right animate-in fade-in slide-in-from-right-2 duration-300">
-                                            <div onClick={(e) => e.stopPropagation()} className="inline-block">
-                                              <Dialog>
-                                                <DialogTrigger asChild>
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="icon-xs"
-                                                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                                                    title="Quitar pedido no entregado"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                  >
-                                                    <Trash2 className="size-4" />
-                                                  </Button>
-                                                </DialogTrigger>
-                                                <DialogContent onClick={(e) => e.stopPropagation()}>
-                                                  <DialogHeader>
-                                                    <DialogTitle>¿Quitar factura del viaje?</DialogTitle>
-                                                    <DialogDescription>
-                                                      Estás a punto de quitar la factura <strong>{inv.id}</strong> asignada a <strong>{inv.clientName}</strong>. Hacer esto indica que el pedido no se entregó. ¿Continuar?
-                                                    </DialogDescription>
-                                                  </DialogHeader>
-                                                  <DialogFooter>
-                                                    <DialogClose asChild>
-                                                      <Button variant="outline" className="cursor-pointer" onClick={(e) => e.stopPropagation()}>Cancelar</Button>
-                                                    </DialogClose>
-                                                    <DialogClose asChild>
+
+                                        <td className="px-5 py-3 text-right">
+                                          <div className="flex items-center justify-end gap-2">
+                                            {/* Reconciliation Actions */}
+                                            {inv.paymentMethod === "efectivo" && (
+                                              <>
+                                                {inv.status === "pendiente" ? (
+                                                  <Dialog>
+                                                    <DialogTrigger asChild>
                                                       <Button
-                                                        variant="destructive"
-                                                        className="cursor-pointer"
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          handleRemoveInvoice(drv.id, inv.id);
-                                                        }}
+                                                        size="xs"
+                                                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-3 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                                                        onClick={(e) => e.stopPropagation()}
                                                       >
-                                                        Sí, Quitar Factura
+                                                        Recibir
                                                       </Button>
-                                                    </DialogClose>
-                                                  </DialogFooter>
-                                                </DialogContent>
-                                              </Dialog>
-                                            </div>
-                                          </td>
-                                        )}
+                                                    </DialogTrigger>
+                                                    <DialogContent onClick={(e) => e.stopPropagation()}>
+                                                      <DialogHeader>
+                                                        <DialogTitle>¿Confirmar recepción?</DialogTitle>
+                                                        <DialogDescription>
+                                                          Registrar el pago de <strong>{formatCurrency(inv.totalAmount)}</strong> de la factura <strong>{inv.id}</strong>.
+                                                        </DialogDescription>
+                                                      </DialogHeader>
+                                                      <DialogFooter>
+                                                        <DialogClose asChild>
+                                                          <Button variant="outline" className="h-9 text-xs">Cancelar</Button>
+                                                        </DialogClose>
+                                                        <DialogClose asChild>
+                                                          <Button
+                                                            className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700"
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              handleReconcileInvoice(drv.id, inv.id);
+                                                            }}
+                                                          >
+                                                            Confirmar
+                                                          </Button>
+                                                        </DialogClose>
+                                                      </DialogFooter>
+                                                    </DialogContent>
+                                                  </Dialog>
+                                                ) : (
+                                                  <Dialog>
+                                                    <DialogTrigger asChild>
+                                                      <Button
+                                                        variant="outline"
+                                                        size="xs"
+                                                        className="h-7 px-3 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-400 dark:hover:bg-amber-950/20 shadow-sm active:scale-95"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                      >
+                                                        Revertir
+                                                      </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent onClick={(e) => e.stopPropagation()}>
+                                                      <DialogHeader>
+                                                        <DialogTitle>¿Revertir recepción?</DialogTitle>
+                                                        <DialogDescription>
+                                                          La factura <strong>{inv.id}</strong> volverá al estado pendiente de cobro.
+                                                        </DialogDescription>
+                                                      </DialogHeader>
+                                                      <DialogFooter>
+                                                        <DialogClose asChild>
+                                                          <Button variant="outline" className="h-9 text-xs">Cancelar</Button>
+                                                        </DialogClose>
+                                                        <DialogClose asChild>
+                                                          <Button
+                                                            variant="destructive"
+                                                            className="h-9 text-xs"
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              handleRevertInvoice(drv.id, inv.id);
+                                                            }}
+                                                          >
+                                                            Sí, Revertir
+                                                          </Button>
+                                                        </DialogClose>
+                                                      </DialogFooter>
+                                                    </DialogContent>
+                                                  </Dialog>
+                                                )}
+                                              </>
+                                            )}
+
+                                            {/* Removal Action (Trash) - Only when editing and pending */}
+                                            {drv.status === "pendiente" && editingDrivers.has(drv.id) && (
+                                              <div onClick={(e) => e.stopPropagation()} className="inline-block">
+                                                <Dialog>
+                                                  <DialogTrigger asChild>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="icon-xs"
+                                                      className="text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors w-7 h-7"
+                                                      title="Quitar pedido"
+                                                      onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                      <Trash2 className="size-3.5" />
+                                                    </Button>
+                                                  </DialogTrigger>
+                                                  <DialogContent onClick={(e) => e.stopPropagation()}>
+                                                    <DialogHeader>
+                                                      <DialogTitle>¿Quitar factura?</DialogTitle>
+                                                      <DialogDescription>
+                                                        Quitar la factura <strong>{inv.id}</strong>.
+                                                      </DialogDescription>
+                                                    </DialogHeader>
+                                                    <DialogFooter>
+                                                      <DialogClose asChild>
+                                                        <Button variant="outline" className="h-9 text-xs">Cancelar</Button>
+                                                      </DialogClose>
+                                                      <DialogClose asChild>
+                                                        <Button
+                                                          variant="destructive"
+                                                          className="h-9 text-xs"
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRemoveInvoice(drv.id, inv.id);
+                                                          }}
+                                                        >
+                                                          Quitar
+                                                        </Button>
+                                                      </DialogClose>
+                                                    </DialogFooter>
+                                                  </DialogContent>
+                                                </Dialog>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </td>
                                       </tr>
                                     );
                                   })}

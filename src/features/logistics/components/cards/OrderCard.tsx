@@ -10,7 +10,8 @@ import {
   Scale,
   MapPin,
   User,
-  Pencil
+  Pencil,
+  ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
@@ -84,6 +85,7 @@ export function OrderCard({ invoice, onAssign }: OrderCardProps) {
   const [isEditing, setIsEditing] = useState(!isAssigned);
   const [selectedDriver, setSelectedDriver] = useState<string>(invoice.assignedDriverId || "");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
 
   const availableDrivers = MOCK_DRIVERS.filter(d => d.block === assignedBlock);
 
@@ -151,12 +153,16 @@ export function OrderCard({ invoice, onAssign }: OrderCardProps) {
           </div>
         </div>
 
-        <div className="flex items-start gap-2 text-xs font-medium text-slate-600 dark:text-slate-300 mb-3 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/50">
-          <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-          <div>
-            <span className="font-bold text-slate-700 dark:text-slate-200 block mb-0.5">Ubicación de Entrega:</span>
+        <div 
+          onClick={() => setShowMapModal(true)}
+          className="flex items-start gap-2 text-xs font-medium text-slate-600 dark:text-slate-300 mb-3 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700/50 cursor-pointer transition-colors group"
+        >
+          <MapPin className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0 mt-0.5 transition-colors" />
+          <div className="flex-1">
+            <span className="font-bold text-slate-700 dark:text-slate-200 block mb-0.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Ubicación de Entrega:</span>
             <span>{invoice.address || fallbackAddress}</span>
           </div>
+          <ExternalLink className="w-4 h-4 text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-all group-hover:text-blue-500" />
         </div>
 
         {materials.length > 0 && (
@@ -277,6 +283,28 @@ export function OrderCard({ invoice, onAssign }: OrderCardProps) {
               </Button>
             </DialogClose>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMapModal} onOpenChange={setShowMapModal}>
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl w-11/12 h-[80vh] flex flex-col p-0 overflow-hidden gap-0">
+          <DialogHeader className="p-4 md:p-6 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+            <div className="pr-6 text-left">
+              <DialogTitle className="text-xl">Ubicación de Entrega</DialogTitle>
+              <DialogDescription className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
+                {invoice.address || fallbackAddress}
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 w-full relative bg-slate-100 dark:bg-slate-900 overflow-hidden">
+             <iframe
+                className="w-full h-full"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(invoice.address || fallbackAddress)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+              ></iframe>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>
