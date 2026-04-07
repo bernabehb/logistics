@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Unit } from "@/features/logistics/models/units";
-import { MOCK_DRIVERS } from "@/features/logistics/models/drivers";
+import { Driver } from "@/features/logistics/models/drivers";
 
 interface UnitCardProps {
   unit: Unit;
@@ -23,6 +23,9 @@ interface UnitCardProps {
   onMaintenance: () => void;
   assignedDriverName?: string;
   assignedDriverIds?: string[];
+  allDrivers?: Driver[];
+  isLoadingDrivers?: boolean;
+  driverError?: string | null;
 }
 
 export function UnitCard({
@@ -30,7 +33,10 @@ export function UnitCard({
   onAssign,
   onMaintenance,
   assignedDriverName,
-  assignedDriverIds = []
+  assignedDriverIds = [],
+  allDrivers = [],
+  isLoadingDrivers = false,
+  driverError = null
 }: UnitCardProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState("");
@@ -212,13 +218,25 @@ export function UnitCard({
                   className="w-full h-11 bg-slate-50 dark:bg-[#0F172A]/50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all cursor-pointer"
                 >
                   <option value="">Selecciona un chofer...</option>
-                  {MOCK_DRIVERS
-                    .filter(driver => !assignedDriverIds.includes(driver.id))
-                    .map(driver => (
-                      <option key={driver.id} value={driver.id}>{driver.name} ({driver.block})</option>
-                    ))
-                  }
+                  {isLoadingDrivers ? (
+                    <option disabled>Cargando choferes...</option>
+                  ) : driverError ? (
+                    <option disabled>{driverError}</option>
+                  ) : (
+                    allDrivers
+                      .filter(driver => !assignedDriverIds.includes(driver.id))
+                      .map(driver => (
+                        <option key={driver.id} value={driver.id}>
+                          {driver.name}
+                        </option>
+                      ))
+                  )}
                 </select>
+                {driverError && (
+                  <p className="text-[9px] font-bold text-red-500 mt-1 uppercase tracking-wider animate-pulse">
+                    Error al cargar: {driverError}
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 <button
@@ -229,7 +247,7 @@ export function UnitCard({
                 </button>
                 <button
                   onClick={() => {
-                    const driver = MOCK_DRIVERS.find(d => d.id === selectedDriverId);
+                    const driver = allDrivers.find(d => d.id === selectedDriverId);
                     showConfirm({
                       title: "Confirmar Asignación",
                       description: (

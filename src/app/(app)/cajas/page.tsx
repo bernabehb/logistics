@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Search, CheckCircle2, User, ChevronDown, Check, ReceiptText, Pencil, Trash2 } from "lucide-react";
+import { Search, CheckCircle2, User, ChevronDown, Check, ReceiptText, Pencil, Trash2, FileX, FileCheck, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ type CajasInvoice = {
   totalAmount: number;
   paymentMethod: "efectivo" | "credito" | "transferencia";
   status: "pendiente" | "entregado";
+  isScanned: boolean;
 };
 
 type CajasDriver = {
@@ -31,6 +32,7 @@ type CajasDriver = {
   driverName: string;
   invoices: CajasInvoice[];
   status: "pendiente" | "entregado";
+  date: string;
 };
 
 const MOCK_DRIVERS: CajasDriver[] = [
@@ -38,28 +40,31 @@ const MOCK_DRIVERS: CajasDriver[] = [
     id: "drv-1",
     driverName: "Juan Pérez",
     status: "pendiente",
+    date: "2024-04-06",
     invoices: [
-      { id: "INV-1001", clientName: "Efrén Juárez Castillo", address: "Av. Benito Juárez #450, Centro", totalAmount: 1560.5, paymentMethod: "efectivo", status: "pendiente" },
-      { id: "INV-1002", clientName: "Ricardo García Morales", address: "Blvd. Luis Donaldo Colosio #1200", totalAmount: 4200.0, paymentMethod: "credito", status: "pendiente" },
-      { id: "INV-1003", clientName: "Gadiel Ramos Hernández", address: "Calle Francisco Madero #23", totalAmount: 890.0, paymentMethod: "efectivo", status: "pendiente" },
+      { id: "INV-1001", clientName: "Efrén Juárez Castillo", address: "Av. Benito Juárez #450, Centro", totalAmount: 1560.5, paymentMethod: "efectivo", status: "pendiente", isScanned: true },
+      { id: "INV-1002", clientName: "Ricardo García Morales", address: "Blvd. Luis Donaldo Colosio #1200", totalAmount: 4200.0, paymentMethod: "credito", status: "pendiente", isScanned: true },
+      { id: "INV-1003", clientName: "Gadiel Ramos Hernández", address: "Calle Francisco Madero #23", totalAmount: 890.0, paymentMethod: "efectivo", status: "pendiente", isScanned: true },
     ],
   },
   {
     id: "drv-2",
     driverName: "Carlos López",
     status: "pendiente",
+    date: "2024-04-07",
     invoices: [
-      { id: "INV-1004", clientName: "Juvencio Mendoza Castelán", address: "Calle Pino Suárez Norte #1010", totalAmount: 3250.0, paymentMethod: "transferencia", status: "entregado" },
-      { id: "INV-1005", clientName: "Luis Alberto Mendoza San Juan", address: "Av. Universidad #80", totalAmount: 640.0, paymentMethod: "efectivo", status: "pendiente" },
+      { id: "INV-1004", clientName: "Juvencio Mendoza Castelán", address: "Calle Pino Suárez Norte #1010", totalAmount: 3250.0, paymentMethod: "transferencia", status: "entregado", isScanned: true },
+      { id: "INV-1005", clientName: "Luis Alberto Mendoza San Juan", address: "Av. Universidad #80", totalAmount: 640.0, paymentMethod: "efectivo", status: "pendiente", isScanned: false },
     ],
   },
   {
     id: "drv-3",
     driverName: "Miguel Sánchez",
     status: "entregado",
+    date: "2024-04-07",
     invoices: [
-      { id: "INV-1008", clientName: "Hermes Salazar Casanova", address: "Colonia Las Fuentes #241", totalAmount: 1200.0, paymentMethod: "efectivo", status: "entregado" },
-      { id: "INV-1009", clientName: " Carlos Andrés Rodríguez Arguelles", address: "Av. 20 de Noviembre #500", totalAmount: 580.0, paymentMethod: "efectivo", status: "entregado" },
+      { id: "INV-1008", clientName: "Hermes Salazar Casanova", address: "Colonia Las Fuentes #241", totalAmount: 1200.0, paymentMethod: "efectivo", status: "entregado", isScanned: true },
+      { id: "INV-1009", clientName: " Carlos Andrés Rodríguez Arguelles", address: "Av. 20 de Noviembre #500", totalAmount: 580.0, paymentMethod: "efectivo", status: "entregado", isScanned: true },
     ],
   },
 ];
@@ -73,6 +78,8 @@ const formatCurrency = (val: number) =>
 export default function CajasPage() {
   const [driversData, setDriversData] = useState<CajasDriver[]>(MOCK_DRIVERS);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState<"pendiente" | "entregado">("pendiente");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [editingDrivers, setEditingDrivers] = useState<Set<string>>(new Set());
@@ -159,7 +166,10 @@ export default function CajasPage() {
         drv.driverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         drv.invoices.some((inv) => inv.id.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      return matchSearch && drv.status === statusFilter ? drv : null;
+      const matchDate = 
+        (!dateFrom || drv.date >= dateFrom) &&
+        (!dateTo || drv.date <= dateTo);
+      return matchSearch && matchDate && drv.status === statusFilter ? drv : null;
     })
     .filter((drv): drv is CajasDriver => drv !== null);
 
@@ -174,23 +184,59 @@ export default function CajasPage() {
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
           Cajas
         </h1>
-        <div className="flex flex-col xl:flex-row flex-wrap justify-between items-start xl:items-center gap-4 w-full">
-          <div className="relative group w-full flex-1 md:max-w-[400px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Buscar por chofer o factura..."
-              value={searchQuery}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setSearchQuery(e.target.value)
-              }
-              className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 h-13 text-sm focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
-            />
+        <div className="flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center gap-4 w-full">
+          <div className="flex flex-col md:flex-row items-center gap-3 w-full xl:flex-1">
+            <div className="relative group w-full md:max-w-[360px]">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
+              <Input
+                type="text"
+                placeholder="Buscar por chofer o factura..."
+                value={searchQuery}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setSearchQuery(e.target.value)
+                }
+                className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 h-11 text-sm focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:w-40 h-11">
+                <Input 
+                  type="date"
+                  placeholder="Desde"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full h-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-2xl px-4 text-sm focus-visible:ring-slate-500/20 shadow-sm transition-all [color-scheme:light] dark:[color-scheme:dark]"
+                />
+              </div>
+              <span className="text-slate-400 text-sm font-medium">al</span>
+              <div className="relative flex-1 md:w-40 h-11">
+                <Input 
+                  type="date"
+                  placeholder="Hasta"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full h-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-2xl px-4 text-sm focus-visible:ring-slate-500/20 shadow-sm transition-all [color-scheme:light] dark:[color-scheme:dark]"
+                />
+              </div>
+            </div>
+            {(searchQuery || dateFrom || dateTo) && (
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+                className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 flex-shrink-0"
+                title="Limpiar filtros"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
 
         {/* Filters */}
         <div className="flex items-center overflow-x-auto w-full xl:w-auto pb-1 xl:pb-0 hide-scrollbar">
-          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-800 h-13 transition-all shrink-0">
+          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-800 h-11 transition-all shrink-0">
             <Button
               variant="ghost"
               onClick={() => setStatusFilter("pendiente")}
@@ -291,21 +337,21 @@ export default function CajasPage() {
                         >
                           <div className="w-full lg:col-span-3 lg:pl-4 flex justify-between lg:justify-start items-center">
                             <span className="lg:hidden text-xs font-bold text-slate-400 uppercase tracking-wider">Chofer</span>
-                            <span className="font-bold text-slate-900 dark:text-slate-100 text-[16px] group-hover:text-blue-600 transition-colors">
+                            <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm group-hover:text-blue-600 transition-colors">
                               {drv.driverName}
                             </span>
                           </div>
 
                           <div className="w-full lg:col-span-2 flex justify-between lg:justify-center items-center text-slate-600 dark:text-slate-300">
                             <span className="lg:hidden text-xs font-bold text-slate-400 uppercase tracking-wider">Facturas</span>
-                            <span className="font-semibold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                            <span className="font-semibold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-sm">
                               {drv.invoices.length} {drv.invoices.length === 1 ? "Factura" : "Facturas"}
                             </span>
                           </div>
 
                           <div className="w-full lg:col-span-2 flex justify-between lg:justify-end lg:pr-6 items-center">
                             <span className="lg:hidden text-xs font-bold text-slate-400 uppercase tracking-wider">A recibir</span>
-                            <span className="font-black text-[17px] text-emerald-600 dark:text-emerald-400 tracking-tight">
+                            <span className="font-semibold text-sm text-slate-900 dark:text-slate-100 tracking-tight">
                               {formatCurrency(totalCashExpected)}
                             </span>
                           </div>
@@ -314,7 +360,7 @@ export default function CajasPage() {
                             <span className="lg:hidden text-xs font-bold text-slate-400 uppercase tracking-wider">Estado</span>
                             <span
                               className={cn(
-                                "text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md",
+                                "text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md",
                                 drv.status === "entregado"
                                   ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400"
                                   : "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
@@ -326,11 +372,7 @@ export default function CajasPage() {
 
                           <div className="w-full lg:col-span-3 flex justify-end items-center mt-2 lg:mt-0 pt-3 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0 text-slate-400">
                             <div className="flex items-center gap-3 pr-2">
-                              {drv.status === "pendiente" ? (
-                                <div className="text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-500 dark:bg-amber-900/10 dark:text-amber-400 px-2 py-1 rounded-md border border-amber-100/50 dark:border-amber-800/20">
-                                  {pendingCash > 0 ? `Por recibir: ${formatCurrency(pendingCash)}` : "Sin efectivo pendiente"}
-                                </div>
-                              ) : (
+                              {drv.status === "pendiente" ? null : (
                                 <div className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-500 dark:bg-emerald-900/10 dark:text-amber-400 px-2 py-1 rounded-md border border-emerald-100/50 dark:border-amber-800/20">
                                   Todo Recibido
                                 </div>
@@ -377,6 +419,7 @@ export default function CajasPage() {
                                     <th className="px-5 py-3">Factura</th>
                                     <th className="px-5 py-3">Cliente</th>
                                     <th className="px-5 py-3 whitespace-normal">Dirección de Entrega</th>
+                                    <th className="px-5 py-3">Escaneada</th>
                                     <th className="px-5 py-3">Método</th>
                                     <th className="px-5 py-3 text-right">Monto a Cobrar (Cajas)</th>
                                     <th className="px-5 py-3 text-right shrink-0">Acción</th>
@@ -397,6 +440,19 @@ export default function CajasPage() {
                                           {inv.address}
                                         </td>
                                         <td className="px-5 py-3 whitespace-nowrap">
+                                          {inv.isScanned ? (
+                                            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] uppercase tracking-wider">
+                                              <FileCheck className="size-4" />
+                                              Escaneada
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold text-[11px] uppercase tracking-wider">
+                                              <FileX className="size-4" />
+                                              No Cargada
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td className="px-5 py-3 whitespace-nowrap">
                                           <span
                                             className={cn(
                                               "px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest",
@@ -410,7 +466,7 @@ export default function CajasPage() {
                                         </td>
                                         <td className="px-5 py-3 text-right">
                                           {expectedRowCash > 0 ? (
-                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                            <span className="font-medium text-slate-700 dark:text-slate-300">
                                               {formatCurrency(expectedRowCash)}
                                             </span>
                                           ) : (
@@ -430,7 +486,13 @@ export default function CajasPage() {
                                                     <DialogTrigger asChild>
                                                       <Button
                                                         size="xs"
-                                                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-3 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                                                        disabled={!inv.isScanned}
+                                                        className={cn(
+                                                          "h-7 px-3 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all shadow-sm active:scale-95",
+                                                          inv.isScanned 
+                                                            ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
+                                                            : "bg-slate-200 text-slate-400 cursor-not-allowed border-slate-200"
+                                                        )}
                                                         onClick={(e) => e.stopPropagation()}
                                                       >
                                                         Recibir

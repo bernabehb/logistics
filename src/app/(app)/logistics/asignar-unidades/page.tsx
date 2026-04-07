@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { MOCK_UNITS, Unit, UnitStatus } from "@/features/logistics/models/units";
-import { MOCK_DRIVERS, Driver } from "@/features/logistics/models/drivers";
+import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
+import { useEffect } from "react";
 import { UnitCard } from "@/features/logistics/components/cards/UnitCard";
 import { Search, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,18 +15,48 @@ export default function AsignarUnidadesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UnitStatus>("Disponible");
 
-  const [assignments, setAssignments] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    MOCK_DRIVERS.forEach(d => {
-      if (d.assignedUnitId) initial[d.assignedUnitId] = d.id;
-    });
-    return initial;
-  });
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
+  const [driverError, setDriverError] = useState<string | null>(null);
+
+  const [assignments, setAssignments] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      try {
+        setIsLoadingDrivers(true);
+        const response = await fetch('/api/drivers');
+        if (!response.ok) throw new Error('No se pudo obtener la información de los choferes');
+        const data: ApiDriver[] = await response.json();
+        
+        const mappedDrivers = data
+          .filter(d => d.bActivo)
+          .map(mapApiDriverToDriver);
+        
+        setDrivers(mappedDrivers);
+        
+        // Populate initial assignments if any driver has assignedUnitId (though API doesn't show it yet)
+        const initialAssignments: Record<string, string> = {};
+        mappedDrivers.forEach(d => {
+          if (d.assignedUnitId) initialAssignments[d.assignedUnitId] = d.id;
+        });
+        setAssignments(initialAssignments);
+        setDriverError(null);
+      } catch (err) {
+        setDriverError('No se pudo obtener la información');
+        console.error('Error fetching drivers:', err);
+      } finally {
+        setIsLoadingDrivers(false);
+      }
+    };
+
+    fetchDrivers();
+  }, []);
 
   // Helper to find driver assigned to a unit
   const getAssignedDriver = (unitId: string) => {
     const driverId = assignments[unitId];
-    return MOCK_DRIVERS.find(d => d.id === driverId);
+    return drivers.find(d => d.id === driverId);
   };
 
   const handleAssignUnit = (unitId: string, driverId: string) => {
@@ -144,6 +175,9 @@ export default function AsignarUnidadesPage() {
               assignedDriverIds={Object.values(assignments)}
               onAssign={(driverId) => handleAssignUnit(unit.id, driverId)}
               onMaintenance={() => handleSetMaintenance(unit.id)}
+              allDrivers={drivers}
+              isLoadingDrivers={isLoadingDrivers}
+              driverError={driverError}
             />
           ))
         ) : (

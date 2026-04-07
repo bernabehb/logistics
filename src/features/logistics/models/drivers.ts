@@ -1,10 +1,32 @@
 export type DriverBlock = "Aztlan" | "Felix U. Gomez" | "General Escobedo" | "Camino Real";
 
+export interface ApiDriver {
+  iId: number;
+  sClave: string;
+  sNombre: string;
+  company: string;
+  bActivo: boolean;
+}
+
 export interface Driver {
   id: string;
   name: string;
-  block: DriverBlock;
+  block?: DriverBlock;
   assignedUnitId?: string;
+  clave?: string;
+  isActive?: boolean;
+  company?: string;
+}
+
+export function mapApiDriverToDriver(apiDriver: ApiDriver): Driver {
+  return {
+    id: apiDriver.iId.toString(),
+    name: apiDriver.sNombre.trim(),
+    clave: apiDriver.sClave.trim(),
+    isActive: apiDriver.bActivo,
+    company: apiDriver.company,
+    // Default block for compatibility if needed, or leave undefined
+  };
 }
 
 export const MOCK_DRIVERS: Driver[] = [
