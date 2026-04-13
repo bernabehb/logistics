@@ -11,7 +11,10 @@ import {
   MapPin,
   User,
   Pencil,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  Search as SearchIcon,
+  Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
@@ -26,18 +29,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { LogisticsRow } from "@/features/logistics/models";
-import { MOCK_DRIVERS, DriverBlock } from "@/features/logistics/models/drivers";
+import { Driver, DriverBlock } from "@/features/logistics/models/drivers";
 
 const BLOCKS: DriverBlock[] = ["Aztlan", "Felix U. Gomez", "General Escobedo", "Camino Real"];
 
 interface OrderCardProps {
   invoice: LogisticsRow;
   onAssign: (id: string, driverId: string) => void;
+  externalDrivers?: Driver[];
+  isLoadingDrivers?: boolean;
+  driversError?: string | null;
 }
 
-export function OrderCard({ invoice, onAssign }: OrderCardProps) {
+export function OrderCard({ invoice, onAssign, externalDrivers = [], isLoadingDrivers, driversError }: OrderCardProps) {
   const isAssigned = !!invoice.assignedDriverId;
-  const assignedDriver = MOCK_DRIVERS.find(d => d.id === invoice.assignedDriverId);
+  const assignedDriver = externalDrivers.find(d => d.id === invoice.assignedDriverId);
 
   const rootBlockIndex = parseInt(invoice.id.replace(/\D/g, '') || '0', 10);
   const assignedBlock = assignedDriver?.block || BLOCKS[rootBlockIndex % BLOCKS.length];
@@ -87,7 +93,19 @@ export function OrderCard({ invoice, onAssign }: OrderCardProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
 
-  const availableDrivers = MOCK_DRIVERS.filter(d => d.block === assignedBlock);
+  // Estados para el Selector Personalizado
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [driverSearch, setDriverSearch] = useState("");
+
+  // Available drivers are now all external drivers (no filtering by block as requested)
+  const availableDrivers = externalDrivers;
+
+  const filteredDriversForSelect = availableDrivers.filter(d => 
+    d.name.toLowerCase().includes(driverSearch.toLowerCase()) ||
+    d.sucursal?.toLowerCase().includes(driverSearch.toLowerCase())
+  );
+
+  const selectedDriverData = externalDrivers.find(d => d.id === selectedDriver);
 
   const handleDriverChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedDriver(e.target.value);
@@ -190,7 +208,7 @@ export function OrderCard({ invoice, onAssign }: OrderCardProps) {
                   Bloque
                 </p>
                 <div className="w-full h-11 flex items-center bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-xl px-3 text-sm font-semibold">
-                  {assignedDriver.block}
+                  {assignedBlock}
                 </div>
               </div>
               <div>
@@ -199,7 +217,10 @@ export function OrderCard({ invoice, onAssign }: OrderCardProps) {
                 </p>
                 <div className="w-full flex items-center gap-2 text-slate-800 dark:text-slate-200 font-semibold bg-slate-50 dark:bg-slate-800/50 h-11 rounded-xl px-3 text-sm border border-slate-100 dark:border-slate-700">
                   <User className="w-4 h-4 text-emerald-500" />
-                  <span>{assignedDriver.name}</span>
+                  <span className="truncate">{assignedDriver.name}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-auto bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md shrink-0">
+                    {assignedDriver.sucursal}
+                  </span>
                 </div>
               </div>
               <button
@@ -221,18 +242,90 @@ export function OrderCard({ invoice, onAssign }: OrderCardProps) {
                 </div>
               </div>
 
-              <div>
+              <div className="relative">
                 <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 block">
                   Seleccionar Chofer
                 </label>
-                <select
-                  value={selectedDriver}
-                  onChange={handleDriverChange}
-                  className="w-full h-11 bg-slate-50 dark:bg-[#0F172A]/50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all cursor-pointer"
-                >
-                  <option value="" disabled hidden className="bg-white dark:bg-[#0F172A]">Selecciona un chofer...</option>
-                  {availableDrivers.map(d => <option key={d.id} value={d.id} className="bg-white dark:bg-[#0F172A]">{d.name}</option>)}
-                </select>
+                
+                {/* Custom Select Trigger */}
+                <div className="relative group">
+                  <button
+                    type="button"
+                    onClick={() => !isLoadingDrivers && !driversError && setIsSelectorOpen(!isSelectorOpen)}
+                    disabled={isLoadingDrivers || !!driversError}
+                    className={cn(
+                      "w-full h-11 bg-slate-50 dark:bg-[#0F172A]/50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl px-4 text-sm font-medium flex items-center justify-between transition-all hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20",
+                      isSelectorOpen && "ring-2 ring-blue-500/20 border-blue-500 dark:border-blue-500/50",
+                      driversError && "border-red-300 dark:border-red-900/50 text-red-500"
+                    )}
+                  >
+                    <span className="truncate">
+                      {isLoadingDrivers ? "Cargando choferes..." : 
+                       driversError ? driversError : 
+                       selectedDriverData ? `${selectedDriverData.name} - ${selectedDriverData.sucursal}` : 
+                       "Selecciona un chofer..."}
+                    </span>
+                    <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform", isSelectorOpen && "rotate-180")} />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isSelectorOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40 bg-transparent" 
+                        onClick={() => setIsSelectorOpen(false)}
+                      />
+                      <div className="absolute top-[calc(100%+6px)] left-0 w-full bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
+                        {/* Internal Search */}
+                        <div className="p-2 border-b border-slate-100 dark:border-slate-800">
+                          <div className="relative">
+                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Buscar chofer..."
+                              value={driverSearch}
+                              onChange={(e) => setDriverSearch(e.target.value)}
+                              className="w-full h-9 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Options List */}
+                        <div className="max-h-[220px] overflow-y-auto py-1 no-scrollbar">
+                          {filteredDriversForSelect.length > 0 ? (
+                            filteredDriversForSelect.map(d => (
+                              <button
+                                key={d.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDriver(d.id);
+                                  setIsSelectorOpen(false);
+                                  setDriverSearch("");
+                                }}
+                                className={cn(
+                                  "w-full px-4 py-2.5 text-left text-[13px] hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors flex items-center justify-between group",
+                                  selectedDriver === d.id && "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold"
+                                )}
+                              >
+                                <div className="flex flex-col">
+                                  <span>{d.name}</span>
+                                  <span className="text-[10px] text-slate-400 group-hover:text-slate-500 uppercase font-medium">{d.sucursal}</span>
+                                </div>
+                                {selectedDriver === d.id && <Check className="w-4 h-4" />}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-8 text-center text-slate-400 text-xs">
+                              No se encontraron choferes
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2 mt-2">
@@ -265,7 +358,7 @@ export function OrderCard({ invoice, onAssign }: OrderCardProps) {
           <DialogHeader className="text-left">
             <DialogTitle>Confirmar Asignación</DialogTitle>
             <DialogDescription className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed pt-2">
-              ¿Deseas asignar el pedido <strong className="text-slate-900 dark:text-slate-100">#{invoice.id}</strong> al chofer <strong className="text-slate-900 dark:text-slate-100">{MOCK_DRIVERS.find(d => d.id === selectedDriver)?.name}</strong>?
+              ¿Deseas asignar el pedido <strong className="text-slate-900 dark:text-slate-100">#{invoice.id}</strong> al chofer <strong className="text-slate-900 dark:text-slate-100">{externalDrivers.find(d => d.id === selectedDriver)?.name}</strong>?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">

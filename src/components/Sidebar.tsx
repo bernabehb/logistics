@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Truck, LogOut, ClipboardList, DollarSign, ShieldCheck } from "lucide-react";
+import { Package, Truck, LogOut, ClipboardList, DollarSign, ShieldCheck, Map } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -39,6 +39,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       roles: ["Logistica"],
     },
     {
+      name: "Rutas",
+      href: "/logistics/rutas",
+      icon: Map,
+      roles: ["Logistica", "Admin"],
+    },
+    {
       name: "Cajas",
       href: "/cajas",
       icon: DollarSign,
@@ -74,7 +80,15 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       icon: Truck,
       roles: ["Chofer"],
     },
-  ].filter((item) => !userRole || item.roles.includes(userRole));
+  ].filter((item) => !userRole || item.roles.includes(userRole))
+   .sort((a, b) => {
+     const disabledNames = ["Asignación de pedidos", "Control de pedidos"];
+     const isADisabled = disabledNames.includes(a.name);
+     const isBDisabled = disabledNames.includes(b.name);
+     if (isADisabled && !isBDisabled) return 1;
+     if (!isADisabled && isBDisabled) return -1;
+     return 0;
+   });
 
   return (
     <aside className={cn(
@@ -115,7 +129,9 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   "size-5 transition-colors",
                   isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400"
                 )} />
-                {item.name}
+                <span className={cn((item.name === "Asignación de pedidos" || item.name === "Control de pedidos") && "line-through opacity-70")}>
+                  {item.name}
+                </span>
               </Link>
             );
           })}

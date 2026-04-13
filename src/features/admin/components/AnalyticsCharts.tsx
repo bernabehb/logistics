@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, Cell, LabelList,
@@ -18,6 +18,11 @@ interface AnalyticsChartsProps {
 
 export function AnalyticsCharts({ invoices, getStableTime, driverId }: AnalyticsChartsProps) {
   const [chartType, setChartType] = useState<"bar" | "pie">("pie");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // ================= DESTINOS =================
   const destinationsData = useMemo(() => {
@@ -174,8 +179,9 @@ export function AnalyticsCharts({ invoices, getStableTime, driverId }: Analytics
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 pt-4 pb-2 [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none">
-          <ResponsiveContainer width="100%" height="100%">
+        <CardContent className="flex-1 pt-4 pb-2 [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none overflow-hidden h-[300px]">
+          {mounted ? (
+            <ResponsiveContainer width="100%" height="100%" debounce={100}>
             {chartType === "bar" ? (
               <BarChart
                 data={destinationsData}
@@ -247,6 +253,11 @@ export function AnalyticsCharts({ invoices, getStableTime, driverId }: Analytics
               </PieChart>
             )}
           </ResponsiveContainer>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
+              Cargando estadísticas...
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -269,9 +280,10 @@ export function AnalyticsCharts({ invoices, getStableTime, driverId }: Analytics
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="flex-1 pt-4 pb-4 flex flex-col min-h-0 [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none">
+        <CardContent className="flex-1 pt-4 pb-4 flex flex-col min-h-0 [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none overflow-hidden h-[300px]">
           <div className="flex-1 min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
+            {mounted ? (
+              <ResponsiveContainer width="100%" height="100%" debounce={100}>
               <AreaChart
                 data={occupancyData}
                 margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
@@ -328,6 +340,11 @@ export function AnalyticsCharts({ invoices, getStableTime, driverId }: Analytics
                 />
               </AreaChart>
             </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs text-center p-8">
+                Cargando ocupación...
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between text-[10px] mt-4 text-slate-400 font-medium px-2">

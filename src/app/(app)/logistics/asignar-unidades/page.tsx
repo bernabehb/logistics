@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { MOCK_UNITS, Unit, UnitStatus } from "@/features/logistics/models/units";
+import { useState, useEffect } from "react";
+import { Unit, UnitStatus, ApiUnit, mapApiUnitToUnit } from "@/features/logistics/models/units";
 import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
-import { useEffect } from "react";
 import { UnitCard } from "@/features/logistics/components/cards/UnitCard";
 import { Search, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,15 +10,40 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export default function AsignarUnidadesPage() {
-  const [units, setUnits] = useState<Unit[]>(MOCK_UNITS);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UnitStatus>("Disponible");
+
+  const [isLoadingUnits, setIsLoadingUnits] = useState(true);
+  const [unitsError, setUnitsError] = useState<string | null>(null);
 
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
   const [driverError, setDriverError] = useState<string | null>(null);
 
   const [assignments, setAssignments] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchUnits = async () => {
+      try {
+        setIsLoadingUnits(true);
+        const response = await fetch('/api/units');
+        if (!response.ok) throw new Error('No se pudo obtener la información de las unidades');
+        const data: ApiUnit[] = await response.json();
+        
+        const mappedUnits = data.map((u, index) => mapApiUnitToUnit(u, index));
+        setUnits(mappedUnits);
+        setUnitsError(null);
+      } catch (err) {
+        setUnitsError('No se pudo obtener la información de las unidades');
+        console.error('Error fetching units:', err);
+      } finally {
+        setIsLoadingUnits(false);
+      }
+    };
+
+    fetchUnits();
+  }, []);
 
   useEffect(() => {
     const fetchDrivers = async () => {
@@ -99,8 +123,21 @@ export default function AsignarUnidadesPage() {
   };
 
   const filteredUnits = units.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.plate.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return u.status === statusFilter;
+
+    let matchesSearch = false;
+    if (/^\d+$/.test(q)) {
+      // Si es un número, buscamos que el nombre de la unidad termine en ese número exacto (con o sin cero inicial)
+      // Esto evita que al buscar "4" salgan la "14" o "24"
+      const numericRegex = new RegExp(`\\b0?${q}$`, 'i');
+      matchesSearch = numericRegex.test(u.name);
+    } else {
+      // Búsqueda por texto normal
+      matchesSearch = u.name.toLowerCase().includes(q) ||
+                     u.plate.toLowerCase().includes(q);
+    }
+
     const matchesStatus = u.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -166,7 +203,17 @@ export default function AsignarUnidadesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
-        {filteredUnits.length > 0 ? (
+        {isLoadingUnits ? (
+           <div className="col-span-full flex flex-col items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-500 mb-4" />
+              <p className="text-slate-500 font-medium">Cargando unidades...</p>
+           </div>
+        ) : unitsError ? (
+          <div className="col-span-full flex flex-col items-center justify-center py-20 bg-red-50/50 dark:bg-red-950/10 border border-dashed border-red-200 dark:border-red-900/30 rounded-[2rem]">
+            <Truck className="size-20 text-red-200 dark:text-red-900/30 mb-4" />
+            <h3 className="text-xl font-bold text-red-400 dark:text-red-800 tracking-tight">{unitsError}</h3>
+          </div>
+        ) : filteredUnits.length > 0 ? (
           filteredUnits.map((unit) => (
             <UnitCard 
               key={unit.id}

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MOCK_LOGISTICS_DATA, LogisticsRow } from "@/features/logistics/models";
-import { MOCK_DRIVERS } from "@/features/logistics/models/drivers";
+import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
 import { OrderCard } from "@/features/logistics/components/cards/OrderCard";
 import { Search, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,37 @@ export default function AsignarRutaPage() {
 
   const [filter, setFilter] = useState<'todos' | 'pendientes' | 'asignados'>('todos');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Estados para choferes dinámicos
+  const [externalDrivers, setExternalDrivers] = useState<Driver[]>([]);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
+  const [driversError, setDriversError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchDrivers() {
+      try {
+        setIsLoadingDrivers(true);
+        const response = await fetch('/api/drivers');
+        if (!response.ok) throw new Error('Falló la conexión');
+        
+        const data: ApiDriver[] = await response.json();
+        if (!data || data.length === 0) {
+          setDriversError("No se pudo obtener los datos");
+          return;
+        }
+
+        const mapped = data.map(mapApiDriverToDriver);
+        setExternalDrivers(mapped);
+      } catch (err) {
+        console.error("Error fetching drivers:", err);
+        setDriversError("No se pudo obtener los datos");
+      } finally {
+        setIsLoadingDrivers(false);
+      }
+    }
+
+    fetchDrivers();
+  }, []);
 
   const handleAssignDriver = (id: string, driverId: string) => {
     // Modifica el estado "global" del mock en memoria para sincronización entre vistas (solo prototipo, sin persistencia remota).
@@ -45,6 +76,10 @@ export default function AsignarRutaPage() {
       i.id.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesFilter && matchesSearch;
+  }).sort((a, b) => {
+    // Los pendientes van primero, los asignados al final
+    if (!!a.assignedDriverId === !!b.assignedDriverId) return 0;
+    return a.assignedDriverId ? 1 : -1;
   });
 
   return (
@@ -141,7 +176,14 @@ export default function AsignarRutaPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
           {filteredInvoices.map((invoice) => (
-            <OrderCard key={invoice.id} invoice={invoice} onAssign={handleAssignDriver} />
+            <OrderCard 
+              key={invoice.id} 
+              invoice={invoice} 
+              onAssign={handleAssignDriver}
+              externalDrivers={externalDrivers}
+              isLoadingDrivers={isLoadingDrivers}
+              driversError={driversError}
+            />
           ))}
         </div>
       )}

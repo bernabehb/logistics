@@ -19,8 +19,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="dark">
-      <body className={`${inter.variable} font-sans antialiased bg-slate-50 text-slate-900 dark:bg-[#0F172A] dark:text-slate-100 transition-colors duration-300 min-h-screen`}>
+    <html lang="es" className="dark" suppressHydrationWarning>
+      <body 
+        className={`${inter.variable} font-sans antialiased bg-slate-50 text-slate-900 dark:bg-[#0F172A] dark:text-slate-100 transition-colors duration-300 min-h-screen`}
+        suppressHydrationWarning
+      >
         <ThemeProvider>
           {children}
         </ThemeProvider>

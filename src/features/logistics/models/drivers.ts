@@ -5,6 +5,7 @@ export interface ApiDriver {
   sClave: string;
   sNombre: string;
   company: string;
+  sSucursal: string;
   bActivo: boolean;
 }
 
@@ -16,6 +17,7 @@ export interface Driver {
   clave?: string;
   isActive?: boolean;
   company?: string;
+  sucursal?: string;
 }
 
 export function mapApiDriverToDriver(apiDriver: ApiDriver): Driver {
@@ -25,7 +27,7 @@ export function mapApiDriverToDriver(apiDriver: ApiDriver): Driver {
     clave: apiDriver.sClave.trim(),
     isActive: apiDriver.bActivo,
     company: apiDriver.company,
-    // Default block for compatibility if needed, or leave undefined
+    sucursal: apiDriver.sSucursal.trim(),
   };
 }
 

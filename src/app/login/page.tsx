@@ -36,7 +36,15 @@ export default function LoginPage() {
 
         {/* Center Logo Area */}
         <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-700">
-          <Image src="/logo.png" alt="COMPERS Logo" width={280} height={120} quality={100} className="mb-6 object-contain drop-shadow-2xl dark:brightness-0 dark:invert" />
+          <Image 
+            src="/logo.png" 
+            alt="COMPERS Logo" 
+            width={280} 
+            height={120} 
+            quality={95} 
+            priority
+            className="mb-6 w-auto h-auto object-contain drop-shadow-2xl dark:brightness-0 dark:invert" 
+          />
           <p className="text-[10px] tracking-[0.3em] text-slate-500 font-medium uppercase ml-2">Sistema de Logística</p>
         </div>
       </div>
