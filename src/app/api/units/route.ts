@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server';
+import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
 
 export async function GET() {
-  const EXTERNAL_API_URL = 'https://ds29pw03-7297.usw3.devtunnels.ms/Logistics/GetUnits';
-
   try {
-    const response = await fetch(EXTERNAL_API_URL, {
-      headers: {
-        'X-Tunnel-Skip-Anti-Phishing-Page': 'true',
-        'Accept': 'application/json',
-      },
+    const response = await fetch(API_ENDPOINTS.units, {
+      headers: API_HEADERS,
       next: { revalidate: 0 } // Disable caching to get fresh data
     });
 

@@ -63,9 +63,7 @@ export default function RutasPage() {
     async function fetchRoutes() {
       try {
         setIsLoading(true);
-        const response = await fetch('https://5xtsg3k1-7297.usw3.devtunnels.ms/Logistics/GetRoutesInvoices', {
-          headers: { 'accept': 'text/plain' }
-        });
+        const response = await fetch('/api/routes');
         if (!response.ok) throw new Error('No se pudo conectar con el servidor de rutas');
         const data: ApiRutaInvoice[] = await response.json();
 
