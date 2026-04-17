@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Truck, Fuel, AlertTriangle, User, BadgeCheck, Wrench, RefreshCw, LogOut, ChevronDown, Search as SearchIcon, Check } from "lucide-react";
+import { Truck, Fuel, AlertTriangle, User, BadgeCheck, Wrench, RefreshCw, LogOut, ChevronDown, Search as SearchIcon, Check, MapPin, Gauge, Box, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import {
@@ -59,6 +59,7 @@ export function UnitCard({
   // Estados para el Selector Personalizado
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [driverSearch, setDriverSearch] = useState("");
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   const filteredDriversForSelect = allDrivers
     .filter(driver => !assignedDriverIds.includes(driver.id))
@@ -102,8 +103,8 @@ export function UnitCard({
     )}>
       <CardHeader className="flex flex-row justify-between items-start pb-4 space-y-0">
         <div className="flex flex-col min-w-0 flex-1 mt-0">
-          <div className="flex items-center gap-2 mb-1 flex-nowrap">
-            <CardTitle className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-colors truncate">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <CardTitle className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-colors leading-tight">
               {unit.name}
             </CardTitle>
             <span className={cn(
@@ -123,29 +124,84 @@ export function UnitCard({
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col">
-        {/* Samsara Stats */}
-        <div className="mb-6">
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2 transition-colors">
-            <div className="flex items-center gap-2 text-slate-400">
-              <Fuel className="size-4" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Combustible</span>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className="text-xl font-black text-slate-700 dark:text-slate-200 leading-none transition-colors">{unit.fuelLevel}%</span>
-              <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all",
-                    unit.fuelLevel < 20 ? "bg-red-500" : 
-                    unit.fuelLevel < 50 ? "bg-amber-500" : 
-                    "bg-emerald-500"
-                  )}
-                  style={{ width: `${unit.fuelLevel}%` }}
-                />
+          {/* Samsara Stats: Fuel */}
+          <div className="mb-5">
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2 transition-colors">
+              <div className="flex items-center gap-2 text-slate-400">
+                <Fuel className="size-4" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Combustible</span>
+              </div>
+              <div className="flex items-end gap-2">
+                <span className="text-xl font-black text-slate-700 dark:text-slate-200 leading-none transition-colors">{unit.fuelLevel}%</span>
+                <div className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      unit.fuelLevel < 20 ? "bg-red-500" : 
+                      unit.fuelLevel < 50 ? "bg-amber-500" : 
+                      "bg-emerald-500"
+                    )}
+                    style={{ width: `${unit.fuelLevel}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+
+          {/* Unit Technical Details (Fluid Grid) */}
+          <div className="grid grid-cols-1 min-[340px]:grid-cols-2 gap-3 mb-6">
+            <div className="bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/50 flex flex-col gap-2 transition-all hover:bg-white dark:hover:bg-slate-800/50 hover:shadow-sm group/item">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 shrink-0">
+                  <Box className="size-3.5 text-slate-500 dark:text-slate-400" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Modelo</span>
+              </div>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase truncate px-1">
+                {unit.type}
+              </span>
+            </div>
+
+            <div className="bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/50 flex flex-col gap-2 transition-all hover:bg-white dark:hover:bg-slate-800/50 hover:shadow-sm group/item">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 shrink-0">
+                  <BadgeCheck className="size-3.5 text-slate-500 dark:text-slate-400" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Placa</span>
+              </div>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-200 px-1">
+                {unit.plate}
+              </span>
+            </div>
+
+            <div className="bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/50 flex flex-col gap-2 transition-all hover:bg-white dark:hover:bg-slate-800/50 hover:shadow-sm group/item border-l-2 border-l-blue-500/20">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 shrink-0">
+                  <Gauge className="size-3.5 text-blue-500 dark:text-blue-400" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Kilometraje</span>
+              </div>
+              <span className="text-xs font-black text-slate-700 dark:text-slate-200 px-1">
+                {unit.mileage.toLocaleString()} KM
+              </span>
+            </div>
+
+            <button 
+              onClick={() => setIsMapOpen(true)}
+              className="bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/50 flex flex-col gap-2 transition-all hover:bg-white dark:hover:bg-slate-800/50 hover:shadow-sm border-l-2 border-l-emerald-500/20 group/loc text-left"
+            >
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 shrink-0 group-hover/loc:border-emerald-200 dark:group-hover/loc:border-emerald-900/50 transition-colors">
+                  <MapPin className="size-3.5 text-emerald-500 dark:text-emerald-400 group-hover/loc:scale-110 transition-transform" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Ubicación</span>
+                <ExternalLink className="size-2.5 ml-auto text-slate-300 opacity-0 group-hover/loc:opacity-100 transition-all" />
+              </div>
+              <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase flex items-center gap-1 group-hover/loc:translate-x-1 transition-transform px-1">
+                VER MAPA
+              </span>
+            </button>
+          </div>
 
         {/* Assignment Control */}
         <div className="mt-auto pt-6 border-t border-slate-100 dark:border-slate-800 transition-colors">
@@ -375,6 +431,40 @@ export function UnitCard({
               </Button>
             </DialogClose>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Map Implementation Dialog */}
+      <Dialog open={isMapOpen} onOpenChange={setIsMapOpen}>
+        <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden bg-white dark:bg-slate-900 border-none">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-500/10 rounded-xl">
+                <MapPin className="size-5 text-blue-500" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-lg font-bold text-slate-800 dark:text-slate-100">Seguimiento en tiempo real</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Samsara Fleet • {unit.name}</span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-950/50">
+            <img 
+              src="/samsara_map.png" 
+              alt="Live tracking map" 
+              className="w-full h-full object-cover opacity-80"
+            />
+            {/* Simulation marker */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+              <div className="relative flex items-center justify-center">
+                <div className="absolute inset-0 animate-ping rounded-full bg-blue-500/40 h-10 w-10" />
+                <div className="relative bg-white dark:bg-slate-900 p-2.5 rounded-2xl shadow-2xl border-2 border-blue-500 scale-110">
+                  <Truck className="size-6 text-blue-600" />
+                </div>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>

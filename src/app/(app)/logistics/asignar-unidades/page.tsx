@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Unit, UnitStatus, ApiUnit, mapApiUnitToUnit } from "@/features/logistics/models/units";
-import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
+import { Unit, UnitStatus, ApiUnit, mapApiUnitToUnit, MOCK_UNITS } from "@/features/logistics/models/units";
+import { Driver, ApiDriver, mapApiDriverToDriver, MOCK_DRIVERS } from "@/features/logistics/models/drivers";
 import { UnitCard } from "@/features/logistics/components/cards/UnitCard";
 import { Search, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,71 +10,26 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export default function AsignarUnidadesPage() {
-  const [units, setUnits] = useState<Unit[]>([]);
+  const [units, setUnits] = useState<Unit[]>(MOCK_UNITS);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UnitStatus>("Disponible");
 
-  const [isLoadingUnits, setIsLoadingUnits] = useState(true);
+  const [isLoadingUnits, setIsLoadingUnits] = useState(false);
   const [unitsError, setUnitsError] = useState<string | null>(null);
 
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
+  const [drivers, setDrivers] = useState<Driver[]>(MOCK_DRIVERS);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
   const [driverError, setDriverError] = useState<string | null>(null);
 
   const [assignments, setAssignments] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const fetchUnits = async () => {
-      try {
-        setIsLoadingUnits(true);
-        const response = await fetch('/api/units');
-        if (!response.ok) throw new Error('No se pudo obtener la información de las unidades');
-        const data: ApiUnit[] = await response.json();
-        
-        const mappedUnits = data.map((u, index) => mapApiUnitToUnit(u, index));
-        setUnits(mappedUnits);
-        setUnitsError(null);
-      } catch (err) {
-        setUnitsError('No se pudo obtener la información de las unidades');
-        console.error('Error fetching units:', err);
-      } finally {
-        setIsLoadingUnits(false);
-      }
-    };
-
-    fetchUnits();
-  }, []);
-
-  useEffect(() => {
-    const fetchDrivers = async () => {
-      try {
-        setIsLoadingDrivers(true);
-        const response = await fetch('/api/drivers');
-        if (!response.ok) throw new Error('No se pudo obtener la información de los choferes');
-        const data: ApiDriver[] = await response.json();
-        
-        const mappedDrivers = data
-          .filter(d => d.bActivo)
-          .map(mapApiDriverToDriver);
-        
-        setDrivers(mappedDrivers);
-        
-        // Populate initial assignments if any driver has assignedUnitId (though API doesn't show it yet)
-        const initialAssignments: Record<string, string> = {};
-        mappedDrivers.forEach(d => {
-          if (d.assignedUnitId) initialAssignments[d.assignedUnitId] = d.id;
-        });
-        setAssignments(initialAssignments);
-        setDriverError(null);
-      } catch (err) {
-        setDriverError('No se pudo obtener la información');
-        console.error('Error fetching drivers:', err);
-      } finally {
-        setIsLoadingDrivers(false);
-      }
-    };
-
-    fetchDrivers();
+    // Initial assignments from mock data
+    const initialAssignments: Record<string, string> = {};
+    MOCK_DRIVERS.forEach(d => {
+      if (d.assignedUnitId) initialAssignments[d.assignedUnitId] = d.id;
+    });
+    setAssignments(initialAssignments);
   }, []);
 
   // Helper to find driver assigned to a unit
@@ -144,65 +99,66 @@ export default function AsignarUnidadesPage() {
 
   return (
     <div className="w-full flex flex-col gap-4 h-full pb-12 -mt-2 md:-mt-4">
-      {/* Header Section: Title, Search & Stats */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all w-full mb-2">
-        {/* Left Section: Title & Unified Master Search */}
-        <div className="flex flex-col gap-3 w-full md:w-auto shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
-              Asignación de Unidades
-            </h1>
-          </div>
-          <div className="relative group w-full md:w-[320px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Buscar por nombre de la unidad..."
-              value={searchQuery}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-              className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 h-13 text-sm focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
-            />
-          </div>
+      {/* Title Header */}
+      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
+        Asignación de Unidades
+      </h1>
+
+      {/* Unified Filter & Stats Row */}
+      <div className="flex flex-wrap items-center justify-start gap-4 md:gap-6 w-full bg-white/50 dark:bg-slate-900/40 py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        {/* 1. Master Search Bar (Left) */}
+        <div className="relative group w-full md:w-auto md:min-w-[320px] flex-1 max-w-md shrink-0">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
+          <Input
+            type="text"
+            placeholder="Buscar por nombre o placa..."
+            value={searchQuery}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+            className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 h-10 text-xs focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
+          />
         </div>
 
-        {/* Right column: Stats & Filters */}
-        <div className="flex flex-wrap items-center gap-3 ml-auto">
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-5 py-2.5 rounded-2xl shadow-sm transition-all flex items-center gap-3">
-              <span className="text-xl leading-none">{counts.Disponible}</span>
-              <span className="opacity-70 uppercase tracking-widest text-[11px] mt-0.5">Disponibles</span>
-            </div>
-            <div className="bg-slate-50 dark:bg-slate-500/10 border border-slate-100 dark:border-slate-500/20 text-slate-600 dark:text-slate-400 font-bold px-5 py-2.5 rounded-2xl shadow-sm transition-all flex items-center gap-3">
-              <span className="text-xl leading-none">{counts.Todas}</span>
-              <span className="opacity-70 uppercase tracking-widest text-[11px] mt-0.5">Total</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-800 h-13 transition-all">
+        {/* 2. Filters & Stats Group (Right) */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Status Filters Toggles */}
+          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 shrink-0">
             {[
               { id: "Disponible", label: "Disponibles" },
               { id: "Asignado", label: "Asignados" },
-              { id: "Mantenimiento", label: "Mantenimiento" }
+              { id: "Mantenimiento", label: "En Taller" }
             ].map((status) => (
-              <Button
-                variant="ghost"
+              <button
                 key={status.id}
                 onClick={() => setStatusFilter(status.id as any)}
                 className={cn(
-                  "h-auto px-5 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
+                  "h-auto px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
                   statusFilter === status.id
-                    ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-md ring-1 ring-slate-200 dark:ring-slate-600 scale-105 z-10 hover:bg-white dark:hover:bg-slate-700"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-transparent"
+                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 )}
               >
                 {status.label}
-              </Button>
+              </button>
             ))}
+          </div>
+
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden xl:block"></div>
+
+          {/* Stats Badges (Compact) */}
+          <div className="flex items-center gap-2">
+            <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-2">
+              <span className="text-sm leading-none">{counts.Disponible}</span>
+              <span className="opacity-70 uppercase tracking-widest text-[9px]">Disponibles</span>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-500/10 border border-slate-100 dark:border-slate-500/20 text-slate-600 dark:text-slate-400 font-bold px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-2">
+              <span className="text-sm leading-none">{counts.Todas}</span>
+              <span className="opacity-70 uppercase tracking-widest text-[9px]">Total</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-6">
         {isLoadingUnits ? (
            <div className="col-span-full flex flex-col items-center justify-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-500 mb-4" />

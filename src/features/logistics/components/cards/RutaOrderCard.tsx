@@ -1,9 +1,13 @@
 "use client";
 
+import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Package, Grid3x3, LayoutGrid, PaintbrushVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export type RutaStatus = 'pending' | 'in-progress' | 'ready' | 'none';
+export type RutaInvoiceType = 'normal' | 'anticipada';
 
 export interface RutaPedido {
   id: string;
@@ -13,21 +17,31 @@ export interface RutaPedido {
   vendedor: string;
   deliveryType: 'sucursal' | 'domicilio';
   hasGlassCut?: boolean;
+  estadoGeneral: RutaStatus;
+  type: RutaInvoiceType;
+  completedDeliveries?: number;
+  block?: string;
 }
 
 interface RutaOrderCardProps {
   pedido: RutaPedido;
+  activeStatusFilters?: RutaStatus[];
 }
 
-export function RutaOrderCard({ pedido }: RutaOrderCardProps) {
+export function RutaOrderCard({ pedido, activeStatusFilters }: RutaOrderCardProps) {
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] overflow-hidden">
       <CardContent className="px-3 py-4 flex flex-col gap-3">
-        {/* Header: ID */}
+        {/* Header: ID and Anticipada Badge */}
         <div className="flex items-center justify-between">
           <span className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">
             #{pedido.id}
           </span>
+          {pedido.type === 'anticipada' && pedido.completedDeliveries !== undefined && (
+            <div className="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 text-[9px] font-black px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-500/30 uppercase tracking-widest shadow-sm">
+              Entregado: {pedido.completedDeliveries}
+            </div>
+          )}
         </div>
 
         {/* Client Name */}
@@ -65,10 +79,20 @@ export function RutaOrderCard({ pedido }: RutaOrderCardProps) {
         {/* Warehouses Grid */}
         <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
           {[
-            { id: "Aluminio", label: "ALUM.", Icon: Grid3x3 },
-            { id: "Vidrio", label: "VID.", Icon: LayoutGrid },
-            { id: "Herrajes", label: "HERR.", Icon: PaintbrushVertical },
-          ].filter(wh => pedido.warehouses.some(pwh => pwh.id === wh.id)).map(({ id, label, Icon }) => {
+            { id: "Aluminio", label: "ALUMINIO", Icon: Grid3x3 },
+            { id: "Vidrio", label: "VIDRIO", Icon: LayoutGrid },
+            { id: "Herrajes", label: "HERRAJES", Icon: PaintbrushVertical },
+          ].filter(wh => {
+            const pwh = pedido.warehouses.find(p => p.id === wh.id);
+            if (!pwh) return false;
+            
+            // Apply status filter if active
+            if (activeStatusFilters && activeStatusFilters.length > 0) {
+              return activeStatusFilters.includes(pwh.status);
+            }
+            
+            return true;
+          }).map(({ id, label, Icon }) => {
             const whInfo = pedido.warehouses.find(w => w.id === id)!;
 
             const statusColors = {
@@ -80,18 +104,20 @@ export function RutaOrderCard({ pedido }: RutaOrderCardProps) {
             return (
               <div
                 key={id}
-                className="flex flex-col items-center gap-1.5 py-2 px-1 rounded-lg bg-slate-50 dark:bg-[#1E293B]/50 border border-slate-100 dark:border-slate-700 shadow-sm"
+                className="flex flex-col items-center justify-center gap-1 py-1 px-1 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800/50 shadow-sm h-[76px] relative"
               >
-                <Icon className="size-3.5 text-slate-400 dark:text-slate-500" />
-                <div className={cn("size-2.5 rounded-full transition-colors duration-300", statusColors[whInfo.status])} />
-                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  {label}
-                </span>
-                {id === "Vidrio" && pedido.hasGlassCut && (
-                  <Badge variant="secondary" className="mt-1 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-none px-1.5 py-0 text-[8px] font-black uppercase tracking-tighter">
-                    Corte
-                  </Badge>
-                )}
+                <Icon className="size-3 text-slate-400 dark:text-slate-500 shrink-0" />
+                <div className={cn("size-2 rounded-full shrink-0 transition-colors duration-300", statusColors[whInfo.status])} />
+                <div className="flex flex-col items-center">
+                  <span className="text-[9.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-tighter leading-tight">
+                    {label}
+                  </span>
+                  {id === "Vidrio" && pedido.hasGlassCut && (
+                    <div className="mt-0.5 bg-blue-600 dark:bg-blue-500 text-white dark:text-white px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm">
+                      Corte
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X } from "lucide-react";
+import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,11 +35,14 @@ export interface ReadyDeparture {
   unitName: string;
   type: string;
   driverName: string;
+  clientName?: string;
   destination: string;
   invoices: Invoice[];
   totalWeightTons: number;
+  totalAmount: number;
+  deliveryType: "domicilio" | "sucursal";
   locations: string[];
-  status: "Pendiente" | "En ruta";
+  status: "Pendiente" | "En ruta" | "Completado";
 }
 
 interface DepartureCardProps {
@@ -162,14 +165,16 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   };
 
   return (
-    <Card className="hover:shadow-xl transition-all duration-300 group relative flex flex-col h-full overflow-hidden border-slate-100 dark:border-slate-800">
-      <CardHeader className="flex flex-col justify-start pb-4">
-        {/* Header: Driver Name */}
+    <Card className="hover:shadow-md transition-all duration-300 group flex flex-col h-full overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] shadow-sm">
+      <CardHeader className="flex flex-col justify-start p-4 pt-3 pb-2">
+        {/* Header: Unit/Invoice Name */}
         <div className="flex justify-between items-start shrink-0 w-full">
           <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1 flex-nowrap">
               <CardTitle className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-colors truncate">
-                {departure.driverName}
+                {departure.deliveryType === 'sucursal'
+                  ? (departure.clientName || "Entrega Cliente")
+                  : departure.unitName}
               </CardTitle>
               <span className={cn(
                 "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-colors shrink-0 whitespace-nowrap",
@@ -180,85 +185,119 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                 {departure.status === "Pendiente" ? "PENDIENTE" : "EN RUTA"}
               </span>
             </div>
-            <span className="text-slate-400 text-[10px] uppercase font-black tracking-widest transition-colors opacity-70">
-              Chofer Asignado
-            </span>
+            {/* Subtitle removed as requested */}
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col gap-4">
         {/* Details Section */}
-        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 flex-1 flex flex-col gap-2.5 border border-slate-100 dark:border-slate-800/50">
-          {/* Unit Info */}
+        <div className="bg-white dark:bg-[#1E293B] rounded-xl p-4 flex-1 flex flex-col gap-2.5 border border-slate-200 dark:border-slate-800/50">
+          {/* Driver/Client Info */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white dark:bg-slate-700/50 rounded-lg shrink-0">
-                <Truck className="size-4 text-slate-500 dark:text-slate-400" />
+              <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0">
+                <User className="size-4 text-slate-500 dark:text-slate-400" />
               </div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                Unidad
+                {departure.deliveryType === 'sucursal' ? "Cliente" : "Chofer"}
               </span>
             </div>
-            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
-              {departure.unitName}
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase truncate ml-2 text-right flex-1 min-w-0">
+              {departure.deliveryType === 'sucursal' ? (departure.clientName || 'Cliente General') : departure.driverName}
             </span>
           </div>
 
           {/* Facturas */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white dark:bg-slate-700/50 rounded-lg shrink-0">
-                <FileText className="size-4 text-slate-500 dark:text-slate-400" />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0">
+                  <FileText className="size-4 text-slate-500 dark:text-slate-400" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  Facturas ({departure.invoices.length})
+                </span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                Facturas
-              </span>
             </div>
-            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
-              {departure.invoices.length}
-            </span>
+            <div className="flex flex-wrap gap-1.5 pl-1">
+              {departure.invoices.map((inv) => (
+                <span key={inv.id} className="text-[10px] font-bold px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-600 dark:text-slate-300">
+                  #{inv.id}
+                </span>
+              ))}
+            </div>
           </div>
 
-          {/* Peso */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white dark:bg-slate-700/50 rounded-lg shrink-0">
+          {/* Peso y Monto (Fluid layout) */}
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 py-1">
+            <div className="flex items-center gap-3 min-w-fit flex-1">
+              <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0 border border-slate-100 dark:border-slate-800 shadow-sm">
                 <Weight className="size-4 text-slate-500 dark:text-slate-400" />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                Peso Total
-              </span>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                  Peso Total
+                </span>
+                <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                  {departure.totalWeightTons?.toFixed(1)} <span className="text-[9px] opacity-70">TON.</span>
+                </span>
+              </div>
             </div>
-            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
-              {departure.totalWeightTons} TON.
-            </span>
+
+            <div className="flex items-center gap-3 min-w-fit flex-1">
+              <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0 border border-slate-100 dark:border-slate-800 shadow-sm">
+                <CircleDollarSign className="size-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                  Monto Total
+                </span>
+                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                  ${departure.totalAmount?.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Locations */}
-          <div className="flex items-start gap-3 mt-1">
-            <div className="p-2 bg-white dark:bg-slate-700/50 rounded-lg shrink-0 mt-0.5">
-              <MapPin className="size-4.5 text-slate-500 dark:text-slate-400" />
-            </div>
-            <div className="flex flex-col flex-1 pb-1 min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 mt-1">
-                Ubicaciones Asignadas
-              </span>
-              <div className="flex flex-col gap-2">
+          {/* Locations Section (Timeline Style) */}
+          {departure.deliveryType === 'domicilio' && (
+            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 bg-blue-50 dark:bg-blue-500/10 rounded-lg shrink-0">
+                  <MapPin className="size-3.5 text-blue-500 dark:text-blue-400" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                  Ruta de Entrega
+                </span>
+              </div>
+
+              <div className="relative pl-3 space-y-4">
+                {/* Vertical Connecting Line */}
+                <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-blue-200 to-slate-200 dark:from-blue-500/30 dark:to-slate-700/30 rounded-full" />
+
                 {departure.locations.map((loc, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0 mt-1.5" />
-                    <span className="leading-snug break-words">{loc}</span>
+                  <div key={i} className="relative flex items-start gap-4 group/stop">
+                    {/* Stop Number Indicator */}
+                    <div className="relative z-10 flex items-center justify-center size-3.5 bg-white dark:bg-slate-900 border-2 border-blue-400 dark:border-blue-500 rounded-full shrink-0 mt-0.5 group-hover/stop:scale-110 group-hover/stop:bg-blue-50 dark:group-hover/stop:bg-blue-900/40 transition-all">
+                      <span className="text-[7.5px] font-black text-blue-600 dark:text-blue-400 leading-none">{i + 1}</span>
+                    </div>
+
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-snug group-hover/stop:text-blue-600 dark:group-hover/stop:text-blue-400 transition-colors">
+                        {loc}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          )}
         </div>
       </CardContent>
 
-      <CardFooter className="px-5 pb-5 pt-0">
-        <div className="w-full shrink-0 pt-4 border-t border-slate-100 dark:border-slate-800">
+      <CardFooter className="px-5 pb-4">
+        <div className="w-full shrink-0">
           {departure.status === "Pendiente" ? (
             <Dialog onOpenChange={(open) => !open && resetAuth()}>
               <DialogTrigger asChild>
@@ -491,14 +530,23 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                           </div>
 
                           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-800 shadow-inner group">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="font-bold text-slate-400 uppercase tracking-widest">Unidad</span>
-                              <span className="font-black text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 transition-colors">{departure.unitName}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-xs mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
-                              <span className="font-bold text-slate-400 uppercase tracking-widest">Chofer</span>
-                              <span className="font-black text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 transition-colors uppercase">{departure.driverName}</span>
-                            </div>
+                            {departure.deliveryType === 'domicilio' ? (
+                              <>
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="font-bold text-slate-400 uppercase tracking-widest">Unidad</span>
+                                  <span className="font-black text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 transition-colors">{departure.unitName}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
+                                  <span className="font-bold text-slate-400 uppercase tracking-widest">Chofer</span>
+                                  <span className="font-black text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 transition-colors uppercase">{departure.driverName}</span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="font-bold text-slate-400 uppercase tracking-widest">Cliente</span>
+                                <span className="font-black text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 transition-colors uppercase">{departure.clientName || 'Cliente General'}</span>
+                              </div>
+                            )}
                           </div>
 
                           <Button
@@ -513,7 +561,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                           <div className="p-10 bg-emerald-600 rounded-full text-white shadow-2xl shadow-emerald-500/40">
                             <CheckCircle className="size-24" />
                           </div>
-                          
+
                           <div className="mt-12 text-center animate-in slide-in-from-bottom-4 duration-700 delay-200">
                             <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">¡SALIDA AUTORIZADA!</h2>
                           </div>

@@ -35,12 +35,12 @@ export function SingleDatePicker({
           <Button
             variant={"outline"}
             className={cn(
-              "w-[125px] sm:w-[160px] justify-start text-left font-medium py-5 px-2 sm:px-3 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-[#1E293B]/80 shadow-sm transition-all",
+              "w-[110px] sm:w-[130px] justify-start text-left font-medium h-9 px-2 sm:px-3 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-[#1E293B]/80 shadow-sm transition-all",
               !date && "text-slate-500 dark:text-slate-400"
             )}
           >
-            <CalendarIcon className="mr-1.5 sm:mr-2 h-3.5 w-3.5 text-slate-400" />
-            {date ? format(date, "d MMM, yyyy", { locale: es }) : <span className="text-[12px] sm:text-[13px]">Seleccionar</span>}
+            <CalendarIcon className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
+            {date ? format(date, "d MMM, yyyy", { locale: es }) : <span className="text-[11px] sm:text-[12px]">Seleccionar</span>}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 rounded-xl overflow-hidden border-slate-200 dark:border-slate-700 shadow-xl" align="start">

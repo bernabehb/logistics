@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { MOCK_LOGISTICS_DATA, LogisticsRow } from "@/features/logistics/models";
-import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
+import { Driver, ApiDriver, mapApiDriverToDriver, MOCK_DRIVERS } from "@/features/logistics/models/drivers";
 import { OrderCard } from "@/features/logistics/components/cards/OrderCard";
 import { Search, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,34 +19,14 @@ export default function AsignarRutaPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Estados para choferes dinámicos
-  const [externalDrivers, setExternalDrivers] = useState<Driver[]>([]);
-  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
+  const [externalDrivers, setExternalDrivers] = useState<Driver[]>(MOCK_DRIVERS);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
   const [driversError, setDriversError] = useState<string | null>(null);
 
+  // Use static data directly
   useEffect(() => {
-    async function fetchDrivers() {
-      try {
-        setIsLoadingDrivers(true);
-        const response = await fetch('/api/drivers');
-        if (!response.ok) throw new Error('Falló la conexión');
-        
-        const data: ApiDriver[] = await response.json();
-        if (!data || data.length === 0) {
-          setDriversError("No se pudo obtener los datos");
-          return;
-        }
-
-        const mapped = data.map(mapApiDriverToDriver);
-        setExternalDrivers(mapped);
-      } catch (err) {
-        console.error("Error fetching drivers:", err);
-        setDriversError("No se pudo obtener los datos");
-      } finally {
-        setIsLoadingDrivers(false);
-      }
-    }
-
-    fetchDrivers();
+    setExternalDrivers(MOCK_DRIVERS);
+    setIsLoadingDrivers(false);
   }, []);
 
   const handleAssignDriver = (id: string, driverId: string) => {

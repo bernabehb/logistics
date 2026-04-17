@@ -126,7 +126,9 @@
       "AZTLAN 1",
       "AZTLAN 1",
       "AZTLAN 1"
-    ]
+    ],
+    "totalAmount": 12500,
+    "deliveryType": "domicilio"
   },
   {
     "id": "DEP-2002",
@@ -221,7 +223,9 @@
       "CAMINO REAL 2",
       "CAMINO REAL 2",
       "CAMINO REAL 2"
-    ]
+    ],
+    "totalAmount": 8400,
+    "deliveryType": "domicilio"
   },
   {
     "id": "DEP-3003",
@@ -333,7 +337,9 @@
       "LA AURORA",
       "LA AURORA",
       "LA AURORA"
-    ]
+    ],
+    "totalAmount": 25600,
+    "deliveryType": "domicilio"
   },
   {
     "id": "DEP-4004",
@@ -370,7 +376,9 @@
     "status": "Completado",
     "blocks": [
       "SAN NICOLAS CRISTINA LARRALDE"
-    ]
+    ],
+    "totalAmount": 15000,
+    "deliveryType": "domicilio"
   },
   {
     "id": "DEP-5005",
@@ -499,7 +507,9 @@
       "SAN NICOLAS SANTO DOMINGO",
       "SAN NICOLAS SANTO DOMINGO",
       "SAN NICOLAS SANTO DOMINGO"
-    ]
+    ],
+    "totalAmount": 32000,
+    "deliveryType": "domicilio"
   },
   {
     "id": "DEP-6006",
@@ -556,7 +566,9 @@
     "blocks": [
       "AZTLAN 2",
       "AZTLAN 2"
-    ]
+    ],
+    "totalAmount": 18900,
+    "deliveryType": "domicilio"
   },
   {
     "id": "DEP-7007",
@@ -615,6 +627,215 @@
     "blocks": [
       "FELIX U. GOMEZ",
       "FELIX U. GOMEZ"
-    ]
+    ],
+    "totalAmount": 45000,
+    "deliveryType": "domicilio"
+  },
+  {
+    "id": "DEP-9001",
+    "deliveryType": "sucursal",
+    "unitName": "Pick-up Cliente",
+    "driverName": "Cliente",
+    "clientName": "Vidriería Ríos",
+    "destination": "Sucursal Matriz",
+    "invoices": [
+      {
+        "id": "FAC-9001",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura de Sobreponer 1260",
+                "quantity": "5 pzas"
+              },
+              {
+                "name": "Bisagra Hidráulica Ryobi",
+                "quantity": "2 pzas"
+              }
+            ]
+          },
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "12 pzas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-8005",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "5 hojas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "totalWeightTons": 0.8,
+    "totalAmount": 19800,
+    "locations": [
+      "Sucursal Matriz"
+    ],
+    "status": "Pendiente"
+  },
+  {
+    "id": "DEP-9002",
+    "deliveryType": "sucursal",
+    "unitName": "Transporte Propio",
+    "driverName": "Juan Carlos",
+    "clientName": "Aluminios del Norte",
+    "destination": "Sucursal Sur",
+    "invoices": [
+      {
+        "id": "FAC-9002",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "10 hojas"
+              },
+              {
+                "name": "Cristal Templado 10mm",
+                "quantity": "4 hojas"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "FAC-8009",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Perfil Zoclo 1400",
+                "quantity": "8 pzas"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "totalWeightTons": 1.2,
+    "totalAmount": 14500,
+    "locations": [
+      "Sucursal Sur"
+    ],
+    "status": "Pendiente"
+  },
+  {
+    "id": "DEP-4005",
+    "unitName": "Unidad 4",
+    "type": "Caja Cerrada",
+    "driverName": "Alejandro Ruiz",
+    "destination": "Almacén Centro",
+    "invoices": [
+      {
+        "id": "FAC-4005",
+        "groups": [
+          {
+            "warehouse": "Aluminio",
+            "materials": [
+              {
+                "name": "Serie 1400 Panorama Natural",
+                "quantity": "25 pzas"
+              }
+            ]
+          }
+        ],
+        "date": "2026-04-01"
+      }
+    ],
+    "totalWeightTons": 1.2,
+    "locations": [
+      "Calle Juárez 120, Monterrey, N.L."
+    ],
+    "status": "Pendiente",
+    "blocks": [
+      "CENTRO"
+    ],
+    "totalAmount": 9500,
+    "deliveryType": "domicilio"
+  },
+  {
+    "id": "DEP-5006",
+    "unitName": "Unidad 5",
+    "type": "Torton",
+    "driverName": "Roberto Torres",
+    "destination": "Almacén Poniente",
+    "invoices": [
+      {
+        "id": "FAC-5006",
+        "groups": [
+          {
+            "warehouse": "Vidrio",
+            "materials": [
+              {
+                "name": "Vidrio 6mm Claro",
+                "quantity": "15 hojas"
+              }
+            ]
+          }
+        ],
+        "date": "2026-03-30"
+      }
+    ],
+    "totalWeightTons": 3.5,
+    "locations": [
+      "Av. Lincoln 4500, Monterrey, N.L."
+    ],
+    "status": "Pendiente",
+    "blocks": [
+      "LINCOLN"
+    ],
+    "totalAmount": 18200,
+    "deliveryType": "domicilio"
+  },
+  {
+    "id": "DEP-7008",
+    "unitName": "Unidad 7",
+    "type": "Plataforma",
+    "driverName": "Luis Ramírez",
+    "destination": "Almacén Sur",
+    "invoices": [
+      {
+        "id": "FAC-7008",
+        "groups": [
+          {
+            "warehouse": "Herrajes",
+            "materials": [
+              {
+                "name": "Cerradura 1260",
+                "quantity": "30 pzas"
+              }
+            ]
+          }
+        ],
+        "date": "2026-03-29"
+      }
+    ],
+    "totalWeightTons": 2.1,
+    "locations": [
+      "Av. Revolución 1289, Monterrey, N.L."
+    ],
+    "status": "Pendiente",
+    "blocks": [
+      "REVOLUCION"
+    ],
+    "totalAmount": 14300,
+    "deliveryType": "domicilio"
   }
 ]

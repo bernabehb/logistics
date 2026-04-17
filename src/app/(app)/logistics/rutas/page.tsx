@@ -4,193 +4,473 @@ import { useState, useMemo } from "react";
 import { Building2, Home, Search as SearchIcon, Truck, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { RutaOrderCard, RutaPedido } from "@/features/logistics/components/cards/RutaOrderCard";
+import { RutaOrderCard, RutaPedido, RutaStatus, RutaInvoiceType } from "@/features/logistics/components/cards/RutaOrderCard";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from "@/components/ui/popover";
+import { LogisticsFilters, LogisticsDateFilters, LogisticsStatusFilters, LogisticsTypeFilters } from "@/features/logistics/components";
+import { isAfter, isBefore, startOfDay, endOfDay, parse } from "date-fns";
+import { es } from "date-fns/locale";
 
-const BLOCKS_LIST = [
+const BLOCKS_LIST_FALLBACK = [
   "AZTLAN 1", "AZTLAN 2", "AZTLAN 3", "AZTLAN 4",
   "CAMINO REAL 1", "CAMINO REAL 2", "CAMINO REAL 3", "CAMINO REAL 4",
   "FELIX U. GOMEZ", "GENERAL ESCOBEDO", "LA AURORA"
 ];
 
-const VENDORES = ["Juan Carlos", "Elena García", "Pedro S.", "Marta Ruiz", "Ricardo M."];
-const CLIENTS = ["Grupo Vitro MTY", "Distribuidora Apex", "Vidriería Ríos", "Aluminios del Norte", "Ferremax SA", "Construcciones García", "Inmobiliaria Altamira", "Construrama Escobedo"];
-const WAREHOUSES = ["Aluminio", "Vidrio", "Herrajes"];
+interface ApiRutaInvoice {
+  factura: string;
+  cliente: string;
+  sucursal: string;
+  almacen: string;
+  vendedor: string;
+  bloque: string;
+  monto_Factura: number;
+  fecha: string;
+  metodo: string;
+  material: string;
+  cantidad: number;
+  unidad: string;
+  direccion: string;
+}
 
-// Helper to generate static mock data for all blocks
-const generateMockData = (): (RutaPedido & { block: string })[] => {
-  const allPedidos: (RutaPedido & { block: string })[] = [];
+const UNIDADES = Array.from({ length: 10 }, (_, i) => `Unidad ${i + 1}`);
 
-  BLOCKS_LIST.forEach((block, blockIdx) => {
-    // Each block gets 2 to 9 total orders to have 1-5 domicilio orders
-    const count = 2 + (blockIdx % 8);
-    for (let i = 1; i <= count; i++) {
-      const idNum = 2500 + (blockIdx * 10) + i;
-      const clientIdx = (idNum + i) % CLIENTS.length;
-      const vendorIdx = (idNum * i) % VENDORES.length;
+// Helper to generate dynamic data from API is now inside the component using state.
 
-      // Determine warehouses (1, 2 or 3) and assign statuses
-      const whCount = (idNum % 3) + 1;
-      const selectedWh: { id: string; status: 'pending' | 'in-progress' | 'ready' }[] = [];
-      const STATUSES: ('pending' | 'in-progress' | 'ready')[] = ['pending', 'in-progress', 'ready'];
-
-      for (let j = 0; j < whCount; j++) {
-        const warehouseId = WAREHOUSES[(idNum + j) % 3];
-        const statusIdx = (blockIdx + i + j) % 3;
-        selectedWh.push({
-          id: warehouseId,
-          status: STATUSES[statusIdx]
-        });
-      }
-
-      // Force Vidrio and Corte ONLY for the first qualifying domicilio item in AZTLAN 3 and AZTLAN 4
-      const isTargetBlock = block === "AZTLAN 3" || block === "AZTLAN 4";
-      const hasVidrio = selectedWh.some(w => w.id === "Vidrio");
-      let hasGlassCut = hasVidrio && (idNum % 8 === 0);
-
-      const isFirstDomicilioInBlock = (block === "AZTLAN 3" && i === 2) || (block === "AZTLAN 4" && i === 1);
-
-      if (isTargetBlock && isFirstDomicilioInBlock) {
-        // Ensure this specific card has Vidrio and Corte
-        if (!hasVidrio) {
-          selectedWh.push({ id: "Vidrio", status: "pending" });
-        }
-        hasGlassCut = true;
-      }
-
-      allPedidos.push({
-        id: `FAC-${idNum}A`,
-        clientName: CLIENTS[clientIdx],
-        date: `2025-0${(idNum % 9) + 1}-${(idNum % 28) + 1}`,
-        warehouses: selectedWh,
-        vendedor: VENDORES[vendorIdx],
-        deliveryType: (blockIdx + i) % 2 === 0 ? 'domicilio' : 'sucursal',
-        block: block,
-        hasGlassCut: hasGlassCut
-      });
-    }
-  });
-
-  return allPedidos;
-};
-
-const STATIC_DATA = generateMockData();
 
 export default function RutasPage() {
+  const [invoices, setInvoices] = useState<RutaPedido[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<'sucursal' | 'domicilio'>('domicilio');
   const [searchQuery, setSearchQuery] = useState("");
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = useState<Date | undefined>(undefined);
+  const [statusFilters, setStatusFilters] = useState<RutaStatus[]>([]);
+  const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<RutaInvoiceType>('normal');
+  const [assignedUnits, setAssignedUnits] = useState<Record<string, string>>({});
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+
+  // Data Fetching and Mapping
+  useMemo(() => {
+    async function fetchRoutes() {
+      try {
+        setIsLoading(true);
+        const response = await fetch('https://5xtsg3k1-7297.usw3.devtunnels.ms/Logistics/GetRoutesInvoices', {
+          headers: { 'accept': 'text/plain' }
+        });
+        if (!response.ok) throw new Error('No se pudo conectar con el servidor de rutas');
+        const data: ApiRutaInvoice[] = await response.json();
+
+        // Group by Invoice (factura)
+        const groupedMap = new Map<string, RutaPedido & { block: string }>();
+        const VALID_STATUSES = ['pending', 'in-progress', 'ready'] as const;
+
+        // 1. Map API data as 'normal' invoices
+        data.forEach((row) => {
+          if (!groupedMap.has(row.factura)) {
+            const randomStatusIdx = Math.floor(Math.random() * 3);
+            
+            groupedMap.set(row.factura, {
+              id: row.factura,
+              clientName: row.cliente,
+              date: row.fecha,
+              warehouses: [],
+              vendedor: row.vendedor,
+              deliveryType: row.metodo === 'EAD' ? 'domicilio' : 'sucursal',
+              block: (row.bloque || "GENERAL").trim().toUpperCase(),
+              estadoGeneral: VALID_STATUSES[randomStatusIdx],
+              type: 'normal',
+              completedDeliveries: undefined,
+              hasGlassCut: false 
+            });
+          }
+
+          const current = groupedMap.get(row.factura)!;
+          
+          let warehouseName = (row.almacen || "General").trim().toUpperCase();
+          if (warehouseName.includes("ALUMINIO")) warehouseName = "Aluminio";
+          else if (warehouseName.includes("VIDRIO")) warehouseName = "Vidrio";
+          else if (warehouseName.includes("HERRAJE")) warehouseName = "Herrajes";
+
+          if (!current.warehouses.some(w => w.id === warehouseName)) {
+            current.warehouses.push({
+              id: warehouseName,
+              status: VALID_STATUSES[Math.floor(Math.random() * 3)]
+            });
+          }
+
+          if (warehouseName === "Vidrio") {
+            if (row.factura.endsWith('2') || row.factura.endsWith('5')) {
+              current.hasGlassCut = true;
+            }
+          }
+        });
+
+        // 2. Add Static Anticipadas (4-digit IDs)
+        const staticAnticipadas: (RutaPedido & { block: string })[] = [
+          {
+            id: "1038",
+            clientName: "VIDRIERÍA RIOS",
+            date: "2026-04-16",
+            warehouses: [
+              { id: "Vidrio", status: "ready" },
+              { id: "Aluminio", status: "in-progress" }
+            ],
+            vendedor: "MARIO RODRIGUEZ",
+            deliveryType: "domicilio",
+            block: "AZTLAN 3",
+            estadoGeneral: "in-progress",
+            type: "anticipada",
+            completedDeliveries: 3,
+            hasGlassCut: true
+          },
+          {
+            id: "1045",
+            clientName: "ALUMEX MONTERREY",
+            date: "2026-04-17",
+            warehouses: [
+              { id: "Aluminio", status: "pending" },
+              { id: "Herrajes", status: "ready" }
+            ],
+            vendedor: "GRECIA DE LEON",
+            deliveryType: "domicilio",
+            block: "CAMINO REAL 1",
+            estadoGeneral: "pending",
+            type: "anticipada",
+            completedDeliveries: 1,
+            hasGlassCut: false
+          },
+          {
+            id: "1052",
+            clientName: "FERREMAX SA",
+            date: "2026-04-16",
+            warehouses: [
+              { id: "Herrajes", status: "ready" }
+            ],
+            vendedor: "PEDRO S.",
+            deliveryType: "domicilio",
+            block: "APODACA BLOQUE 4",
+            estadoGeneral: "ready",
+            type: "anticipada",
+            completedDeliveries: 4,
+            hasGlassCut: false
+          },
+          {
+            id: "2038",
+            clientName: "CONSTRUCCIONES GARCÍA",
+            date: "2026-04-16",
+            warehouses: [
+              { id: "Aluminio", status: "ready" },
+              { id: "Vidrio", status: "in-progress" }
+            ],
+            vendedor: "RICARDO M.",
+            deliveryType: "sucursal",
+            block: "GENERAL",
+            estadoGeneral: "in-progress",
+            type: "anticipada",
+            completedDeliveries: 2,
+            hasGlassCut: true
+          },
+          {
+            id: "2045",
+            clientName: "HERRAJES FINOS",
+            date: "2026-04-17",
+            warehouses: [
+              { id: "Herrajes", status: "ready" }
+            ],
+            vendedor: "ELENA GARCÍA",
+            deliveryType: "sucursal",
+            block: "GENERAL",
+            estadoGeneral: "ready",
+            type: "anticipada",
+            completedDeliveries: 5,
+            hasGlassCut: false
+          }
+        ];
+
+        const allData = [
+          ...Array.from(groupedMap.values()),
+          ...staticAnticipadas
+        ];
+
+        setInvoices(allData);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching routes:", err);
+        setError("Error al cargar la información de rutas dinámica");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchRoutes();
+  }, []);
+
+  // Compute Blocks from Data
+  const BLOCKS_LIST = useMemo(() => {
+    if (invoices.length === 0) return BLOCKS_LIST_FALLBACK;
+    const blocks = new Set<string>();
+    invoices.forEach(p => {
+      if (p.block) blocks.add(p.block);
+    });
+    BLOCKS_LIST_FALLBACK.forEach(b => blocks.add(b));
+    return Array.from(blocks).sort();
+  }, [invoices]);
+
+  const toggleStatusFilter = (status: RutaStatus) => {
+    setStatusFilters((prev) =>
+      prev.includes(status)
+        ? prev.filter((s) => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setFromDate(undefined);
+    setToDate(undefined);
+    setStatusFilters([]);
+    setInvoiceTypeFilter('normal');
+  };
 
   const filteredPedidos = useMemo(() => {
-    const filtered = STATIC_DATA.filter((p) => {
-      const matchesFilter = p.deliveryType === deliveryTypeFilter;
-      const matchesSearch = p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.clientName.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
+    const filtered = invoices.filter((p) => {
+      // 1. Delivery Type (Sucursal/Domicilio)
+      if (p.deliveryType !== deliveryTypeFilter) return false;
+
+      // 2. Search Query
+      if (searchQuery) {
+        const lowerQuery = searchQuery.toLowerCase();
+        const matchesSearch = p.id.toLowerCase().includes(lowerQuery) ||
+          p.clientName.toLowerCase().includes(lowerQuery);
+        if (!matchesSearch) return false;
+      }
+
+      // 3. Invoice Type
+      if (p.type !== invoiceTypeFilter) return false;
+
+      // 4. Status Filters - Deep check within warehouses
+      if (statusFilters.length > 0 && !p.warehouses.some(w => statusFilters.includes(w.status))) {
+        return false;
+      }
+
+      // 5. Date Range
+      if (fromDate) {
+        const from = startOfDay(fromDate);
+        // API dates appear as YYYY-MM-DD
+        const rowDate = parse(p.date, "yyyy-MM-dd", new Date());
+        if (!(isAfter(rowDate, from) || rowDate.getTime() === from.getTime())) return false;
+      }
+
+      if (toDate) {
+        const to = endOfDay(toDate);
+        const rowDate = parse(p.date, "yyyy-MM-dd", new Date());
+        if (!(isBefore(rowDate, to) || rowDate.getTime() === to.getTime())) return false;
+      }
+
+      return true;
     });
 
-    // Limit sucursal invoices to 11 as requested to avoid clutter
+    // Limit sucursal invoices as requested to avoid clutter
     if (deliveryTypeFilter === "sucursal") {
-      return filtered.slice(0, 11);
+      return filtered.slice(0, 15);
     }
 
     return filtered;
-  }, [deliveryTypeFilter, searchQuery]);
+  }, [invoices, deliveryTypeFilter, searchQuery, fromDate, toDate, statusFilters, invoiceTypeFilter]);
 
   // Grouping
   const groupedData = useMemo(() => {
     const groups: Record<string, RutaPedido[]> = {};
     BLOCKS_LIST.forEach(b => groups[b] = []);
     filteredPedidos.forEach(p => {
-      if (groups[p.block]) groups[p.block].push(p);
+      if (p.block && groups[p.block]) {
+        groups[p.block].push(p);
+      }
     });
     return groups;
-  }, [filteredPedidos]);
+  }, [filteredPedidos, BLOCKS_LIST]);
 
   return (
     <div className="w-full flex flex-col gap-4 h-full pb-12 -mt-2 md:-mt-4">
-      {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all w-full mb-2">
-        {/* Title & Search Column */}
-        <div className="flex flex-col gap-3 w-full md:w-auto shrink-0">
-          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
-            Gestión de rutas
-          </h1>
+      {/* Title Header */}
+      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
+        Gestión de rutas
+      </h1>
 
-          <div className="relative group w-full md:w-[320px]">
-            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Buscar por factura o cliente..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 h-11 text-sm focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
-            />
-          </div>
+      {/* Unified Single Row Filters */}
+      <div className="flex flex-wrap items-center gap-1.5 w-full bg-white/50 dark:bg-slate-900/40 py-2 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        {/* 1. Search Bar */}
+        <div className="relative group w-full md:w-[245px] shrink-0">
+          <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
+          <Input
+            type="text"
+            placeholder="Buscar factura o cliente..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 h-9 text-xs focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
+          />
         </div>
 
-        {/* Filter Buttons Section */}
-        <div className="flex flex-wrap items-center gap-3 ml-auto">
-          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1.5 rounded-2xl border border-slate-200/60 dark:border-slate-800 h-11 transition-all">
-            {[
-              { id: 'domicilio', label: 'Domicilio', Icon: Home },
-              { id: 'sucursal', label: 'Sucursal', Icon: Building2 },
-            ].map((btn) => (
-              <button
-                key={btn.id}
-                onClick={() => setDeliveryTypeFilter(btn.id as any)}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-bold uppercase transition-all",
-                  deliveryTypeFilter === btn.id
-                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                {btn.Icon && <btn.Icon className="size-4" />}
-                {btn.label}
-              </button>
-            ))}
-          </div>
+        {/* 2. Date Filters */}
+        <div className="shrink-0 flex items-center">
+          <LogisticsDateFilters
+            fromDate={fromDate}
+            onFromDateChange={setFromDate}
+            toDate={toDate}
+            onToDateChange={setToDate}
+            onClearFilters={clearFilters}
+          />
+        </div>
+
+        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden xl:block"></div>
+
+        {/* 3. Status Filters (Compact) */}
+        <div className="shrink-0 scale-95 origin-left">
+          <LogisticsStatusFilters
+            activeStatusFilters={statusFilters as any}
+            onToggleStatusFilter={toggleStatusFilter as any}
+            compact={true}
+          />
+        </div>
+
+        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden xl:block"></div>
+
+        {/* 4. Invoice Type Filters */}
+        <div className="shrink-0">
+          <LogisticsTypeFilters
+            invoiceTypeFilter={invoiceTypeFilter as any}
+            onInvoiceTypeChange={setInvoiceTypeFilter as any}
+          />
+        </div>
+
+        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden xl:block"></div>
+
+        {/* 5. Delivery Type Filter (Domicilio/Sucursal) */}
+        <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 shrink-0">
+          {[
+            { id: 'domicilio', label: 'Domicilio', Icon: Home },
+            { id: 'sucursal', label: 'Sucursal', Icon: Building2 },
+          ].map((btn) => (
+            <button
+              key={btn.id}
+              onClick={() => setDeliveryTypeFilter(btn.id as any)}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                deliveryTypeFilter === btn.id
+                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              )}
+            >
+              {btn.Icon && <btn.Icon className="size-3" />}
+              {btn.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Content View */}
-      {deliveryTypeFilter === 'domicilio' ? (
+      {isLoading ? (
+        <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white/30 dark:bg-slate-900/20 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 animate-pulse">
+          <Truck className="size-10 text-slate-300 dark:text-slate-700 animate-bounce mb-4" />
+          <p className="text-sm font-black uppercase tracking-[0.3em] text-slate-400">Cargando rutas...</p>
+        </div>
+      ) : error ? (
+        <div className="flex-1 flex flex-col items-center justify-center py-20 bg-red-50/30 dark:bg-red-900/10 rounded-3xl border border-dashed border-red-200 dark:border-red-900/30">
+          <p className="text-sm font-bold text-red-500 mb-2">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            Reintentar
+          </Button>
+        </div>
+      ) : deliveryTypeFilter === 'domicilio' ? (
         /* 11 Block Cards Grid */
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-          {BLOCKS_LIST.map((blockName) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 min-[2000px]:grid-cols-4 gap-4">
+          {BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
             const items = groupedData[blockName] || [];
             return (
-              <Card key={blockName} className="border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-sm">
+              <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
                 <CardHeader className="p-4 pb-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-800 px-3 py-1 text-[10px] font-black uppercase tracking-widest">
-                      {items.length} Pedidos
-                    </Badge>
-                  </div>
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider leading-none">
-                      Bloque: {blockName}
-                    </CardTitle>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 bg-white dark:bg-slate-800 shadow-sm opacity-80 hover:opacity-100 transition-all hover:bg-slate-50"
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider leading-none">
+                        {blockName}
+                      </CardTitle>
+                      <div className="flex items-center justify-center size-5 rounded-full bg-blue-600 dark:bg-blue-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
+                        {items.length}
+                      </div>
+                    </div>
+
+                    <Popover 
+                      open={openPopoverId === blockName} 
+                      onOpenChange={(open) => setOpenPopoverId(open ? blockName : null)}
                     >
-                      <Truck className="size-3.5" />
-                      <span className="uppercase tracking-widest">Unidad</span>
-                      <ChevronDown className="size-3 opacity-50" />
-                    </Button>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
+                            assignedUnits[blockName] 
+                              ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100" 
+                              : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
+                          )}
+                        >
+                          <Truck className="size-3.5" />
+                          <span className="uppercase tracking-widest">
+                            {assignedUnits[blockName] || "Unidad"}
+                          </span>
+                          <ChevronDown className="size-3 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
+                        <div className="flex flex-col gap-1">
+                          <p className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
+                            Seleccionar Unidad
+                          </p>
+                          <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
+                            {UNIDADES.map((unid) => (
+                              <button
+                                key={unid}
+                                onClick={() => {
+                                  setAssignedUnits(prev => ({ ...prev, [blockName]: unid }));
+                                  setOpenPopoverId(null);
+                                }}
+                                className={cn(
+                                  "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
+                                  assignedUnits[blockName] === unid
+                                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                )}
+                              >
+                                {unid}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </CardHeader>
 
                 <CardContent className="px-2 py-4 flex-1">
                   {items.length > 0 ? (
-                    <div className="flex flex-col gap-3 max-h-[510px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className={cn(
+                      "flex flex-col gap-3",
+                      items.length > 2 
+                        ? "max-h-[510px] overflow-y-auto pr-2 custom-scrollbar" 
+                        : "h-auto overflow-visible pr-0"
+                    )}>
                       {items.map(p => (
                         <div key={p.id} className="shrink-0">
-                          <RutaOrderCard pedido={p} />
+                          <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} />
                         </div>
                       ))}
                     </div>
@@ -219,7 +499,7 @@ export default function RutasPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filteredPedidos.length > 0 ? (
               filteredPedidos.map(p => (
-                <RutaOrderCard key={p.id} pedido={p} />
+                <RutaOrderCard key={p.id} pedido={p} activeStatusFilters={statusFilters} />
               ))
             ) : (
               <div className="col-span-full py-20 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center opacity-50">
