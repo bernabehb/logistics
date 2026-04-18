@@ -105,9 +105,9 @@ export default function AsignarUnidadesPage() {
       </h1>
 
       {/* Unified Filter & Stats Row */}
-      <div className="flex flex-wrap items-center justify-start gap-4 md:gap-6 w-full bg-white/50 dark:bg-slate-900/40 py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 md:gap-6 w-full bg-white/50 dark:bg-slate-900/40 py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {/* 1. Master Search Bar (Left) */}
-        <div className="relative group w-full md:w-auto md:min-w-[320px] flex-1 max-w-md shrink-0">
+        <div className="relative group w-full lg:w-auto lg:min-w-[320px] flex-1 max-w-md shrink-0">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
           <Input
             type="text"
@@ -119,7 +119,7 @@ export default function AsignarUnidadesPage() {
         </div>
 
         {/* 2. Filters & Stats Group (Right) */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
           {/* Status Filters Toggles */}
           <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 shrink-0">
             {[
@@ -142,10 +142,10 @@ export default function AsignarUnidadesPage() {
             ))}
           </div>
 
-          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden xl:block"></div>
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden min-[1400px]:block"></div>
 
           {/* Stats Badges (Compact) */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-2">
               <span className="text-sm leading-none">{counts.Disponible}</span>
               <span className="opacity-70 uppercase tracking-widest text-[9px]">Disponibles</span>

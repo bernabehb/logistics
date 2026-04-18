@@ -41,7 +41,7 @@ export async function loginAction(formData: FormData) {
   } else if (user.role === "Admin") {
     redirect("/admin");
   } else {
-    redirect("/logistics");
+    redirect("/logistics/rutas");
   }
 }
 

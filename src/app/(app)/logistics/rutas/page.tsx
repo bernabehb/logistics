@@ -305,9 +305,9 @@ export default function RutasPage() {
       </h1>
 
       {/* Unified Single Row Filters */}
-      <div className="flex flex-wrap items-center gap-1.5 w-full bg-white/50 dark:bg-slate-900/40 py-2 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 md:gap-1.5 w-full bg-white/50 dark:bg-slate-900/40 py-2 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {/* 1. Search Bar */}
-        <div className="relative group w-full md:w-[245px] shrink-0">
+        <div className="relative group w-full md:w-[220px] shrink-0">
           <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
           <Input
             type="text"
@@ -318,60 +318,55 @@ export default function RutasPage() {
           />
         </div>
 
-        {/* 2. Date Filters */}
-        <div className="shrink-0 flex items-center">
-          <LogisticsDateFilters
-            fromDate={fromDate}
-            onFromDateChange={setFromDate}
-            toDate={toDate}
-            onToDateChange={setToDate}
-            onClearFilters={clearFilters}
-          />
+        {/* 2. Group A: Dates Only */}
+        <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-between md:justify-start">
+          <div className="flex items-center">
+            <LogisticsDateFilters
+              fromDate={fromDate}
+              onFromDateChange={setFromDate}
+              toDate={toDate}
+              onToDateChange={setToDate}
+              onClearFilters={clearFilters}
+            />
+          </div>
         </div>
 
-        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden xl:block"></div>
-
-        {/* 3. Status Filters (Compact) */}
-        <div className="shrink-0 scale-95 origin-left">
-          <LogisticsStatusFilters
-            activeStatusFilters={statusFilters as any}
-            onToggleStatusFilter={toggleStatusFilter as any}
-            compact={true}
-          />
-        </div>
-
-        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden xl:block"></div>
-
-        {/* 4. Invoice Type Filters */}
-        <div className="shrink-0">
+        {/* 3-5. Group B: Status, Type & Delivery */}
+        <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-between min-[1400px]:justify-end min-[1400px]:ml-auto">
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
+          <div className="scale-95 origin-left">
+            <LogisticsStatusFilters
+              activeStatusFilters={statusFilters as any}
+              onToggleStatusFilter={toggleStatusFilter as any}
+              compact={true}
+            />
+          </div>
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
           <LogisticsTypeFilters
             invoiceTypeFilter={invoiceTypeFilter as any}
             onInvoiceTypeChange={setInvoiceTypeFilter as any}
           />
-        </div>
-
-        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden xl:block"></div>
-
-        {/* 5. Delivery Type Filter (Domicilio/Sucursal) */}
-        <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 shrink-0">
-          {[
-            { id: 'domicilio', label: 'Domicilio', Icon: Home },
-            { id: 'sucursal', label: 'Sucursal', Icon: Building2 },
-          ].map((btn) => (
-            <button
-              key={btn.id}
-              onClick={() => setDeliveryTypeFilter(btn.id as any)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                deliveryTypeFilter === btn.id
-                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-              )}
-            >
-              {btn.Icon && <btn.Icon className="size-3" />}
-              {btn.label}
-            </button>
-          ))}
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden min-[1400px]:block"></div>
+          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 shrink-0">
+            {[
+              { id: 'domicilio', label: 'Domicilio', Icon: Home },
+              { id: 'sucursal', label: 'Sucursal', Icon: Building2 },
+            ].map((btn) => (
+              <button
+                key={btn.id}
+                onClick={() => setDeliveryTypeFilter(btn.id as any)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                  deliveryTypeFilter === btn.id
+                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                )}
+              >
+                {btn.Icon && <btn.Icon className="size-3" />}
+                {btn.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -42,7 +42,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       name: "Rutas",
       href: "/logistics/rutas",
       icon: Map,
-      roles: ["Logistica", "Admin"],
+      roles: ["Logistica"],
     },
     {
       name: "Cajas",
@@ -80,7 +80,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       icon: Truck,
       roles: ["Chofer"],
     },
-  ].filter((item) => !userRole || item.roles.includes(userRole))
+  ].filter((item) => userRole && item.roles.includes(userRole))
    .sort((a, b) => {
      const disabledNames = ["Asignación de pedidos", "Control de pedidos"];
      const isADisabled = disabledNames.includes(a.name);
