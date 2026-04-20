@@ -1,37 +1,46 @@
 export type UnitStatus = "Disponible" | "Asignado" | "Mantenimiento" | "Fuera de Servicio";
-export type UnitType = "Torthon" | "Rabon" | "Camioneta 3.5" | "Tractocamión" | "Unidad Ligera";
 
 export interface Unit {
   id: string;
   name: string;
   plate: string;
-  type: UnitType;
+  type: string; // Permitir modelos dinámicos del backend
   status: UnitStatus;
   capacity: string;
   lastLocation: string;
   fuelLevel: number;
   mileage: number;
   sucursal?: string;
+  latitud?: number;
+  longitud?: number;
 }
 
 export interface ApiUnit {
   sNombre_Unidad: string;
   sSucursal: string;
   iCombustible: number;
+  sModelo: string;
+  sPlaca: string;
+  iKilometraje: number;
+  sUbicacion: string;
+  fLatitud: number;
+  fLongitud: number;
 }
 
 export function mapApiUnitToUnit(apiUnit: ApiUnit, index: number): Unit {
   return {
     id: `unidad-api-${index}`,
     name: apiUnit.sNombre_Unidad.trim(),
-    plate: "-", // No provisto por el API
-    type: "Unidad Ligera", // Por defecto
-    status: "Disponible", // Por defecto
+    plate: apiUnit.sPlaca.trim(),
+    type: apiUnit.sModelo.trim(),
+    status: "Disponible", // Por defecto al cargar
     capacity: "5 Toneladas", // Por defecto
-    lastLocation: "Sucursal " + apiUnit.sSucursal,
+    lastLocation: apiUnit.sUbicacion.trim(),
     fuelLevel: apiUnit.iCombustible,
-    mileage: 0,
+    mileage: apiUnit.iKilometraje,
     sucursal: apiUnit.sSucursal.trim(),
+    latitud: apiUnit.fLatitud,
+    longitud: apiUnit.fLongitud,
   };
 }
 

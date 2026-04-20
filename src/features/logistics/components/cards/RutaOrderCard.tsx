@@ -21,6 +21,7 @@ export interface RutaPedido {
   type: RutaInvoiceType;
   completedDeliveries?: number;
   block?: string;
+  montoTotal?: number;
 }
 
 interface RutaOrderCardProps {
@@ -34,9 +35,11 @@ export function RutaOrderCard({ pedido, activeStatusFilters }: RutaOrderCardProp
       <CardContent className="px-3 py-4 flex flex-col gap-3">
         {/* Header: ID and Anticipada Badge */}
         <div className="flex items-center justify-between">
-          <span className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">
-            #{pedido.id}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight uppercase">
+              Factura: {pedido.id}
+            </span>
+          </div>
           {pedido.type === 'anticipada' && pedido.completedDeliveries !== undefined && (
             <div className="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 text-[9px] font-black px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-500/30 uppercase tracking-widest shadow-sm">
               Entregado: {pedido.completedDeliveries}

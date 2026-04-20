@@ -10,11 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 export default function AsignarUnidadesPage() {
-  const [units, setUnits] = useState<Unit[]>(MOCK_UNITS);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UnitStatus>("Disponible");
 
-  const [isLoadingUnits, setIsLoadingUnits] = useState(false);
+  const [isLoadingUnits, setIsLoadingUnits] = useState(true);
   const [unitsError, setUnitsError] = useState<string | null>(null);
 
   const [drivers, setDrivers] = useState<Driver[]>(MOCK_DRIVERS);
@@ -22,15 +22,67 @@ export default function AsignarUnidadesPage() {
   const [driverError, setDriverError] = useState<string | null>(null);
 
   const [assignments, setAssignments] = useState<Record<string, string>>({});
+  const [activeMapUnitId, setActiveMapUnitId] = useState<string | null>(null);
 
+  // Función de carga de datos
+  const fetchUnits = async (isInitial = false) => {
+    // Si no es la carga inicial, y no hay mapa abierto O la pestaña está oculta, no hacer nada
+    if (!isInitial && (document.visibilityState !== 'visible' || !activeMapUnitId)) return;
+
+    if (isInitial) setIsLoadingUnits(true);
+    try {
+      const response = await fetch('/api/units');
+      if (!response.ok) throw new Error('Error al conectar con la API');
+      const data = await response.json();
+      
+      const mappedUnits = data.map((u: ApiUnit, index: number) => mapApiUnitToUnit(u, index));
+      setUnits(mappedUnits);
+      setUnitsError(null);
+    } catch (err) {
+      console.error('Error fetching units:', err);
+      if (isInitial) setUnitsError('No se pudo cargar la información de las unidades');
+    } finally {
+      if (isInitial) setIsLoadingUnits(false);
+    }
+  };
+
+  // 1. Carga inicial (Solo una vez al montar)
   useEffect(() => {
-    // Initial assignments from mock data
+    fetchUnits(true);
+
+    // Asignaciones iniciales del mock
     const initialAssignments: Record<string, string> = {};
     MOCK_DRIVERS.forEach(d => {
       if (d.assignedUnitId) initialAssignments[d.assignedUnitId] = d.id;
     });
     setAssignments(initialAssignments);
   }, []);
+
+  // 2. Lógica de Seguimiento / Polling (Depende de activeMapUnitId)
+  useEffect(() => {
+    // Si hay un mapa activo, pedir actualización inmediata (silenciosa)
+    if (activeMapUnitId) {
+      fetchUnits(false);
+    }
+
+    // Configurar polling cada 30 segundos (solo si es visible y hay un mapa)
+    const interval = setInterval(() => {
+      fetchUnits(false);
+    }, 30000);
+
+    // Escuchar cambios de visibilidad
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && activeMapUnitId) {
+        fetchUnits(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeMapUnitId]);
 
   // Helper to find driver assigned to a unit
   const getAssignedDriver = (unitId: string) => {
@@ -181,6 +233,8 @@ export default function AsignarUnidadesPage() {
               allDrivers={drivers}
               isLoadingDrivers={isLoadingDrivers}
               driverError={driverError}
+              isMapOpen={activeMapUnitId === unit.id}
+              onMapOpenChange={(open) => setActiveMapUnitId(open ? unit.id : null)}
             />
           ))
         ) : (

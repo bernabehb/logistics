@@ -1,7 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Truck, Fuel, AlertTriangle, User, BadgeCheck, Wrench, RefreshCw, LogOut, ChevronDown, Search as SearchIcon, Check, MapPin, Gauge, Box, ExternalLink } from "lucide-react";
+
+const UnitMap = dynamic(
+  () => import("../maps/UnitMap"),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-900/50 animate-pulse">
+        <Truck className="size-8 text-slate-300 mb-2 animate-bounce" />
+        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Cargando Mapa...</p>
+      </div>
+    )
+  }
+);
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import {
@@ -26,6 +40,8 @@ interface UnitCardProps {
   allDrivers?: Driver[];
   isLoadingDrivers?: boolean;
   driverError?: string | null;
+  isMapOpen?: boolean;
+  onMapOpenChange?: (open: boolean) => void;
 }
 
 export function UnitCard({
@@ -36,7 +52,9 @@ export function UnitCard({
   assignedDriverIds = [],
   allDrivers = [],
   isLoadingDrivers = false,
-  driverError = null
+  driverError = null,
+  isMapOpen = false,
+  onMapOpenChange = () => {}
 }: UnitCardProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState("");
@@ -59,7 +77,6 @@ export function UnitCard({
   // Estados para el Selector Personalizado
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [driverSearch, setDriverSearch] = useState("");
-  const [isMapOpen, setIsMapOpen] = useState(false);
 
   const filteredDriversForSelect = allDrivers
     .filter(driver => !assignedDriverIds.includes(driver.id))
@@ -187,7 +204,7 @@ export function UnitCard({
             </div>
 
             <button 
-              onClick={() => setIsMapOpen(true)}
+              onClick={() => onMapOpenChange(true)}
               className="bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/50 flex flex-col gap-2 transition-all hover:bg-white dark:hover:bg-slate-800/50 hover:shadow-sm border-l-2 border-l-emerald-500/20 group/loc text-left"
             >
               <div className="flex items-center gap-2">
@@ -435,35 +452,34 @@ export function UnitCard({
       </Dialog>
 
       {/* Map Implementation Dialog */}
-      <Dialog open={isMapOpen} onOpenChange={setIsMapOpen}>
-        <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden bg-white dark:bg-slate-900 border-none">
+      <Dialog open={isMapOpen} onOpenChange={onMapOpenChange}>
+        <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden bg-white dark:bg-slate-900 border-none shadow-2xl rounded-3xl">
           <DialogHeader className="p-6 pb-2">
             <DialogTitle className="flex items-center gap-3">
               <div className="p-2.5 bg-blue-50 dark:bg-blue-500/10 rounded-xl">
                 <MapPin className="size-5 text-blue-500" />
               </div>
               <div className="flex flex-col">
-                <span className="text-lg font-bold text-slate-800 dark:text-slate-100">Seguimiento en tiempo real</span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Samsara Fleet • {unit.name}</span>
+                <span className="text-lg font-bold text-slate-800 dark:text-slate-100">Ubicación en tiempo real</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{unit.lastLocation || 'Samsara Fleet'} • {unit.name}</span>
               </div>
             </DialogTitle>
           </DialogHeader>
           
-          <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-950/50">
-            <img 
-              src="/samsara_map.png" 
-              alt="Live tracking map" 
-              className="w-full h-full object-cover opacity-80"
-            />
-            {/* Simulation marker */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              <div className="relative flex items-center justify-center">
-                <div className="absolute inset-0 animate-ping rounded-full bg-blue-500/40 h-10 w-10" />
-                <div className="relative bg-white dark:bg-slate-900 p-2.5 rounded-2xl shadow-2xl border-2 border-blue-500 scale-110">
-                  <Truck className="size-6 text-blue-600" />
-                </div>
+          <div className="relative aspect-video w-full bg-slate-100 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800">
+            {unit.latitud && unit.longitud ? (
+              <UnitMap 
+                lat={unit.latitud} 
+                lng={unit.longitud} 
+                unitName={unit.name} 
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center">
+                <AlertTriangle className="size-12 text-amber-500 mb-4 opacity-20" />
+                <h3 className="text-xl font-bold text-slate-400">Coordenadas no disponibles</h3>
+                <p className="text-sm text-slate-500 mt-2">Esta unidad no ha reportado su ubicación GPS recientemente.</p>
               </div>
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

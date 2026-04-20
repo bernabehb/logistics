@@ -33,10 +33,14 @@ interface ApiRutaInvoice {
   monto_Factura: number;
   fecha: string;
   metodo: string;
+  partNum: string;
   material: string;
   cantidad: number;
   unidad: string;
   direccion: string;
+  corte: number;
+  tipoFactura: "NORMAL" | "ANTICIPADA";
+  montoAnticipado: number;
 }
 
 const UNIDADES = Array.from({ length: 10 }, (_, i) => `Unidad ${i + 1}`);
@@ -71,13 +75,18 @@ export default function RutasPage() {
         const groupedMap = new Map<string, RutaPedido & { block: string }>();
         const VALID_STATUSES = ['pending', 'in-progress', 'ready'] as const;
 
-        // 1. Map API data as 'normal' invoices
         data.forEach((row) => {
-          if (!groupedMap.has(row.factura)) {
+          const facturaId = row.factura;
+          
+          if (!groupedMap.has(facturaId)) {
+            // Determine invoice type
+            const type: RutaInvoiceType = row.tipoFactura === "ANTICIPADA" ? "anticipada" : "normal";
+            
+            // For now, randomization of general status is kept as API doesn't provide it yet
             const randomStatusIdx = Math.floor(Math.random() * 3);
             
-            groupedMap.set(row.factura, {
-              id: row.factura,
+            groupedMap.set(facturaId, {
+              id: facturaId,
               clientName: row.cliente,
               date: row.fecha,
               warehouses: [],
@@ -85,119 +94,40 @@ export default function RutasPage() {
               deliveryType: row.metodo === 'EAD' ? 'domicilio' : 'sucursal',
               block: (row.bloque || "GENERAL").trim().toUpperCase(),
               estadoGeneral: VALID_STATUSES[randomStatusIdx],
-              type: 'normal',
-              completedDeliveries: undefined,
-              hasGlassCut: false 
+              type: type,
+              completedDeliveries: type === 'anticipada' ? (row.montoAnticipado > 0 ? 1 : 0) : undefined,
+              hasGlassCut: false,
+              montoTotal: row.monto_Factura
             });
           }
 
-          const current = groupedMap.get(row.factura)!;
+          const current = groupedMap.get(facturaId)!;
           
-          let warehouseName = (row.almacen || "General").trim().toUpperCase();
-          if (warehouseName.includes("ALUMINIO")) warehouseName = "Aluminio";
-          else if (warehouseName.includes("VIDRIO")) warehouseName = "Vidrio";
-          else if (warehouseName.includes("HERRAJE")) warehouseName = "Herrajes";
+          // Determine Warehouse
+          let warehouseName = (row.almacen || "").trim().toUpperCase();
+          let warehouseId: string | null = null;
+          
+          if (warehouseName.includes("ALUMINIO")) warehouseId = "Aluminio";
+          else if (warehouseName.includes("VIDRIO")) warehouseId = "Vidrio";
+          else if (warehouseName.includes("HERRAJE")) warehouseId = "Herrajes";
 
-          if (!current.warehouses.some(w => w.id === warehouseName)) {
-            current.warehouses.push({
-              id: warehouseName,
-              status: VALID_STATUSES[Math.floor(Math.random() * 3)]
-            });
-          }
+          if (warehouseId) {
+            // Aggregate warehouse if not already present
+            if (!current.warehouses.some(w => w.id === warehouseId)) {
+              current.warehouses.push({
+                id: warehouseId,
+                status: VALID_STATUSES[Math.floor(Math.random() * 3)] // Keep random status for Wh for now
+              });
+            }
 
-          if (warehouseName === "Vidrio") {
-            if (row.factura.endsWith('2') || row.factura.endsWith('5')) {
+            // Specific "CORTE" logic for VIDRIO
+            if (warehouseId === "Vidrio" && row.corte === 1) {
               current.hasGlassCut = true;
             }
           }
         });
 
-        // 2. Add Static Anticipadas (4-digit IDs)
-        const staticAnticipadas: (RutaPedido & { block: string })[] = [
-          {
-            id: "1038",
-            clientName: "VIDRIERÍA RIOS",
-            date: "2026-04-16",
-            warehouses: [
-              { id: "Vidrio", status: "ready" },
-              { id: "Aluminio", status: "in-progress" }
-            ],
-            vendedor: "MARIO RODRIGUEZ",
-            deliveryType: "domicilio",
-            block: "AZTLAN 3",
-            estadoGeneral: "in-progress",
-            type: "anticipada",
-            completedDeliveries: 3,
-            hasGlassCut: true
-          },
-          {
-            id: "1045",
-            clientName: "ALUMEX MONTERREY",
-            date: "2026-04-17",
-            warehouses: [
-              { id: "Aluminio", status: "pending" },
-              { id: "Herrajes", status: "ready" }
-            ],
-            vendedor: "GRECIA DE LEON",
-            deliveryType: "domicilio",
-            block: "CAMINO REAL 1",
-            estadoGeneral: "pending",
-            type: "anticipada",
-            completedDeliveries: 1,
-            hasGlassCut: false
-          },
-          {
-            id: "1052",
-            clientName: "FERREMAX SA",
-            date: "2026-04-16",
-            warehouses: [
-              { id: "Herrajes", status: "ready" }
-            ],
-            vendedor: "PEDRO S.",
-            deliveryType: "domicilio",
-            block: "APODACA BLOQUE 4",
-            estadoGeneral: "ready",
-            type: "anticipada",
-            completedDeliveries: 4,
-            hasGlassCut: false
-          },
-          {
-            id: "2038",
-            clientName: "CONSTRUCCIONES GARCÍA",
-            date: "2026-04-16",
-            warehouses: [
-              { id: "Aluminio", status: "ready" },
-              { id: "Vidrio", status: "in-progress" }
-            ],
-            vendedor: "RICARDO M.",
-            deliveryType: "sucursal",
-            block: "GENERAL",
-            estadoGeneral: "in-progress",
-            type: "anticipada",
-            completedDeliveries: 2,
-            hasGlassCut: true
-          },
-          {
-            id: "2045",
-            clientName: "HERRAJES FINOS",
-            date: "2026-04-17",
-            warehouses: [
-              { id: "Herrajes", status: "ready" }
-            ],
-            vendedor: "ELENA GARCÍA",
-            deliveryType: "sucursal",
-            block: "GENERAL",
-            estadoGeneral: "ready",
-            type: "anticipada",
-            completedDeliveries: 5,
-            hasGlassCut: false
-          }
-        ];
-
-        const allData = [
-          ...Array.from(groupedMap.values()),
-          ...staticAnticipadas
-        ];
+        const allData = Array.from(groupedMap.values());
 
         setInvoices(allData);
         setError(null);
@@ -261,17 +191,27 @@ export default function RutasPage() {
       }
 
       // 5. Date Range
-      if (fromDate) {
-        const from = startOfDay(fromDate);
-        // API dates appear as YYYY-MM-DD
-        const rowDate = parse(p.date, "yyyy-MM-dd", new Date());
-        if (!(isAfter(rowDate, from) || rowDate.getTime() === from.getTime())) return false;
-      }
+      if (fromDate || toDate) {
+        // Safe parsing: take only YYYY-MM-DD
+        const cleanDateStr = p.date?.split('T')[0]?.split(' ')[0] || "";
+        const parts = cleanDateStr.split('-');
+        
+        if (parts.length === 3) {
+          const year = parseInt(parts[0]);
+          const month = parseInt(parts[1]) - 1;
+          const day = parseInt(parts[2]);
+          const rowDate = new Date(year, month, day);
 
-      if (toDate) {
-        const to = endOfDay(toDate);
-        const rowDate = parse(p.date, "yyyy-MM-dd", new Date());
-        if (!(isBefore(rowDate, to) || rowDate.getTime() === to.getTime())) return false;
+          if (fromDate) {
+            const from = startOfDay(fromDate);
+            if (!(isAfter(rowDate, from) || rowDate.getTime() === from.getTime())) return false;
+          }
+
+          if (toDate) {
+            const to = endOfDay(toDate);
+            if (!(isBefore(rowDate, to) || rowDate.getTime() === to.getTime())) return false;
+          }
+        }
       }
 
       return true;
