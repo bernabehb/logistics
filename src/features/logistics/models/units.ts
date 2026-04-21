@@ -4,7 +4,7 @@ export interface Unit {
   id: string;
   name: string;
   plate: string;
-  type: string; // Permitir modelos dinámicos del backend
+  type: string;
   status: UnitStatus;
   capacity: string;
   lastLocation: string;
@@ -13,6 +13,7 @@ export interface Unit {
   sucursal?: string;
   latitud?: number;
   longitud?: number;
+  apiDriverName?: string; // Nombre del chofer que viene del backend
 }
 
 export interface ApiUnit {
@@ -25,22 +26,33 @@ export interface ApiUnit {
   sUbicacion: string;
   fLatitud: number;
   fLongitud: number;
+  sEstatus: string; // "Disponible", "Asignado", "En Taller", etc.
+  sChofer: string;
 }
 
 export function mapApiUnitToUnit(apiUnit: ApiUnit, index: number): Unit {
+  // Normalizar el estado del backend a nuestro UnitStatus
+  let status: UnitStatus = "Disponible";
+  const apiStatus = apiUnit.sEstatus?.trim();
+  
+  if (apiStatus === "Asignado") status = "Asignado";
+  else if (apiStatus === "En Taller" || apiStatus === "Mantenimiento") status = "Mantenimiento";
+  else if (apiStatus === "Fuera de Servicio") status = "Fuera de Servicio";
+
   return {
     id: `unidad-api-${index}`,
     name: apiUnit.sNombre_Unidad.trim(),
     plate: apiUnit.sPlaca.trim(),
     type: apiUnit.sModelo.trim(),
-    status: "Disponible", // Por defecto al cargar
-    capacity: "5 Toneladas", // Por defecto
+    status: status,
+    capacity: "5 Toneladas",
     lastLocation: apiUnit.sUbicacion.trim(),
     fuelLevel: apiUnit.iCombustible,
     mileage: apiUnit.iKilometraje,
     sucursal: apiUnit.sSucursal.trim(),
     latitud: apiUnit.fLatitud,
     longitud: apiUnit.fLongitud,
+    apiDriverName: apiUnit.sChofer?.trim() || undefined,
   };
 }
 

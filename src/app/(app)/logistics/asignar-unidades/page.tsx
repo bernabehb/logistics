@@ -85,9 +85,12 @@ export default function AsignarUnidadesPage() {
   }, [activeMapUnitId]);
 
   // Helper to find driver assigned to a unit
-  const getAssignedDriver = (unitId: string) => {
-    const driverId = assignments[unitId];
-    return drivers.find(d => d.id === driverId);
+  const getAssignedDriverName = (unit: Unit) => {
+    const localDriverId = assignments[unit.id];
+    if (localDriverId) {
+      return drivers.find(d => d.id === localDriverId)?.name;
+    }
+    return unit.apiDriverName;
   };
 
   const handleAssignUnit = (unitId: string, driverId: string) => {
@@ -226,7 +229,7 @@ export default function AsignarUnidadesPage() {
             <UnitCard 
               key={unit.id}
               unit={unit}
-              assignedDriverName={getAssignedDriver(unit.id)?.name}
+              assignedDriverName={getAssignedDriverName(unit)}
               assignedDriverIds={Object.values(assignments)}
               onAssign={(driverId) => handleAssignUnit(unit.id, driverId)}
               onMaintenance={() => handleSetMaintenance(unit.id)}
