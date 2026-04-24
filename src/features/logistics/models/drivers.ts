@@ -7,6 +7,8 @@ export interface ApiDriver {
   company: string;
   sSucursal: string;
   bActivo: boolean;
+  sEstatus?: string;
+  sUnidadAsignada?: string;
 }
 
 export interface Driver {
@@ -18,6 +20,8 @@ export interface Driver {
   isActive?: boolean;
   company?: string;
   sucursal?: string;
+  status?: string;
+  apiAssignedUnit?: string;
 }
 
 export function mapApiDriverToDriver(apiDriver: ApiDriver): Driver {
@@ -28,6 +32,8 @@ export function mapApiDriverToDriver(apiDriver: ApiDriver): Driver {
     isActive: apiDriver.bActivo,
     company: apiDriver.company,
     sucursal: apiDriver.sSucursal.trim(),
+    status: apiDriver.sEstatus,
+    apiAssignedUnit: apiDriver.sUnidadAsignada,
   };
 }
 

@@ -17,12 +17,33 @@ export default function AsignarUnidadesPage() {
   const [isLoadingUnits, setIsLoadingUnits] = useState(true);
   const [unitsError, setUnitsError] = useState<string | null>(null);
 
-  const [drivers, setDrivers] = useState<Driver[]>(MOCK_DRIVERS);
-  const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
   const [driverError, setDriverError] = useState<string | null>(null);
 
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [activeMapUnitId, setActiveMapUnitId] = useState<string | null>(null);
+
+  const fetchDrivers = async () => {
+    setIsLoadingDrivers(true);
+    try {
+      const response = await fetch('/api/drivers');
+      if (!response.ok) throw new Error('Error al conectar con la API de choferes');
+      const data = await response.json();
+      
+      const mappedDrivers = data.map((d: ApiDriver) => mapApiDriverToDriver(d));
+      // Filtrar para mostrar solo los que tienen el estatus "Disponible" en el select
+      const availableDrivers = mappedDrivers.filter((d: Driver) => d.status === "Disponible");
+      
+      setDrivers(availableDrivers);
+      setDriverError(null);
+    } catch (err) {
+      console.error('Error fetching drivers:', err);
+      setDriverError('No se pudieron cargar los choferes');
+    } finally {
+      setIsLoadingDrivers(false);
+    }
+  };
 
   // Función de carga de datos
   const fetchUnits = async (isInitial = false) => {
@@ -49,13 +70,7 @@ export default function AsignarUnidadesPage() {
   // 1. Carga inicial (Solo una vez al montar)
   useEffect(() => {
     fetchUnits(true);
-
-    // Asignaciones iniciales del mock
-    const initialAssignments: Record<string, string> = {};
-    MOCK_DRIVERS.forEach(d => {
-      if (d.assignedUnitId) initialAssignments[d.assignedUnitId] = d.id;
-    });
-    setAssignments(initialAssignments);
+    fetchDrivers();
   }, []);
 
   // 2. Lógica de Seguimiento / Polling (Depende de activeMapUnitId)

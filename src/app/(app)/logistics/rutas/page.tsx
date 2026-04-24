@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Building2, Home, Search as SearchIcon, Truck, ChevronDown } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw } from "lucide-react";
+import { API_ENDPOINTS, API_HEADERS } from "@/lib/apiConfig";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RutaOrderCard, RutaPedido, RutaStatus, RutaInvoiceType } from "@/features/logistics/components/cards/RutaOrderCard";
@@ -43,14 +44,24 @@ interface ApiRutaInvoice {
   montoAnticipado: number;
 }
 
-const UNIDADES = Array.from({ length: 10 }, (_, i) => `Unidad ${i + 1}`);
-
 // Helper to generate dynamic data from API is now inside the component using state.
 
 
+interface AvailableUnit {
+  id: string;
+  name: string;
+  sucursal: string;
+}
+
+// Client-side cache para persistencia rápida al navegar
+let cachedInvoices: RutaPedido[] | null = null;
+let cachedUnidades: AvailableUnit[] | null = null;
+let cachedAssignedUnits: Record<string, AvailableUnit> | null = null;
+
 export default function RutasPage() {
-  const [invoices, setInvoices] = useState<RutaPedido[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoices || []);
+  const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
+  const [isLoading, setIsLoading] = useState(!cachedInvoices || !cachedUnidades);
   const [error, setError] = useState<string | null>(null);
   
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<'sucursal' | 'domicilio'>('domicilio');
@@ -59,14 +70,44 @@ export default function RutasPage() {
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
   const [statusFilters, setStatusFilters] = useState<RutaStatus[]>([]);
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<RutaInvoiceType>('normal');
-  const [assignedUnits, setAssignedUnits] = useState<Record<string, string>>({});
+  const [assignedUnits, setAssignedUnits] = useState<Record<string, AvailableUnit>>(cachedAssignedUnits || {});
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
 
+  // Sincronizar asignaciones con la caché
+  useEffect(() => {
+    cachedAssignedUnits = assignedUnits;
+  }, [assignedUnits]);
+
   // Data Fetching and Mapping
-  useMemo(() => {
-    async function fetchRoutes() {
+  const fetchAllData = async (forceRefresh = false) => {
+    if (!forceRefresh && cachedInvoices && cachedUnidades) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Fetch Unidades Disponibles
       try {
-        setIsLoading(true);
+        const unitsResponse = await fetch('/api/units');
+          if (unitsResponse.ok) {
+            const unitsData = await unitsResponse.json();
+            const availableUnits = unitsData
+              .filter((u: any) => u.sEstatus === "Disponible")
+              .map((u: any, i: number) => ({
+                id: `${u.sNombre_Unidad}-${u.sSucursal}-${i}`,
+                name: u.sNombre_Unidad,
+                sucursal: u.sSucursal
+              }));
+            cachedUnidades = availableUnits;
+            setUnidadesDisponibles(availableUnits);
+          }
+        } catch (unitErr) {
+          console.error("Error fetching units:", unitErr);
+        }
+
         const response = await fetch('/api/routes');
         if (!response.ok) throw new Error('No se pudo conectar con el servidor de rutas');
         const data: ApiRutaInvoice[] = await response.json();
@@ -129,6 +170,7 @@ export default function RutasPage() {
 
         const allData = Array.from(groupedMap.values());
 
+        cachedInvoices = allData;
         setInvoices(allData);
         setError(null);
       } catch (err) {
@@ -137,9 +179,10 @@ export default function RutasPage() {
       } finally {
         setIsLoading(false);
       }
-    }
+  };
 
-    fetchRoutes();
+  useEffect(() => {
+    fetchAllData();
   }, []);
 
   // Compute Blocks from Data
@@ -240,9 +283,21 @@ export default function RutasPage() {
   return (
     <div className="w-full flex flex-col gap-4 h-full pb-12 -mt-2 md:-mt-4">
       {/* Title Header */}
-      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
-        Gestión de rutas
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
+          Gestión de rutas
+        </h1>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => fetchAllData(true)}
+          disabled={isLoading}
+          className="h-8 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
+        >
+          <RefreshCw className={cn("size-3.5 mr-2", isLoading && "animate-spin text-blue-500")} />
+          Actualizar
+        </Button>
+      </div>
 
       {/* Unified Single Row Filters */}
       <div className="flex flex-wrap items-center gap-3 md:gap-1.5 w-full bg-white/50 dark:bg-slate-900/40 py-2 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -357,8 +412,8 @@ export default function RutasPage() {
                           )}
                         >
                           <Truck className="size-3.5" />
-                          <span className="uppercase tracking-widest">
-                            {assignedUnits[blockName] || "Unidad"}
+                          <span className="uppercase tracking-widest truncate max-w-[100px]">
+                            {assignedUnits[blockName] ? assignedUnits[blockName].name : "Unidad"}
                           </span>
                           <ChevronDown className="size-3 opacity-50" />
                         </Button>
@@ -369,23 +424,56 @@ export default function RutasPage() {
                             Seleccionar Unidad
                           </p>
                           <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
-                            {UNIDADES.map((unid) => (
-                              <button
-                                key={unid}
-                                onClick={() => {
-                                  setAssignedUnits(prev => ({ ...prev, [blockName]: unid }));
-                                  setOpenPopoverId(null);
-                                }}
-                                className={cn(
-                                  "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
-                                  assignedUnits[blockName] === unid
-                                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                                )}
-                              >
-                                {unid}
-                              </button>
-                            ))}
+                            <button
+                              onClick={() => {
+                                setAssignedUnits(prev => {
+                                  const next = { ...prev };
+                                  delete next[blockName];
+                                  return next;
+                                });
+                                setOpenPopoverId(null);
+                              }}
+                              className={cn(
+                                "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
+                                !assignedUnits[blockName]
+                                  ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
+                                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                              )}
+                            >
+                              Sin Asignación
+                            </button>
+                            <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
+                            {unidadesDisponibles.length > 0 ? (
+                              unidadesDisponibles.map((unid) => (
+                                <button
+                                  key={unid.id}
+                                  onClick={() => {
+                                    setAssignedUnits(prev => ({ ...prev, [blockName]: unid }));
+                                    setOpenPopoverId(null);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
+                                    assignedUnits[blockName]?.id === unid.id
+                                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                  )}
+                                >
+                                  <span>{unid.name}</span>
+                                  <span className={cn(
+                                    "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
+                                    assignedUnits[blockName]?.id === unid.id
+                                      ? "bg-white/20 text-white"
+                                      : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                                  )}>
+                                    {unid.sucursal}
+                                  </span>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-4 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest">
+                                No hay unidades disponibles
+                              </div>
+                            )}
                           </div>
                         </div>
                       </PopoverContent>

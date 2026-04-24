@@ -203,3 +203,11 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-300 dark:bg-slate-700;
 }
+
+/* 
+  Leaflet Dark Mode Inversion (Google Maps Tiles)
+  Inverts brightness but keeps hues looking natural (water=blue)
+*/
+.dark .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
