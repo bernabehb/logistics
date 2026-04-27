@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { MOCK_LOGISTICS_DATA, LogisticsRow } from "@/features/logistics/models";
-import { Driver, ApiDriver, mapApiDriverToDriver, MOCK_DRIVERS } from "@/features/logistics/models/drivers";
+import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
 import { OrderCard } from "@/features/logistics/components/cards/OrderCard";
 import { Search, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,14 +19,25 @@ export default function AsignarRutaPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Estados para choferes dinámicos
-  const [externalDrivers, setExternalDrivers] = useState<Driver[]>(MOCK_DRIVERS);
-  const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
+  const [externalDrivers, setExternalDrivers] = useState<Driver[]>([]);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
   const [driversError, setDriversError] = useState<string | null>(null);
 
-  // Use static data directly
   useEffect(() => {
-    setExternalDrivers(MOCK_DRIVERS);
-    setIsLoadingDrivers(false);
+    const fetchDrivers = async () => {
+      try {
+        const res = await fetch('/api/drivers');
+        if (res.ok) {
+          const data = await res.json();
+          setExternalDrivers(data.map((d: ApiDriver) => mapApiDriverToDriver(d)));
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoadingDrivers(false);
+      }
+    };
+    fetchDrivers();
   }, []);
 
   const handleAssignDriver = (id: string, driverId: string) => {

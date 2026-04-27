@@ -33,7 +33,7 @@ export default function AutorizarSalidaPage() {
       if (dep.id === id) {
         return { 
           ...dep, 
-          status: dep.deliveryType === 'sucursal' ? "Completado" : "En ruta" 
+          status: (dep.deliveryType === 'sucursal' ? "Completado" : "En ruta") as ReadyDeparture["status"]
         };
       }
       return dep;
