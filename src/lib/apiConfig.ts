@@ -15,4 +15,9 @@ export const API_ENDPOINTS = {
   routes: `${EXTERNAL_API_BASE_URL}/Logistics/GetRoutesInvoices`,
   units: `${EXTERNAL_API_BASE_URL}/Logistics/GetUnits`,
   drivers: `${EXTERNAL_API_BASE_URL}/Logistics/GetDrivers`,
+  blocksStatus: `${EXTERNAL_API_BASE_URL}/Logistics/GetBlocksStatus`,
+  assignBlock: `${EXTERNAL_API_BASE_URL}/Logistics/AssignDriverToBlock`,
+  unassignBlock: `${EXTERNAL_API_BASE_URL}/Logistics/UnassignBlock`,
+  assignUnitToBlock: `${EXTERNAL_API_BASE_URL}/Logistics/AssignUnitToBlock`,
+  assignedDrivers: `${EXTERNAL_API_BASE_URL}/Logistics/GetAssignedDrivers`,
 };

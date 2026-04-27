@@ -37,7 +37,7 @@ export function RutaOrderCard({ pedido, activeStatusFilters }: RutaOrderCardProp
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight uppercase">
-              Factura: {pedido.id}
+              {pedido.id.startsWith('ORDER-') ? `Orden: ${pedido.id.split('-')[1]}` : `Factura: ${pedido.id}`}
             </span>
           </div>
           {pedido.type === 'anticipada' && pedido.completedDeliveries !== undefined && (

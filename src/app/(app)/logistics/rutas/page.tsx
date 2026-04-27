@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw } from "lucide-react";
+import { useState, useMemo, useEffect, Fragment, useRef } from "react";
+import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User } from "lucide-react";
 import { API_ENDPOINTS, API_HEADERS } from "@/lib/apiConfig";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RutaOrderCard, RutaPedido, RutaStatus, RutaInvoiceType } from "@/features/logistics/components/cards/RutaOrderCard";
+import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import {
   PopoverContent, 
   PopoverTrigger 
 } from "@/components/ui/popover";
-import { LogisticsFilters, LogisticsDateFilters, LogisticsStatusFilters, LogisticsTypeFilters } from "@/features/logistics/components";
+import { LogisticsFilters, LogisticsDateFilters, LogisticsStatusFilters, LogisticsTypeFilters, StatusCircle, StatusPill } from "@/features/logistics/components";
 import { isAfter, isBefore, startOfDay, endOfDay, parse } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -25,23 +26,39 @@ const BLOCKS_LIST_FALLBACK = [
 ];
 
 interface ApiRutaInvoice {
+  tipoFactura: string;
+  montoAnticipado: number;
+  orderNum: number;
   factura: string;
+  linea: number;
+  custNum: number;
+  custID: string;
   cliente: string;
-  sucursal: string;
-  almacen: string;
-  vendedor: string;
-  bloque: string;
-  monto_Factura: number;
+  direccionCliente: string;
+  direccionEnvio: string;
+  orderDate: string;
   fecha: string;
-  metodo: string;
   partNum: string;
   material: string;
+  orderQty: number;
+  salesUM: string;
   cantidad: number;
-  unidad: string;
-  direccion: string;
+  unidadEmbarque: string;
+  totalNetWeight: number;
+  unidadPeso: string;
+  almacen: string;
+  warehouseCode: string;
+  almacenDescripcionEpicor: string;
+  pasillo: string;
+  descripcionBin: string;
+  descripcionLargaUdc: string;
   corte: number;
-  tipoFactura: "NORMAL" | "ANTICIPADA";
-  montoAnticipado: number;
+  vendedor: string;
+  metodo: string;
+  monto_Factura: number;
+  sucursal: string;
+  bloque: string;
+  estatusEmbarque: string;
 }
 
 // Helper to generate dynamic data from API is now inside the component using state.
@@ -51,90 +68,224 @@ interface AvailableUnit {
   id: string;
   name: string;
   sucursal: string;
+  iId: number;
+}
+
+interface ApiBlockStatus {
+  iIdDeliveryBlock: number;
+  sDeliveryBlock: string;
+  sEstatus: string;
+  sChofer: string | null;
+  sUnidad: string | null;
+  iIdDriver: number | null;
+  iIdUnit: number | null;
 }
 
 // Client-side cache para persistencia rápida al navegar
 let cachedInvoices: RutaPedido[] | null = null;
 let cachedUnidades: AvailableUnit[] | null = null;
 let cachedAssignedUnits: Record<string, AvailableUnit> | null = null;
+let cachedDrivers: Driver[] | null = null;
+let cachedBlocks: ApiBlockStatus[] | null = null;
+let cachedInvoicesByDriver: Record<string, RutaPedido[]> = {};
+let lastDriverFilter: string = 'all';
 
 export default function RutasPage() {
-  const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoices || []);
+  const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[lastDriverFilter] || []);
   const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
-  const [isLoading, setIsLoading] = useState(!cachedInvoices || !cachedUnidades);
+  const [isLoading, setIsLoading] = useState(!cachedInvoices);
   const [error, setError] = useState<string | null>(null);
   
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<'sucursal' | 'domicilio'>('domicilio');
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
-  const [toDate, setToDate] = useState<Date | undefined>(undefined);
   const [statusFilters, setStatusFilters] = useState<RutaStatus[]>([]);
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<RutaInvoiceType>('normal');
   const [assignedUnits, setAssignedUnits] = useState<Record<string, AvailableUnit>>(cachedAssignedUnits || {});
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [driverFilter, setDriverFilter] = useState<string>(lastDriverFilter);
+  const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
+  const [apiBlocks, setApiBlocks] = useState<ApiBlockStatus[]>(cachedBlocks || []);
+  const [isAssigning, setIsAssigning] = useState<string | null>(null);
+
+  const lastRequestRef = useRef<number>(0);
 
   // Sincronizar asignaciones con la caché
   useEffect(() => {
     cachedAssignedUnits = assignedUnits;
   }, [assignedUnits]);
 
+  // Sincronizar con el cambio de filtro de chofer
+  useEffect(() => {
+    lastDriverFilter = driverFilter;
+    fetchAllData(false); // No forzar si ya lo tenemos en caché
+  }, [driverFilter]);
+
+  const handleAssignUnit = async (blockName: string, unit: AvailableUnit | null) => {
+    // Find the block iId from our fetched blocks
+    const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
+    
+    if (!apiBlock) {
+      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
+      return;
+    }
+
+    const originalAssignments = { ...assignedUnits };
+
+    // Optimistic update
+    setAssignedUnits(prev => {
+      const next = { ...prev };
+      if (unit) {
+        next[blockName] = unit;
+      } else {
+        delete next[blockName];
+      }
+      return next;
+    });
+
+    try {
+      setIsAssigning(blockName);
+      const response = await fetch('/api/logistics/assign-unit-to-block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
+          iIdUnit: unit ? Number(unit.iId) : 0
+        })
+      });
+
+      if (!response.ok) throw new Error("Error en la asignación");
+      
+      // Refresh silently in background
+      fetchAllData(true, true);
+    } catch (err) {
+      console.error("Error assigning unit to block:", err);
+      setAssignedUnits(originalAssignments); // Rollback
+      alert("Hubo un error al asignar la unidad al bloque.");
+    } finally {
+      setIsAssigning(null);
+      setOpenPopoverId(null);
+    }
+  };
+
   // Data Fetching and Mapping
-  const fetchAllData = async (forceRefresh = false) => {
-    if (!forceRefresh && cachedInvoices && cachedUnidades) {
+  const fetchAllData = async (forceRefresh = false, silent = false) => {
+    const requestId = ++lastRequestRef.current;
+    
+    // Si ya tenemos datos para ESTE chofer y no es force ni silent, usar caché
+    if (!forceRefresh && !silent && cachedInvoicesByDriver[driverFilter]) {
+      setInvoices(cachedInvoicesByDriver[driverFilter]);
       setIsLoading(false);
       return;
     }
 
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       setError(null);
 
-      // Fetch Unidades Disponibles
-      try {
-        const unitsResponse = await fetch('/api/units');
-          if (unitsResponse.ok) {
-            const unitsData = await unitsResponse.json();
-            const availableUnits = unitsData
-              .filter((u: any) => u.sEstatus === "Disponible")
-              .map((u: any, i: number) => ({
-                id: `${u.sNombre_Unidad}-${u.sSucursal}-${i}`,
-                name: u.sNombre_Unidad,
-                sucursal: u.sSucursal
-              }));
-            cachedUnidades = availableUnits;
-            setUnidadesDisponibles(availableUnits);
-          }
-        } catch (unitErr) {
-          console.error("Error fetching units:", unitErr);
+      // 1. Iniciar peticiones en paralelo para ganar velocidad
+      const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedDrivers || !cachedBlocks;
+      
+      let routesUrl = '/api/routes';
+      if (driverFilter && driverFilter !== 'all') {
+        routesUrl += `?iIdDriver=${driverFilter}`;
+      }
+
+      // Disparamos todo al mismo tiempo
+      const [catalogsResults, routesResponse] = await Promise.all([
+        catalogsNeeded 
+          ? Promise.all([
+              fetch('/api/logistics/blocks-status'),
+              fetch('/api/units'),
+              fetch('/api/logistics/assigned-drivers')
+            ])
+          : Promise.resolve(null),
+        fetch(routesUrl)
+      ]);
+
+      // 2. Procesar Catálogos (si se pidieron)
+      if (catalogsResults) {
+        const [blocksRes, unitsRes, driversRes] = catalogsResults;
+        
+        if (blocksRes.ok) {
+          const blocksData: ApiBlockStatus[] = await blocksRes.json();
+          setApiBlocks(blocksData);
+          cachedBlocks = blocksData;
+          
+          const initialAssignments: Record<string, AvailableUnit> = {};
+          blocksData.forEach(b => {
+            if (b.sUnidad && b.iIdUnit) {
+              const blockKey = b.sDeliveryBlock.trim().toUpperCase();
+              initialAssignments[blockKey] = {
+                id: `${b.sUnidad}-${b.iIdUnit}`,
+                name: b.sUnidad,
+                sucursal: "", 
+                iId: Number(b.iIdUnit || 0)
+              };
+            }
+          });
+          setAssignedUnits(initialAssignments);
+          cachedAssignedUnits = initialAssignments;
         }
 
-        const response = await fetch('/api/routes');
-        if (!response.ok) throw new Error('No se pudo conectar con el servidor de rutas');
-        const data: ApiRutaInvoice[] = await response.json();
+        if (unitsRes.ok) {
+          const unitsData = await unitsRes.json();
+          const availableUnits = unitsData
+            .filter((u: any) => u.sEstatus === "Disponible")
+            .map((u: any, i: number) => ({
+              id: `${u.sNombre_Unidad}-${u.sSucursal}-${i}`,
+              name: u.sNombre_Unidad,
+              sucursal: u.sSucursal,
+              iId: Number(u.iId || u.sId || 0)
+            }));
+          setUnidadesDisponibles(availableUnits);
+          cachedUnidades = availableUnits;
+        }
 
-        // Group by Invoice (factura)
-        const groupedMap = new Map<string, RutaPedido & { block: string }>();
-        const VALID_STATUSES = ['pending', 'in-progress', 'ready'] as const;
+        if (driversRes.ok) {
+          const driversData = await driversRes.json();
+          const mappedDrivers = driversData.map((d: ApiDriver) => mapApiDriverToDriver(d));
+          setDrivers(mappedDrivers);
+          cachedDrivers = mappedDrivers;
+        }
+      }
 
-        data.forEach((row) => {
-          const facturaId = row.factura;
-          
-          if (!groupedMap.has(facturaId)) {
+      // 3. Procesar Rutas
+      // Protección contra Race Conditions
+      if (requestId !== lastRequestRef.current) return;
+
+      if (!routesResponse.ok) throw new Error('No se pudo conectar con el servidor de rutas');
+      const data: ApiRutaInvoice[] = await routesResponse.json();
+
+      // Mapeo de datos (optimizado)
+      const groupedMap = new Map<string, RutaPedido & { block: string }>();
+      
+      data.forEach((row) => {
+        const isFactura = row.factura && row.factura.trim() !== "";
+        const groupKey = isFactura ? row.factura : `ORDER-${row.orderNum}`;
+        
+        if (!groupedMap.has(groupKey)) {
+          // ... resto del mapeo ...
             // Determine invoice type
             const type: RutaInvoiceType = row.tipoFactura === "ANTICIPADA" ? "anticipada" : "normal";
             
-            // For now, randomization of general status is kept as API doesn't provide it yet
-            const randomStatusIdx = Math.floor(Math.random() * 3);
-            
-            groupedMap.set(facturaId, {
-              id: facturaId,
+            // Map status from estatusEmbarque
+            let status: RutaStatus = 'pending';
+            const rawStatus = (row.estatusEmbarque || "").toLowerCase();
+            if (rawStatus === 'listo') status = 'ready';
+            else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') status = 'in-progress';
+            else status = 'pending';
+
+            groupedMap.set(groupKey, {
+              id: groupKey,
               clientName: row.cliente,
-              date: row.fecha,
+              date: isFactura ? row.fecha : row.orderDate,
               warehouses: [],
               vendedor: row.vendedor,
-              deliveryType: row.metodo === 'EAD' ? 'domicilio' : 'sucursal',
+              deliveryType: (row.metodo === 'EAD' || (row.bloque && row.bloque.includes("ZONA"))) ? 'domicilio' : 'sucursal',
               block: (row.bloque || "GENERAL").trim().toUpperCase(),
-              estadoGeneral: VALID_STATUSES[randomStatusIdx],
+              estadoGeneral: status, // Use current row's status for general state initial value
               type: type,
               completedDeliveries: type === 'anticipada' ? (row.montoAnticipado > 0 ? 1 : 0) : undefined,
               hasGlassCut: false,
@@ -142,7 +293,7 @@ export default function RutasPage() {
             });
           }
 
-          const current = groupedMap.get(facturaId)!;
+          const current = groupedMap.get(groupKey)!;
           
           // Determine Warehouse
           let warehouseName = (row.almacen || "").trim().toUpperCase();
@@ -153,12 +304,25 @@ export default function RutasPage() {
           else if (warehouseName.includes("HERRAJE")) warehouseId = "Herrajes";
 
           if (warehouseId) {
+             // Map status from estatusEmbarque
+            let itemStatus: RutaStatus = 'pending';
+            const rawStatus = (row.estatusEmbarque || "").toLowerCase();
+            if (rawStatus === 'listo') itemStatus = 'ready';
+            else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') itemStatus = 'in-progress';
+            else itemStatus = 'pending';
+
             // Aggregate warehouse if not already present
             if (!current.warehouses.some(w => w.id === warehouseId)) {
               current.warehouses.push({
                 id: warehouseId,
-                status: VALID_STATUSES[Math.floor(Math.random() * 3)] // Keep random status for Wh for now
+                status: itemStatus
               });
+            } else {
+                // Logic to consolidate statuses for the same warehouse category
+                const existing = current.warehouses.find(w => w.id === warehouseId)!;
+                // Priority: pending > in-progress > ready (if one is pending, whole category is pending)
+                if (itemStatus === 'pending') existing.status = 'pending';
+                else if (itemStatus === 'in-progress' && existing.status === 'ready') existing.status = 'in-progress';
             }
 
             // Specific "CORTE" logic for VIDRIO
@@ -170,6 +334,8 @@ export default function RutasPage() {
 
         const allData = Array.from(groupedMap.values());
 
+        // Mapeo final y guardado en caché específica por chofer
+        cachedInvoicesByDriver[driverFilter] = allData;
         cachedInvoices = allData;
         setInvoices(allData);
         setError(null);
@@ -177,13 +343,14 @@ export default function RutasPage() {
         console.error("Error fetching routes:", err);
         setError("Error al cargar la información de rutas dinámica");
       } finally {
-        setIsLoading(false);
+        if (requestId === lastRequestRef.current) {
+          setIsLoading(false);
+        }
       }
   };
 
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  // Quitamos el useEffect de montaje redundante, ya que el useEffect de [driverFilter]
+  // se encarga de la carga inicial al activarse por primera vez.
 
   // Compute Blocks from Data
   const BLOCKS_LIST = useMemo(() => {
@@ -207,7 +374,6 @@ export default function RutasPage() {
   const clearFilters = () => {
     setSearchQuery("");
     setFromDate(undefined);
-    setToDate(undefined);
     setStatusFilters([]);
     setInvoiceTypeFilter('normal');
   };
@@ -233,8 +399,8 @@ export default function RutasPage() {
         return false;
       }
 
-      // 5. Date Range
-      if (fromDate || toDate) {
+      // 5. Date Filter (Single Day)
+      if (fromDate) {
         // Safe parsing: take only YYYY-MM-DD
         const cleanDateStr = p.date?.split('T')[0]?.split(' ')[0] || "";
         const parts = cleanDateStr.split('-');
@@ -245,15 +411,8 @@ export default function RutasPage() {
           const day = parseInt(parts[2]);
           const rowDate = new Date(year, month, day);
 
-          if (fromDate) {
-            const from = startOfDay(fromDate);
-            if (!(isAfter(rowDate, from) || rowDate.getTime() === from.getTime())) return false;
-          }
-
-          if (toDate) {
-            const to = endOfDay(toDate);
-            if (!(isBefore(rowDate, to) || rowDate.getTime() === to.getTime())) return false;
-          }
+          const filterDate = startOfDay(fromDate);
+          if (rowDate.getTime() !== filterDate.getTime()) return false;
         }
       }
 
@@ -266,7 +425,7 @@ export default function RutasPage() {
     }
 
     return filtered;
-  }, [invoices, deliveryTypeFilter, searchQuery, fromDate, toDate, statusFilters, invoiceTypeFilter]);
+  }, [invoices, deliveryTypeFilter, searchQuery, fromDate, statusFilters, invoiceTypeFilter]);
 
   // Grouping
   const groupedData = useMemo(() => {
@@ -287,16 +446,107 @@ export default function RutasPage() {
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
           Gestión de rutas
         </h1>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => fetchAllData(true)}
-          disabled={isLoading}
-          className="h-8 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
-        >
-          <RefreshCw className={cn("size-3.5 mr-2", isLoading && "animate-spin text-blue-500")} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 pl-3 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all hover:bg-white dark:hover:bg-slate-900 shadow-sm min-w-[180px] justify-between group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <User className="size-3.5 text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
+                  <span className="truncate max-w-[200px]">
+                    {driverFilter === 'all' ? 'TODOS LOS CHOFERES' : drivers.find(d => d.id === driverFilter)?.name || 'TODOS LOS CHOFERES'}
+                  </span>
+                </div>
+                <ChevronDown className="size-3.5 text-slate-400 shrink-0 ml-2" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[280px] p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
+              <div className="flex flex-col gap-1">
+                <p className="px-3 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+                  Filtrar por Chofer
+                </p>
+                <button
+                  onClick={() => setDriverFilter('all')}
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                    driverFilter === 'all'
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  )}
+                >
+                  <div className={cn("size-2 rounded-full", driverFilter === 'all' ? "bg-white animate-pulse" : "bg-blue-500")} />
+                  TODOS LOS CHOFERES
+                </button>
+                <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-2" />
+                <div className="max-h-[320px] overflow-y-auto pr-1 no-scrollbar flex flex-col gap-0.5">
+                  {drivers.map(driver => (
+                    <button
+                      key={driver.id}
+                      onClick={() => setDriverFilter(driver.id)}
+                      className={cn(
+                        "w-full text-left px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 group",
+                        driverFilter === driver.id
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                      )}
+                    >
+                      <div className={cn(
+                        "size-6 rounded-lg flex items-center justify-center text-[10px] shrink-0",
+                        driverFilter === driver.id ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600"
+                      )}>
+                        {driver.name.substring(0, 1)}
+                      </div>
+                      <span className="truncate">{driver.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1 hidden sm:block"></div>
+          {/* View Toggle */}
+          <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9">
+            <button
+              onClick={() => setViewMode('cards')}
+              title="Vista de Tarjetas"
+              className={cn(
+                "p-1.5 rounded-lg transition-all",
+                viewMode === 'cards' 
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600" 
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              )}
+            >
+              <LayoutGrid className="size-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              title="Vista de Tablero"
+              className={cn(
+                "p-1.5 rounded-lg transition-all",
+                viewMode === 'table' 
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600" 
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              )}
+            >
+              <List className="size-4" />
+            </button>
+          </div>
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => fetchAllData(true)}
+            disabled={isLoading}
+            className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
+          >
+            <RefreshCw className={cn("size-3.5 mr-2", isLoading && "animate-spin text-blue-500")} />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
       {/* Unified Single Row Filters */}
@@ -319,9 +569,8 @@ export default function RutasPage() {
             <LogisticsDateFilters
               fromDate={fromDate}
               onFromDateChange={setFromDate}
-              toDate={toDate}
-              onToDateChange={setToDate}
               onClearFilters={clearFilters}
+              isSingleDate={true}
             />
           </div>
         </div>
@@ -378,10 +627,211 @@ export default function RutasPage() {
             Reintentar
           </Button>
         </div>
+      ) : viewMode === 'table' ? (
+        /* Table View */
+        <div className="bg-white/50 dark:bg-[#0F172A]/40 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm backdrop-blur-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Factura #</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aluminio</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Vidrio</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Herrajes</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado General</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredPedidos.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-24 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="size-16 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800">
+                          <Truck className="size-8 text-slate-300 dark:text-slate-600" />
+                        </div>
+                        <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : deliveryTypeFilter === 'sucursal' ? (
+                  <>
+                    {/* Single header for sucursal as seen in user's image */}
+                    <tr className="bg-slate-50/80 dark:bg-slate-800/30 border-y border-slate-200/60 dark:border-slate-800/60">
+                      <td colSpan={6} className="px-6 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">Entrega en Sucursal</span>
+                          <div className="size-5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
+                            {filteredPedidos.length}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    {filteredPedidos.map(p => {
+                      const aluminio = p.warehouses.find(w => w.id === 'Aluminio')?.status || 'none';
+                      const vidrio = p.warehouses.find(w => w.id === 'Vidrio')?.status || 'none';
+                      const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
+                      
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+                          <td className="px-6 py-5">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                {p.id.startsWith('ORDER-') ? `Orden: ${p.id.split('-')[1]}` : `Factura: ${p.id}`}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="flex items-center gap-3">
+                                <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
+                                  {p.clientName.substring(0, 2).toUpperCase()}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
+                                </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="flex justify-center">
+                              <StatusCircle status={aluminio} />
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="flex justify-center">
+                              <StatusCircle status={vidrio} />
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="flex justify-center">
+                              <StatusCircle status={herrajes} />
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="flex items-center">
+                              <StatusPill status={p.estadoGeneral} />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </>
+                ) : (
+                  BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
+                    const items = groupedData[blockName] || [];
+                    return (
+                      <Fragment key={blockName}>
+                        {/* Block Separator Header */}
+                        <tr className="bg-slate-50/80 dark:bg-slate-800/30 border-y border-slate-200/60 dark:border-slate-800/60">
+                          <td colSpan={6} className="px-6 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">{blockName}</span>
+                              <div className="size-5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
+                                {items.length}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        {items.map(p => {
+                          const aluminio = p.warehouses.find(w => w.id === 'Aluminio')?.status || 'none';
+                          const vidrio = p.warehouses.find(w => w.id === 'Vidrio')?.status || 'none';
+                          const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
+                          
+                          return (
+                            <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+                              <td className="px-6 py-5">
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    {p.id.startsWith('ORDER-') ? `Orden: ${p.id.split('-')[1]}` : `Factura: ${p.id}`}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
+                                      {p.clientName.substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
+                                    </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-5">
+                                <div className="flex justify-center">
+                                  <StatusCircle status={aluminio} />
+                                </div>
+                              </td>
+                              <td className="px-6 py-5">
+                                <div className="flex justify-center">
+                                  <StatusCircle status={vidrio} />
+                                </div>
+                              </td>
+                              <td className="px-6 py-5">
+                                <div className="flex justify-center">
+                                  <StatusCircle status={herrajes} />
+                                </div>
+                              </td>
+                              <td className="px-6 py-5">
+                                <div className="flex items-center">
+                                  <StatusPill status={p.estadoGeneral} />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+            {filteredPedidos.length === 0 && (
+              <div className="py-20 flex flex-col items-center justify-center opacity-40">
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-slate-400">Sin resultados para mostrar</p>
+              </div>
+            )}
+          </div>
+          {/* Pagination Footer Placeholder as seen in Image 2 */}
+          <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 flex items-center justify-between">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Mostrando {filteredPedidos.length} de {filteredPedidos.length} pedidos
+            </p>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled><ChevronDown className="size-4 rotate-90" /></Button>
+              <Button variant="ghost" size="sm" className="h-8 px-3 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 hover:text-white">1</Button>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled><ChevronDown className="size-4 -rotate-90" /></Button>
+            </div>
+          </div>
+        </div>
       ) : deliveryTypeFilter === 'domicilio' ? (
         /* 11 Block Cards Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 min-[2000px]:grid-cols-4 gap-4">
-          {BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
+          {filteredPedidos.length === 0 ? (
+            <div className="col-span-full flex flex-col items-center justify-center py-20 bg-white/50 dark:bg-slate-900/40 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 transition-all">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 scale-150 bg-blue-500/5 blur-3xl rounded-full" />
+                <Truck className="size-20 text-slate-300 dark:text-slate-700 relative z-10 opacity-40 animate-pulse" />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-[0.2em] mb-2">No se encontraron resultados</h3>
+              <p className="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest text-center max-w-md px-6 leading-relaxed">
+                No hay facturas o pedidos que coincidan con los filtros seleccionados actualmente (chofer, fecha o estatus).
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => fetchAllData(true)}
+                className="mt-8 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm h-10 px-6"
+              >
+                <RefreshCw className="size-3.5 mr-2" />
+                Reintentar carga
+              </Button>
+            </div>
+          ) : (
+            BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
             const items = groupedData[blockName] || [];
             return (
               <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
@@ -404,6 +854,7 @@ export default function RutasPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          disabled={isAssigning === blockName}
                           className={cn(
                             "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
                             assignedUnits[blockName] 
@@ -411,7 +862,11 @@ export default function RutasPage() {
                               : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
                           )}
                         >
-                          <Truck className="size-3.5" />
+                          {isAssigning === blockName ? (
+                            <RefreshCw className="size-3.5 animate-spin" />
+                          ) : (
+                            <Truck className="size-3.5" />
+                          )}
                           <span className="uppercase tracking-widest truncate max-w-[100px]">
                             {assignedUnits[blockName] ? assignedUnits[blockName].name : "Unidad"}
                           </span>
@@ -425,14 +880,7 @@ export default function RutasPage() {
                           </p>
                           <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
                             <button
-                              onClick={() => {
-                                setAssignedUnits(prev => {
-                                  const next = { ...prev };
-                                  delete next[blockName];
-                                  return next;
-                                });
-                                setOpenPopoverId(null);
-                              }}
+                              onClick={() => handleAssignUnit(blockName, null)}
                               className={cn(
                                 "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
                                 !assignedUnits[blockName]
@@ -447,10 +895,7 @@ export default function RutasPage() {
                               unidadesDisponibles.map((unid) => (
                                 <button
                                   key={unid.id}
-                                  onClick={() => {
-                                    setAssignedUnits(prev => ({ ...prev, [blockName]: unid }));
-                                    setOpenPopoverId(null);
-                                  }}
+                                  onClick={() => handleAssignUnit(blockName, unid)}
                                   className={cn(
                                     "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
                                     assignedUnits[blockName]?.id === unid.id
@@ -503,8 +948,9 @@ export default function RutasPage() {
                 </CardContent>
               </Card>
             );
-          })}
-        </div>
+          })
+        )}
+      </div>
       ) : (
         /* Direct Order Grid for Sucursal */
         <div className="flex flex-col gap-4">

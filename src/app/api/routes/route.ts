@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
 import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const response = await fetch(API_ENDPOINTS.routes, {
+    const { searchParams } = new URL(request.url);
+    const iIdDriver = searchParams.get('iIdDriver');
+    
+    let url = API_ENDPOINTS.routes;
+    if (iIdDriver && iIdDriver !== 'all') {
+      url += `?iIdDriver=${iIdDriver}`;
+    }
+
+    const response = await fetch(url, {
       headers: API_HEADERS,
-      next: { revalidate: 0 } // Desactivar caché para rutas
+      next: { revalidate: 0 }
     });
 
     if (!response.ok) {

@@ -1,31 +1,36 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Unit, UnitStatus, ApiUnit, mapApiUnitToUnit, MOCK_UNITS } from "@/features/logistics/models/units";
-import { Driver, ApiDriver, mapApiDriverToDriver, MOCK_DRIVERS } from "@/features/logistics/models/drivers";
+import { Unit, UnitStatus, ApiUnit, mapApiUnitToUnit } from "@/features/logistics/models/units";
+import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
 import { UnitCard } from "@/features/logistics/components/cards/UnitCard";
-import { Search, Truck } from "lucide-react";
+import { Search, Truck, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+// Cache persistente para navegación rápida
+let cachedUnits: Unit[] | null = null;
+let cachedDrivers: Driver[] | null = null;
+let cachedAssignments: Record<string, string> | null = null;
+
 export default function AsignarUnidadesPage() {
-  const [units, setUnits] = useState<Unit[]>([]);
+  const [units, setUnits] = useState<Unit[]>(cachedUnits || []);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UnitStatus>("Disponible");
 
-  const [isLoadingUnits, setIsLoadingUnits] = useState(true);
+  const [isLoadingUnits, setIsLoadingUnits] = useState(!cachedUnits);
   const [unitsError, setUnitsError] = useState<string | null>(null);
 
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [isLoadingDrivers, setIsLoadingDrivers] = useState(true);
+  const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(!cachedDrivers);
   const [driverError, setDriverError] = useState<string | null>(null);
 
-  const [assignments, setAssignments] = useState<Record<string, string>>({});
+  const [assignments, setAssignments] = useState<Record<string, string>>(cachedAssignments || {});
   const [activeMapUnitId, setActiveMapUnitId] = useState<string | null>(null);
 
-  const fetchDrivers = async () => {
-    setIsLoadingDrivers(true);
+  const fetchDrivers = async (silent = false) => {
+    if (!silent) setIsLoadingDrivers(true);
     try {
       const response = await fetch('/api/drivers');
       if (!response.ok) throw new Error('Error al conectar con la API de choferes');
@@ -36,6 +41,7 @@ export default function AsignarUnidadesPage() {
       const availableDrivers = mappedDrivers.filter((d: Driver) => d.status === "Disponible");
       
       setDrivers(availableDrivers);
+      cachedDrivers = availableDrivers;
       setDriverError(null);
     } catch (err) {
       console.error('Error fetching drivers:', err);
@@ -46,11 +52,12 @@ export default function AsignarUnidadesPage() {
   };
 
   // Función de carga de datos
-  const fetchUnits = async (isInitial = false) => {
+  const fetchUnits = async (isInitial = false, silent = false) => {
     // Si no es la carga inicial, y no hay mapa abierto O la pestaña está oculta, no hacer nada
-    if (!isInitial && (document.visibilityState !== 'visible' || !activeMapUnitId)) return;
+    // A MENOS que se llame explícitamente como refresh (silent = false)
+    if (!isInitial && !silent && document.visibilityState !== 'visible' && !activeMapUnitId) return;
 
-    if (isInitial) setIsLoadingUnits(true);
+    if (isInitial && !silent) setIsLoadingUnits(true);
     try {
       const response = await fetch('/api/units');
       if (!response.ok) throw new Error('Error al conectar con la API');
@@ -58,6 +65,7 @@ export default function AsignarUnidadesPage() {
       
       const mappedUnits = data.map((u: ApiUnit, index: number) => mapApiUnitToUnit(u, index));
       setUnits(mappedUnits);
+      cachedUnits = mappedUnits;
       setUnitsError(null);
     } catch (err) {
       console.error('Error fetching units:', err);
@@ -65,6 +73,12 @@ export default function AsignarUnidadesPage() {
     } finally {
       if (isInitial) setIsLoadingUnits(false);
     }
+  };
+
+  const refreshAllData = async () => {
+    setIsLoadingUnits(true);
+    setIsLoadingDrivers(true);
+    await Promise.all([fetchUnits(true, false), fetchDrivers(false)]);
   };
 
   // 1. Carga inicial (Solo una vez al montar)
@@ -170,9 +184,21 @@ export default function AsignarUnidadesPage() {
   return (
     <div className="w-full flex flex-col gap-4 h-full pb-12 -mt-2 md:-mt-4">
       {/* Title Header */}
-      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
-        Asignación de Unidades
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
+          Asignación de Unidades
+        </h1>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={refreshAllData}
+          disabled={isLoadingUnits || isLoadingDrivers}
+          className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
+        >
+          <RefreshCw className={cn("size-3.5 mr-2", (isLoadingUnits || isLoadingDrivers) && "animate-spin text-blue-500")} />
+          Actualizar
+        </Button>
+      </div>
 
       {/* Unified Filter & Stats Row */}
       <div className="flex flex-wrap items-center justify-between gap-4 md:gap-6 w-full bg-white/50 dark:bg-slate-900/40 py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">

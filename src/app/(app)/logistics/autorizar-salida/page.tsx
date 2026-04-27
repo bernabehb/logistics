@@ -6,18 +6,30 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DepartureCard, ReadyDeparture } from "@/features/logistics/components/cards/DepartureCard";
+import { RefreshCw } from "lucide-react";
 import departuresData from "@/lib/departures.json";
 
 const MOCK_DEPARTURES: ReadyDeparture[] = departuresData as ReadyDeparture[];
 
+let cachedDepartures: ReadyDeparture[] | null = null;
+
 export default function AutorizarSalidaPage() {
-  const [departures, setDepartures] = useState<ReadyDeparture[]>(MOCK_DEPARTURES);
+  const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || MOCK_DEPARTURES);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    // Simular carga de datos reales (por ahora reseteamos al mock si no hay cache, o simplemente forzamos un refresh)
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 800);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Pendiente" | "En ruta">("Pendiente");
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<"domicilio" | "sucursal">("domicilio");
 
   const handleAuthorize = (id: string) => {
-    setDepartures(departures.map(dep => {
+    const updated = departures.map(dep => {
       if (dep.id === id) {
         return { 
           ...dep, 
@@ -25,7 +37,9 @@ export default function AutorizarSalidaPage() {
         };
       }
       return dep;
-    }));
+    });
+    setDepartures(updated);
+    cachedDepartures = updated;
   };
 
   const filteredDepartures = departures.filter(dep => 
@@ -43,9 +57,21 @@ export default function AutorizarSalidaPage() {
   return (
     <div className="w-full flex flex-col gap-4 min-h-full pb-12 -mt-2 md:-mt-4">
       {/* Title Header */}
-      <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
-        Autorizar Salidas
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
+          Autorizar Salidas
+        </h1>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
+        >
+          <RefreshCw className={cn("size-3.5 mr-2", isRefreshing && "animate-spin text-blue-500")} />
+          Actualizar
+        </Button>
+      </div>
 
       {/* Unified Filter Row */}
       <div className="flex flex-wrap items-center justify-between gap-4 md:gap-6 w-full bg-white/50 dark:bg-slate-900/40 py-2.5 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">

@@ -10,18 +10,32 @@ type Status = 'pending' | 'in-progress' | 'ready' | 'none';
 interface DateFiltersProps {
   fromDate: Date | undefined;
   onFromDateChange: (date: Date | undefined) => void;
-  toDate: Date | undefined;
-  onToDateChange: (date: Date | undefined) => void;
+  toDate?: Date | undefined;
+  onToDateChange?: (date: Date | undefined) => void;
   onClearFilters: () => void;
+  isSingleDate?: boolean;
 }
 
-export function LogisticsDateFilters({ fromDate, onFromDateChange, toDate, onToDateChange, onClearFilters }: DateFiltersProps) {
-  const hasActiveFilters = fromDate || toDate;
+export function LogisticsDateFilters({ 
+  fromDate, 
+  onFromDateChange, 
+  toDate, 
+  onToDateChange, 
+  onClearFilters,
+  isSingleDate = false
+}: DateFiltersProps) {
+  const hasActiveFilters = fromDate || (toDate && !isSingleDate);
   return (
     <div className="flex flex-nowrap items-center gap-1.5 w-full md:w-auto">
       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-        <SingleDatePicker label="De" date={fromDate} setDate={onFromDateChange} />
-        <SingleDatePicker label="A" date={toDate} setDate={onToDateChange} />
+        <SingleDatePicker 
+          label={isSingleDate ? "Fecha" : "De"} 
+          date={fromDate} 
+          setDate={onFromDateChange} 
+        />
+        {!isSingleDate && onToDateChange && (
+          <SingleDatePicker label="A" date={toDate} setDate={onToDateChange} />
+        )}
       </div>
       {hasActiveFilters && (
         <Button
