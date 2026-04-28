@@ -20,4 +20,6 @@ export const API_ENDPOINTS = {
   unassignBlock: `${EXTERNAL_API_BASE_URL}/Logistics/UnassignBlock`,
   assignUnitToBlock: `${EXTERNAL_API_BASE_URL}/Logistics/AssignUnitToBlock`,
   assignedDrivers: `${EXTERNAL_API_BASE_URL}/Logistics/GetAssignedDrivers`,
+  authorizationsHome: `${EXTERNAL_API_BASE_URL}/Logistics/GetDepartureAuthorizationsHome`,
+  authorizationsBranch: `${EXTERNAL_API_BASE_URL}/Logistics/GetDepartureAuthorizationsBranch`,
 };

@@ -240,7 +240,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                   Peso Total
                 </span>
                 <span className="text-xs font-black text-slate-700 dark:text-slate-200">
-                  {departure.totalWeightTons?.toFixed(1)} <span className="text-[9px] opacity-70">TON.</span>
+                  {departure.totalWeightTons?.toFixed(1)} <span className="text-[9px] opacity-70">KG.</span>
                 </span>
               </div>
             </div>

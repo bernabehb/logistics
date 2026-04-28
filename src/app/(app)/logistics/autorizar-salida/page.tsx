@@ -1,28 +1,98 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, CheckCircle2, Home, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DepartureCard, ReadyDeparture } from "@/features/logistics/components/cards/DepartureCard";
 import { RefreshCw } from "lucide-react";
-import departuresData from "@/lib/departures.json";
+interface ApiDepartureHome {
+  unidad: string;
+  chofer: string;
+  estatus: string;
+  facturas: string[];
+  pesoTotal: number;
+  montoTotal: number;
+  direccionesEntrega: string[];
+}
 
-const MOCK_DEPARTURES: ReadyDeparture[] = departuresData as ReadyDeparture[];
+interface ApiDepartureBranch {
+  cliente: string;
+  estatus: string;
+  facturas: string[];
+  pesoTotal: number;
+  montoTotal: number;
+}
 
 let cachedDepartures: ReadyDeparture[] | null = null;
 
 export default function AutorizarSalidaPage() {
-  const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || MOCK_DEPARTURES);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || []);
+  const [isRefreshing, setIsRefreshing] = useState(!cachedDepartures);
+
+  const fetchDepartures = async (silent = false) => {
+    if (!silent) setIsRefreshing(true);
+    try {
+      const [homeRes, branchRes] = await Promise.all([
+        fetch('/api/logistics/authorizations-home'),
+        fetch('/api/logistics/authorizations-branch')
+      ]);
+
+      let newDepartures: ReadyDeparture[] = [];
+
+      if (homeRes.ok) {
+        const homeData: ApiDepartureHome[] = await homeRes.json();
+        const mappedHome = homeData.map((d, i) => ({
+          id: `home-${i}-${Date.now()}`,
+          unitName: d.unidad,
+          type: "Reparto",
+          driverName: d.chofer,
+          destination: d.direccionesEntrega?.[0] || "Destinos múltiples",
+          invoices: d.facturas.map(f => ({ id: f, groups: [] })),
+          totalWeightTons: d.pesoTotal,
+          totalAmount: d.montoTotal,
+          deliveryType: "domicilio" as const,
+          locations: d.direccionesEntrega || [],
+          status: (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta" as ReadyDeparture["status"],
+        }));
+        newDepartures = [...newDepartures, ...mappedHome];
+      }
+
+      if (branchRes.ok) {
+        const branchData: ApiDepartureBranch[] = await branchRes.json();
+        const mappedBranch = branchData.map((d, i) => ({
+          id: `branch-${i}-${Date.now()}`,
+          unitName: "SUCURSAL",
+          type: "Recolección",
+          driverName: "Cliente",
+          clientName: d.cliente,
+          destination: "Sucursal",
+          invoices: d.facturas.map(f => ({ id: f, groups: [] })),
+          totalWeightTons: d.pesoTotal,
+          totalAmount: d.montoTotal,
+          deliveryType: "sucursal" as const,
+          locations: [],
+          status: (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta" as ReadyDeparture["status"],
+        }));
+        newDepartures = [...newDepartures, ...mappedBranch];
+      }
+
+      setDepartures(newDepartures);
+      cachedDepartures = newDepartures;
+    } catch (err) {
+      console.error("Error fetching departures:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDepartures(!!cachedDepartures);
+  }, []);
 
   const handleRefresh = () => {
-    setIsRefreshing(true);
-    // Simular carga de datos reales (por ahora reseteamos al mock si no hay cache, o simplemente forzamos un refresh)
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 800);
+    fetchDepartures();
   };
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Pendiente" | "En ruta">("Pendiente");
