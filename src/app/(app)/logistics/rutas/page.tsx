@@ -108,6 +108,7 @@ export default function RutasPage() {
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
   const [apiBlocks, setApiBlocks] = useState<ApiBlockStatus[]>(cachedBlocks || []);
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const lastRequestRef = useRef<number>(0);
 
@@ -119,7 +120,29 @@ export default function RutasPage() {
   // Sincronizar con el cambio de filtro de chofer
   useEffect(() => {
     lastDriverFilter = driverFilter;
-    fetchAllData(false); // No forzar si ya lo tenemos en caché
+    // Siempre refrescamos en silencio al cambiar de filtro o al montar
+    fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]); 
+  }, [driverFilter]);
+
+  // Polling para actualizaciones silenciosas cada 10 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchAllData(true, true);
+      }
+    }, 10000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAllData(true, true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [driverFilter]);
 
   const handleAssignUnit = async (blockName: string, unit: AvailableUnit | null) => {
@@ -181,6 +204,7 @@ export default function RutasPage() {
     }
 
     try {
+      setIsRefreshing(true);
       if (!silent) setIsLoading(true);
       setError(null);
 
@@ -344,6 +368,7 @@ export default function RutasPage() {
         console.error("Error fetching routes:", err);
         setError("Error al cargar la información de rutas dinámica");
       } finally {
+        setIsRefreshing(false);
         if (requestId === lastRequestRef.current) {
           setIsLoading(false);
         }
@@ -547,7 +572,7 @@ export default function RutasPage() {
             disabled={isLoading}
             className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
           >
-            <RefreshCw className={cn("size-3.5 mr-2", isLoading && "animate-spin text-blue-500")} />
+            <RefreshCw className={cn("size-3.5 mr-2", isRefreshing && "animate-spin text-blue-500")} />
             Actualizar
           </Button>
         </div>

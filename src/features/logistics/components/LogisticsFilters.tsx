@@ -2,7 +2,7 @@ import { Search, RotateCcw, Trash2 } from "lucide-react";
 import { StatusCircle } from "./StatusIndicator";
 import { cn } from "@/lib/utils";
 import { SingleDatePicker } from "./DateRangePicker";
-import { InvoiceType } from "../hooks/useLogisticsPageState";
+export type InvoiceType = 'normal' | 'anticipada';
 import { Button } from "@/components/ui/button";
 
 type Status = 'pending' | 'in-progress' | 'ready' | 'none';

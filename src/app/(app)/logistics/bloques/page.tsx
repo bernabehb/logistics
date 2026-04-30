@@ -44,16 +44,14 @@ export default function BloquesPage() {
   const [driverError, setDriverError] = useState<string | null>(null);
   
   const [errorDialog, setErrorDialog] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchAllData = async (silent: boolean | any = false) => {
-    // If silent is an event object (from onClick), treat it as false (it's a manual refresh)
     const isManualRefresh = typeof silent === 'object' && silent !== null;
     const isSilent = typeof silent === 'boolean' ? silent : false;
     
-    // Si tenemos caché y no es un refresco manual, no mostramos el spinner "pesado"
-    const shouldShowSpinner = !isManualRefresh && !isSilent && !cachedBlocks;
-
-    if (shouldShowSpinner) {
+    setIsRefreshing(true);
+    if (isManualRefresh || (!isSilent && !cachedBlocks)) {
       setIsLoadingBlocks(true);
       setIsLoadingDrivers(true);
     }
@@ -81,14 +79,31 @@ export default function BloquesPage() {
       setBlocks(mappedBlocks);
       cachedBlocks = mappedBlocks;
 
-      // Map Drivers
-      const mappedDrivers: Driver[] = driversData.map(d => mapApiDriverToDriver(d));
+      // Map & Sort Drivers by Branch Priority
+      const branchPriority: Record<string, number> = {
+        'MONTERREY': 0,
+        'APODACA': 1,
+        'GUADALUPE': 2,
+        'SANTA CATARINA': 3
+      };
+
+      const mappedDrivers: Driver[] = driversData
+        .map(d => mapApiDriverToDriver(d))
+        .sort((a, b) => {
+          const priorityA = branchPriority[a.sucursal?.toUpperCase() || ''] ?? 99;
+          const priorityB = branchPriority[b.sucursal?.toUpperCase() || ''] ?? 99;
+          
+          if (priorityA !== priorityB) return priorityA - priorityB;
+          return a.name.localeCompare(b.name);
+        });
+
       setDrivers(mappedDrivers);
       cachedDrivers = mappedDrivers;
     } catch (err) {
       console.error('Error fetching data:', err);
       setDriverError('No se pudieron cargar los datos del servidor');
     } finally {
+      setIsRefreshing(false);
       setIsLoadingBlocks(false);
       setIsLoadingDrivers(false);
     }
@@ -98,6 +113,27 @@ export default function BloquesPage() {
     // Carga inicial: Si no hay caché, se muestra el spinner.
     // Si hay caché, se usa el estado inicial (que ya tiene cachedBlocks) y se refresca en silencio.
     fetchAllData(!!cachedBlocks);
+  }, []);
+
+  // Polling para actualizaciones silenciosas cada 10 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchAllData(true);
+      }
+    }, 10000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAllData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const getAssignedDriverName = (block: Block) => {
@@ -207,7 +243,7 @@ export default function BloquesPage() {
           disabled={isLoadingBlocks}
           className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
         >
-          <RefreshCw className={cn("size-3.5 mr-2", isLoadingBlocks && "animate-spin text-blue-500")} />
+          <RefreshCw className={cn("size-3.5 mr-2", isRefreshing && "animate-spin text-blue-500")} />
           Actualizar
         </Button>
       </div>

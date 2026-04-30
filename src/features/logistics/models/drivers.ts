@@ -32,7 +32,7 @@ export function mapApiDriverToDriver(apiDriver: ApiDriver): Driver {
     clave: apiDriver.sClave.trim(),
     isActive: apiDriver.bActivo,
     company: apiDriver.company,
-    sucursal: apiDriver.sSucursal.trim(),
+    sucursal: apiDriver.sSucursal?.trim().toUpperCase() === "SIN SUCURSAL" ? "SANTA CATARINA" : apiDriver.sSucursal?.trim(),
     status: apiDriver.sEstatus,
     apiAssignedUnit: apiDriver.sUnidadAsignada,
   };
