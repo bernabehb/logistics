@@ -4,7 +4,7 @@
  */
 
 // Usamos la URL del Túnel activa reportada en los logs de error
-export const EXTERNAL_API_BASE_URL = 'https://5xtsg3k1-7297.usw3.devtunnels.ms';
+export const EXTERNAL_API_BASE_URL = 'https://c2kkz73q-7297.usw3.devtunnels.ms';
 
 export const API_HEADERS = {
   'X-Tunnel-Skip-Anti-Phishing-Page': 'true',
