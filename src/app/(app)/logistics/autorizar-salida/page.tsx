@@ -7,11 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DepartureCard, ReadyDeparture } from "@/features/logistics/components/cards/DepartureCard";
 import { RefreshCw } from "lucide-react";
+interface FacturaObj {
+  factura?: string;
+  Factura?: string;
+  autorizada?: boolean;
+  Autorizada?: boolean;
+}
+
 interface ApiDepartureHome {
   unidad: string;
   chofer: string;
   estatus: string;
-  facturas: string[];
+  facturas: FacturaObj[];
   pesoTotal: number;
   montoTotal: number;
   direccionesEntrega: string[];
@@ -20,7 +27,7 @@ interface ApiDepartureHome {
 interface ApiDepartureBranch {
   cliente: string;
   estatus: string;
-  facturas: string[];
+  facturas: FacturaObj[];
   pesoTotal: number;
   montoTotal: number;
 }
@@ -43,38 +50,66 @@ export default function AutorizarSalidaPage() {
 
       if (homeRes.ok) {
         const homeData: ApiDepartureHome[] = await homeRes.json();
-        const mappedHome = homeData.map((d, i) => ({
-          id: `home-${i}-${Date.now()}`,
-          unitName: d.unidad,
-          type: "Reparto",
-          driverName: d.chofer,
-          destination: d.direccionesEntrega?.[0] || "Destinos múltiples",
-          invoices: d.facturas.map(f => ({ id: f, groups: [] })),
-          totalWeightTons: d.pesoTotal,
-          totalAmount: d.montoTotal,
-          deliveryType: "domicilio" as const,
-          locations: d.direccionesEntrega || [],
-          status: (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta" as ReadyDeparture["status"],
-        }));
+        const mappedHome = homeData.map((d, i) => {
+          const mappedInvoices = (d.facturas || [])
+            .filter(f => {
+              if (typeof f === 'string') return true; 
+              const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
+              return !isAuth;
+            })
+            .map(f => ({ id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), groups: [] }));
+            
+          const isFullyAuthorized = (d.facturas && d.facturas.length > 0) && mappedInvoices.length === 0;
+          let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
+          if (isFullyAuthorized) computedStatus = "En ruta";
+
+          return {
+            id: `home-${i}-${Date.now()}`,
+            unitName: d.unidad,
+            type: "Reparto",
+            driverName: d.chofer,
+            destination: d.direccionesEntrega?.[0] || "Destinos múltiples",
+            invoices: mappedInvoices,
+            totalWeightTons: d.pesoTotal,
+            totalAmount: d.montoTotal,
+            deliveryType: "domicilio" as const,
+            locations: d.direccionesEntrega || [],
+            status: computedStatus as ReadyDeparture["status"],
+          };
+        }).filter(d => d.invoices.length > 0 || d.status === "En ruta");
         newDepartures = [...newDepartures, ...mappedHome];
       }
 
       if (branchRes.ok) {
         const branchData: ApiDepartureBranch[] = await branchRes.json();
-        const mappedBranch = branchData.map((d, i) => ({
-          id: `branch-${i}-${Date.now()}`,
-          unitName: "SUCURSAL",
-          type: "Recolección",
-          driverName: "Cliente",
-          clientName: d.cliente,
-          destination: "Sucursal",
-          invoices: d.facturas.map(f => ({ id: f, groups: [] })),
-          totalWeightTons: d.pesoTotal,
-          totalAmount: d.montoTotal,
-          deliveryType: "sucursal" as const,
-          locations: [],
-          status: (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta" as ReadyDeparture["status"],
-        }));
+        const mappedBranch = branchData.map((d, i) => {
+          const mappedInvoices = (d.facturas || [])
+            .filter(f => {
+              if (typeof f === 'string') return true;
+              const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
+              return !isAuth;
+            })
+            .map(f => ({ id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), groups: [] }));
+
+          const isFullyAuthorized = (d.facturas && d.facturas.length > 0) && mappedInvoices.length === 0;
+          let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
+          if (isFullyAuthorized) computedStatus = "En ruta";
+
+          return {
+            id: `branch-${i}-${Date.now()}`,
+            unitName: "SUCURSAL",
+            type: "Recolección",
+            driverName: "Cliente",
+            clientName: d.cliente,
+            destination: "Sucursal",
+            invoices: mappedInvoices,
+            totalWeightTons: d.pesoTotal,
+            totalAmount: d.montoTotal,
+            deliveryType: "sucursal" as const,
+            locations: [],
+            status: computedStatus as ReadyDeparture["status"],
+          };
+        }).filter(d => d.invoices.length > 0 || d.status === "En ruta");
         newDepartures = [...newDepartures, ...mappedBranch];
       }
 
@@ -103,7 +138,7 @@ export default function AutorizarSalidaPage() {
       if (dep.id === id) {
         return { 
           ...dep, 
-          status: (dep.deliveryType === 'sucursal' ? "Completado" : "En ruta") as ReadyDeparture["status"]
+          status: "En ruta" as ReadyDeparture["status"]
         };
       }
       return dep;
@@ -188,7 +223,7 @@ export default function AutorizarSalidaPage() {
           <div className="flex items-center justify-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
             {[
               { id: "Pendiente", label: "Pendientes", count: pendingCount },
-              { id: "En ruta", label: "En Ruta", count: enRutaCount }
+              { id: "En ruta", label: deliveryTypeFilter === "sucursal" ? "Autorizadas" : "En Ruta", count: enRutaCount }
             ].map((status) => (
               <button
                 key={status.id}
@@ -223,7 +258,9 @@ export default function AutorizarSalidaPage() {
             <p className="text-lg font-medium">
               {statusFilter === "Pendiente" 
                 ? "No hay salidas pendientes de autorización" 
-                : "No hay unidades en ruta actualmente"}
+                : deliveryTypeFilter === "sucursal"
+                  ? "No hay recolecciones autorizadas actualmente"
+                  : "No hay unidades en ruta actualmente"}
             </p>
           </div>
         ) : (

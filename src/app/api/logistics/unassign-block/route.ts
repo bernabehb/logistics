@@ -14,8 +14,14 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        // Ignorar error de parseo si no es JSON
+      }
       return NextResponse.json(
-        { error: 'Error al liberar el bloque en el servidor externo' },
+        errorData || { error: 'Error al liberar el bloque en el servidor externo' },
         { status: response.status }
       );
     }

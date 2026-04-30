@@ -28,7 +28,7 @@ export function middleware(request: NextRequest) {
         } else if (session.role === 'Admin') {
           return NextResponse.redirect(new URL('/admin', request.url));
         } else {
-          return NextResponse.redirect(new URL('/logistics', request.url));
+          return NextResponse.redirect(new URL('/logistics/rutas', request.url));
         }
       }
 
@@ -37,8 +37,8 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/chofer', request.url));
       }
       
-      if (session.role === 'Logistica' && (path.startsWith('/chofer') || path.startsWith('/cajas'))) {
-        return NextResponse.redirect(new URL('/logistics', request.url));
+      if (session.role === 'Logistica' && (path === '/logistics' || path.startsWith('/chofer') || path.startsWith('/cajas'))) {
+        return NextResponse.redirect(new URL('/logistics/rutas', request.url));
       }
 
       if (session.role === 'Guardia' && (path === '/logistics' || (path.startsWith('/logistics') && path !== '/logistics/autorizar-salida') || path.startsWith('/cajas'))) {

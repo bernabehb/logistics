@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign } from "lucide-react";
+import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,18 @@ interface WarehouseGroup {
 export interface Invoice {
   id: string;
   groups: WarehouseGroup[];
+}
+
+export interface FetchedInvoiceDetails {
+  factura: string;
+  almacenes: {
+    almacen: string;
+    materiales: {
+      material: string;
+      cantidad: number;
+      unidadVenta: string;
+    }[];
+  }[];
 }
 
 export interface ReadyDeparture {
@@ -63,6 +75,10 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isAuthorizedSuccess, setIsAuthorizedSuccess] = useState(false);
 
+  const [fetchedInvoiceDetails, setFetchedInvoiceDetails] = useState<FetchedInvoiceDetails | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+
   // Derived state
   const isTripComplete = verifiedInvoiceIds.length === departure.invoices.length;
 
@@ -76,10 +92,27 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     [departure.invoices, verifiedInvoiceIds]
   );
 
-  const handleVerificationSuccess = React.useCallback((code: string) => {
+  const handleVerificationSuccess = React.useCallback(async (code: string) => {
     setCurrentInvoiceId(code);
-    setAuthStep("invoice_review");
     setIsError(false);
+    setIsLoadingDetails(true);
+    setAuthStep("invoice_review");
+    
+    try {
+      const res = await fetch(`/api/logistics/invoice-details/${code}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFetchedInvoiceDetails(data);
+      } else {
+        console.error("Failed to fetch invoice details");
+        setFetchedInvoiceDetails(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setFetchedInvoiceDetails(null);
+    } finally {
+      setIsLoadingDetails(false);
+    }
   }, []);
 
   // Handle camera stream for "Scanning" step
@@ -121,18 +154,33 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     }
   }, [authStep, selectedMethod, remainingInvoices, handleVerificationSuccess]);
 
-  const confirmInvoiceVerification = () => {
+  const confirmInvoiceVerification = async () => {
     if (currentInvoiceId && !verifiedInvoiceIds.includes(currentInvoiceId)) {
-      const newVerified = [...verifiedInvoiceIds, currentInvoiceId];
-      setVerifiedInvoiceIds(newVerified);
+      setIsAuthorizing(true);
+      try {
+        const res = await fetch(`/api/logistics/authorize-invoice/${currentInvoiceId}`, {
+          method: 'POST'
+        });
+        if (!res.ok) throw new Error("Failed to authorize");
+        
+        // Authorization successful, proceed
+        const newVerified = [...verifiedInvoiceIds, currentInvoiceId];
+        setVerifiedInvoiceIds(newVerified);
 
-      if (newVerified.length === departure.invoices.length) {
-        setAuthStep("trip_verified");
-      } else {
-        setAuthStep("active_verification");
+        if (newVerified.length === departure.invoices.length) {
+          setAuthStep("trip_verified");
+        } else {
+          setAuthStep("active_verification");
+        }
+        setCurrentInvoiceId(null);
+        setInvoiceInput("");
+        setFetchedInvoiceDetails(null);
+      } catch (err) {
+        console.error(err);
+        alert("Hubo un error al autorizar la carga de la factura.");
+      } finally {
+        setIsAuthorizing(false);
       }
-      setCurrentInvoiceId(null);
-      setInvoiceInput("");
     }
   };
 
@@ -154,6 +202,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     setInvoiceInput("");
     setIsError(false);
     setIsAuthorizedSuccess(false);
+    setFetchedInvoiceDetails(null);
   };
 
   const handleFinalAuthorization = () => {
@@ -221,8 +270,8 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5 pl-1">
-              {departure.invoices.map((inv) => (
-                <span key={inv.id} className="text-[10px] font-bold px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-600 dark:text-slate-300">
+              {departure.invoices.map((inv, idx) => (
+                <span key={`${inv.id}-${idx}`} className="text-[10px] font-bold px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-600 dark:text-slate-300">
                   #{inv.id}
                 </span>
               ))}
@@ -461,32 +510,42 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                     </div>
                   )}
 
-                  {authStep === "invoice_review" && currentInvoice && (
+                  {authStep === "invoice_review" && currentInvoiceId && (
                     <div className="space-y-6 animate-in zoom-in-95 duration-300">
                       <div className="text-center space-y-2 px-2">
                         <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Revisar Carga</DialogTitle>
-                        <p className="text-xs sm:text-sm font-bold text-emerald-500 uppercase tracking-widest">{currentInvoice.id}</p>
+                        <p className="text-xs sm:text-sm font-bold text-emerald-500 uppercase tracking-widest">{currentInvoiceId}</p>
                       </div>
 
                       <div className="space-y-4 max-h-[60vh] sm:max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-                        {currentInvoice.groups?.map((group, gIdx) => (
-                          <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
-                            <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
-                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén: {group.warehouse}</span>
-                              <span className="text-[10px] font-bold text-slate-400 capitalize">{group.materials.length} productos</span>
-                            </div>
-                            <table className="w-full text-left">
-                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {group.materials.map((mat, mIdx) => (
-                                  <tr key={mIdx}>
-                                    <td className="px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200">{mat.name}</td>
-                                    <td className="px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100 text-right">{mat.quantity}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                        {isLoadingDetails ? (
+                          <div className="flex justify-center items-center py-10">
+                            <RefreshCw className="size-8 text-emerald-500 animate-spin" />
                           </div>
-                        ))}
+                        ) : fetchedInvoiceDetails && fetchedInvoiceDetails.almacenes?.length > 0 ? (
+                          fetchedInvoiceDetails.almacenes.map((group, gIdx) => (
+                            <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
+                              <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén: {group.almacen}</span>
+                                <span className="text-[10px] font-bold text-slate-400 capitalize">{group.materiales.length} productos</span>
+                              </div>
+                              <table className="w-full text-left">
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                  {group.materiales.map((mat, mIdx) => (
+                                    <tr key={mIdx}>
+                                      <td className="px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200">{mat.material}</td>
+                                      <td className="px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100 text-right">{mat.cantidad} {mat.unidadVenta}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-10 text-slate-500 font-bold uppercase text-xs">
+                            No se encontraron detalles para esta factura
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -494,13 +553,16 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                           variant="ghost"
                           className="h-14 sm:flex-1 rounded-2xl font-bold uppercase tracking-widest text-slate-500 shrink-0"
                           onClick={() => setAuthStep("active_verification")}
+                          disabled={isAuthorizing}
                         >
                           Re-intentar
                         </Button>
                         <Button
-                          className="h-14 sm:flex-[2] rounded-2xl text-md font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-500/20"
+                          className="h-14 sm:flex-[2] rounded-2xl text-md font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2"
                           onClick={confirmInvoiceVerification}
+                          disabled={isLoadingDetails || isAuthorizing || !fetchedInvoiceDetails}
                         >
+                          {isAuthorizing ? <RefreshCw className="size-5 animate-spin" /> : null}
                           Carga Verificada
                         </Button>
                       </div>

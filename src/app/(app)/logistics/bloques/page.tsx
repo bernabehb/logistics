@@ -8,6 +8,14 @@ import { Search, Layers, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
 import { API_ENDPOINTS, API_HEADERS } from "@/lib/apiConfig";
 
 interface ApiBlockStatus {
@@ -34,6 +42,8 @@ export default function BloquesPage() {
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(!cachedDrivers);
   const [driverError, setDriverError] = useState<string | null>(null);
+  
+  const [errorDialog, setErrorDialog] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
 
   const fetchAllData = async (silent: boolean | any = false) => {
     // If silent is an event object (from onClick), treat it as false (it's a manual refresh)
@@ -124,14 +134,23 @@ export default function BloquesPage() {
           body: JSON.stringify(block.iId)
         });
 
-        if (!response.ok) throw new Error("Error en la liberación");
+        if (!response.ok) {
+          const errData = await response.json().catch(() => null);
+          const errorMsg = errData?.message || errData?.error || "Error en la liberación";
+          throw new Error(errorMsg);
+        }
         
         // Refresco silencioso en segundo plano con retraso para dar tiempo a la BD
         setTimeout(() => fetchAllData(true), 2000);
-      } catch (err) {
-        console.error("Error unassigning block:", err);
+      } catch (err: any) {
+        console.warn("Validation/Error assigning block:", err?.message || err);
         setBlocks(originalBlocks); // Revertir en caso de error
-        alert("Hubo un error al liberar el bloque.");
+        
+        if (err && err.message) {
+          setErrorDialog({ show: true, message: err.message });
+        } else {
+          setErrorDialog({ show: true, message: "Hubo un error al intentar liberar el bloque. Intenta de nuevo más tarde." });
+        }
       }
       return;
     }
@@ -266,6 +285,25 @@ export default function BloquesPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={errorDialog.show} onOpenChange={(open) => !open && setErrorDialog({ show: false, message: "" })}>
+        <DialogContent className="sm:max-w-md p-6 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl">
+          <DialogHeader className="mb-2">
+            <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">No se pudo liberar el bloque</DialogTitle>
+            <DialogDescription className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              {errorDialog.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 flex justify-end">
+            <Button
+              onClick={() => setErrorDialog({ show: false, message: "" })}
+              className="px-6 py-2.5 rounded-xl font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 transition-colors"
+            >
+              Aceptar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -289,7 +289,8 @@ export default function RutasPage() {
               type: type,
               completedDeliveries: type === 'anticipada' ? (row.montoAnticipado > 0 ? 1 : 0) : undefined,
               hasGlassCut: false,
-              montoTotal: row.monto_Factura
+              montoTotal: row.monto_Factura,
+              orderNum: row.orderNum
             });
           }
 
@@ -386,8 +387,11 @@ export default function RutasPage() {
       // 2. Search Query
       if (searchQuery) {
         const lowerQuery = searchQuery.toLowerCase();
-        const matchesSearch = p.id.toLowerCase().includes(lowerQuery) ||
-          p.clientName.toLowerCase().includes(lowerQuery);
+        const matchesSearch = 
+          p.id.toLowerCase().includes(lowerQuery) ||
+          p.clientName.toLowerCase().includes(lowerQuery) ||
+          (p.block && p.block.toLowerCase().includes(lowerQuery)) ||
+          (p.orderNum && p.orderNum.toString().includes(lowerQuery));
         if (!matchesSearch) return false;
       }
 
@@ -552,11 +556,11 @@ export default function RutasPage() {
       {/* Unified Single Row Filters */}
       <div className="flex flex-wrap items-center gap-3 md:gap-1.5 w-full bg-white/50 dark:bg-slate-900/40 py-2 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {/* 1. Search Bar */}
-        <div className="relative group w-full md:w-[220px] shrink-0">
+        <div className="relative group w-full md:w-[320px] shrink-0">
           <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
           <Input
             type="text"
-            placeholder="Buscar factura o cliente..."
+            placeholder="Buscar por factura, cliente u orden"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 h-9 text-xs focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"

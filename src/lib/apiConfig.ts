@@ -22,4 +22,6 @@ export const API_ENDPOINTS = {
   assignedDrivers: `${EXTERNAL_API_BASE_URL}/Logistics/GetAssignedDrivers`,
   authorizationsHome: `${EXTERNAL_API_BASE_URL}/Logistics/GetDepartureAuthorizationsHome`,
   authorizationsBranch: `${EXTERNAL_API_BASE_URL}/Logistics/GetDepartureAuthorizationsBranch`,
+  invoiceDetails: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/GetInvoiceDetails/${invoiceNum}`,
+  authorizeInvoice: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeInvoice/${invoiceNum}`,
 };

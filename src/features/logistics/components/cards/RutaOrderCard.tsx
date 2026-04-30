@@ -22,6 +22,7 @@ export interface RutaPedido {
   completedDeliveries?: number;
   block?: string;
   montoTotal?: number;
+  orderNum?: number;
 }
 
 interface RutaOrderCardProps {
