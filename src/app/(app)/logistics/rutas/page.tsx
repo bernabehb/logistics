@@ -458,6 +458,11 @@ export default function RutasPage() {
         }
       }
 
+      // 6. Branch Filter
+      if (branchFilter !== 'all') {
+        if (!p.sucursal || p.sucursal.toUpperCase() !== branchFilter.toUpperCase()) return false;
+      }
+
       return true;
     });
 
