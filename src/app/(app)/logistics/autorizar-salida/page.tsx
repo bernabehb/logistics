@@ -64,7 +64,7 @@ export default function AutorizarSalidaPage() {
           if (isFullyAuthorized) computedStatus = "En ruta";
 
           return {
-            id: `home-${i}-${Date.now()}`,
+            id: `home-${i}-${d.unidad.trim()}`,
             unitName: d.unidad,
             type: "Reparto",
             driverName: d.chofer,
@@ -96,7 +96,7 @@ export default function AutorizarSalidaPage() {
           if (isFullyAuthorized) computedStatus = "En ruta";
 
           return {
-            id: `branch-${i}-${Date.now()}`,
+            id: `branch-${i}-${d.cliente.trim()}`,
             unitName: "SUCURSAL",
             type: "Recolección",
             driverName: "Cliente",

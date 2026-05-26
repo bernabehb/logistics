@@ -23,6 +23,7 @@ export interface RutaPedido {
   block?: string;
   montoTotal?: number;
   orderNum?: number;
+  sucursal?: string;
 }
 
 interface RutaOrderCardProps {

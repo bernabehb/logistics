@@ -25,6 +25,8 @@ const BLOCKS_LIST_FALLBACK = [
   "FELIX U. GOMEZ", "GENERAL ESCOBEDO", "LA AURORA"
 ];
 
+const BRANCHES = ["APODACA", "GUADALUPE", "MONTERREY", "SANTA CATARINA"];
+
 interface ApiRutaInvoice {
   tipoFactura: string;
   montoAnticipado: number;
@@ -89,6 +91,7 @@ let cachedDrivers: Driver[] | null = null;
 let cachedBlocks: ApiBlockStatus[] | null = null;
 let cachedInvoicesByDriver: Record<string, RutaPedido[]> = {};
 let lastDriverFilter: string = 'all';
+let lastBranchFilter: string = 'all';
 
 export default function RutasPage() {
   const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[lastDriverFilter] || []);
@@ -105,6 +108,7 @@ export default function RutasPage() {
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [driverFilter, setDriverFilter] = useState<string>(lastDriverFilter);
+  const [branchFilter, setBranchFilter] = useState<string>(lastBranchFilter);
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
   const [apiBlocks, setApiBlocks] = useState<ApiBlockStatus[]>(cachedBlocks || []);
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
@@ -123,6 +127,11 @@ export default function RutasPage() {
     // Siempre refrescamos en silencio al cambiar de filtro o al montar
     fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]); 
   }, [driverFilter]);
+
+  // Sincronizar con el cambio de filtro de sucursal
+  useEffect(() => {
+    lastBranchFilter = branchFilter;
+  }, [branchFilter]);
 
   // Polling para actualizaciones silenciosas cada 10 segundos
   useEffect(() => {
@@ -301,6 +310,9 @@ export default function RutasPage() {
             else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') status = 'in-progress';
             else status = 'pending';
 
+            const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
+            const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
+
             groupedMap.set(groupKey, {
               id: groupKey,
               clientName: row.cliente,
@@ -314,7 +326,8 @@ export default function RutasPage() {
               completedDeliveries: type === 'anticipada' ? (row.montoAnticipado > 0 ? 1 : 0) : undefined,
               hasGlassCut: false,
               montoTotal: row.monto_Factura,
-              orderNum: row.orderNum
+              orderNum: row.orderNum,
+              sucursal: mappedSucursal
             });
           }
 
@@ -454,7 +467,7 @@ export default function RutasPage() {
     }
 
     return filtered;
-  }, [invoices, deliveryTypeFilter, searchQuery, fromDate, statusFilters, invoiceTypeFilter]);
+  }, [invoices, deliveryTypeFilter, searchQuery, fromDate, statusFilters, invoiceTypeFilter, branchFilter]);
 
   // Grouping
   const groupedData = useMemo(() => {
@@ -476,6 +489,68 @@ export default function RutasPage() {
           Gestión de rutas
         </h1>
         <div className="flex items-center gap-3">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 pl-3 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all hover:bg-white dark:hover:bg-slate-900 shadow-sm min-w-[180px] justify-between group"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Building2 className="size-3.5 text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
+                  <span className="truncate max-w-[200px]">
+                    {branchFilter === 'all' ? 'TODAS LAS SUCURSALES' : branchFilter}
+                  </span>
+                </div>
+                <ChevronDown className="size-3.5 text-slate-400 shrink-0 ml-2" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[240px] p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
+              <div className="flex flex-col gap-1">
+                <p className="px-3 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+                  Filtrar por Sucursal
+                </p>
+                <button
+                  onClick={() => setBranchFilter('all')}
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                    branchFilter === 'all'
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  )}
+                >
+                  <div className={cn("size-2 rounded-full", branchFilter === 'all' ? "bg-white animate-pulse" : "bg-blue-500")} />
+                  TODAS LAS SUCURSALES
+                </button>
+                <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-2" />
+                <div className="flex flex-col gap-0.5">
+                  {BRANCHES.map(branch => (
+                    <button
+                      key={branch}
+                      onClick={() => setBranchFilter(branch)}
+                      className={cn(
+                        "w-full text-left px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 group",
+                        branchFilter === branch
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                      )}
+                    >
+                      <div className={cn(
+                        "size-6 rounded-lg flex items-center justify-center text-[10px] shrink-0",
+                        branchFilter === branch
+                          ? "bg-white/20 text-white"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600"
+                      )}>
+                        {branch.substring(0, 2)}
+                      </div>
+                      <span className="truncate">{branch}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Popover>
             <PopoverTrigger asChild>
               <Button
