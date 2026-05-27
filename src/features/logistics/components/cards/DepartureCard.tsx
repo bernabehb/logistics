@@ -120,26 +120,10 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
   // Auto-detect device and select scanMode
   useEffect(() => {
-    const detectDevice = async () => {
-      if (authStep === "active_verification" && selectedMethod === "scanning") {
-        const isMobileDevice = window.matchMedia("(pointer: coarse)").matches;
-        if (isMobileDevice && navigator.mediaDevices) {
-          try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const hasBackCamera = devices.some(device => 
-              device.kind === 'videoinput' && 
-              (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trasera'))
-            );
-            setScanMode(hasBackCamera ? "camera" : "reader");
-          } catch (e) {
-            setScanMode("reader");
-          }
-        } else {
-          setScanMode("reader");
-        }
-      }
-    };
-    detectDevice();
+    if (authStep === "active_verification" && selectedMethod === "scanning") {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setScanMode(isMobile ? "camera" : "reader");
+    }
   }, [authStep, selectedMethod]);
 
   // Focus the scanner input when the scanning screen is active in reader mode
@@ -182,23 +166,14 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
       startCamera();
       setIsCameraActive(true);
 
-      // Simulate scan after 2 seconds
-      const timer = setTimeout(() => {
-        if (remainingInvoices.length > 0) {
-          const autoCode = remainingInvoices[0].id;
-          handleVerificationSuccess(autoCode);
-        }
-      }, 2000);
-
       return () => {
-        clearTimeout(timer);
         if (stream) {
           stream.getTracks().forEach(track => track.stop());
         }
         setIsCameraActive(false);
       };
     }
-  }, [authStep, selectedMethod, scanMode, remainingInvoices, handleVerificationSuccess]);
+  }, [authStep, selectedMethod, scanMode]);
 
   const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -541,32 +516,34 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
                       {scanMode === "camera" ? (
                         /* Camera Scanning View */
-                        <div className="relative h-[220px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner group/video">
-                          {cameraError ? (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
-                              <ScanLine className="size-8 text-slate-700 opacity-30" />
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">{cameraError}</p>
-                            </div>
-                          ) : (
-                            <video
-                              ref={videoRef}
-                              autoPlay
-                              playsInline
-                              className="w-full h-full object-cover grayscale opacity-60"
-                            />
-                          )}
-
-                          {!cameraError && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-[85%] h-24 border-2 border-emerald-500/50 rounded-xl relative">
-                                <div className="absolute left-0 w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-scan-line" />
-                                <div className="absolute -top-1 -left-1 size-4 border-t-2 border-l-2 border-emerald-500 rounded-tl-lg" />
-                                <div className="absolute -top-1 -right-1 size-4 border-t-2 border-r-2 border-emerald-500 rounded-tr-lg" />
-                                <div className="absolute -bottom-1 -left-1 size-4 border-b-2 border-l-2 border-emerald-500 rounded-bl-lg" />
-                                <div className="absolute -bottom-1 -right-1 size-4 border-b-2 border-r-2 border-emerald-500 rounded-br-lg" />
+                        <div className="flex flex-col gap-3">
+                          <div className="relative h-[220px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner group/video">
+                            {cameraError ? (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
+                                <ScanLine className="size-8 text-slate-700 opacity-30" />
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">{cameraError}</p>
                               </div>
-                            </div>
-                          )}
+                            ) : (
+                              <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                className="w-full h-full object-cover grayscale opacity-60"
+                              />
+                            )}
+
+                            {!cameraError && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-[85%] h-24 border-2 border-emerald-500/50 rounded-xl relative">
+                                  <div className="absolute left-0 w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-scan-line" />
+                                  <div className="absolute -top-1 -left-1 size-4 border-t-2 border-l-2 border-emerald-500 rounded-tl-lg" />
+                                  <div className="absolute -top-1 -right-1 size-4 border-t-2 border-r-2 border-emerald-500 rounded-tr-lg" />
+                                  <div className="absolute -bottom-1 -left-1 size-4 border-b-2 border-l-2 border-emerald-500 rounded-bl-lg" />
+                                  <div className="absolute -bottom-1 -right-1 size-4 border-b-2 border-r-2 border-emerald-500 rounded-br-lg" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ) : (
                         /* Physical USB Barcode Scanner View */
