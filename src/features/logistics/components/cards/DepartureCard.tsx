@@ -656,7 +656,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                       {scanMode === "camera" ? (
                         /* Camera Scanning View */
                         <div className="flex flex-col gap-3">
-                          <div className="relative min-h-[260px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner">
+                          <div className="relative h-[130px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner">
                             {cameraError ? (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
                                 <ScanLine className="size-8 text-slate-700 opacity-30" />
@@ -667,7 +667,15 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                             )}
 
                             {!cameraError && (
-                              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-10">
+                              <>
+                                <style dangerouslySetInnerHTML={{ __html: `
+                                  #camera-reader video {
+                                    width: 100% !important;
+                                    height: 100% !important;
+                                    object-fit: cover !important;
+                                  }
+                                ` }} />
+                                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-10">
                                 <div className="w-[85%] h-24 border-2 border-emerald-500/50 rounded-xl relative">
                                   <div className="absolute left-0 w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-scan-line" />
                                   <div className="absolute -top-1 -left-1 size-4 border-t-2 border-l-2 border-emerald-500 rounded-tl-lg" />
@@ -676,6 +684,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                                   <div className="absolute -bottom-1 -right-1 size-4 border-b-2 border-r-2 border-emerald-500 rounded-br-lg" />
                                 </div>
                               </div>
+                              </>
                             )}
                           </div>
                           {isError && scannedCode && (
