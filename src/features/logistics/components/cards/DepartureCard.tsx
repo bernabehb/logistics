@@ -78,6 +78,8 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState<"camera" | "reader">("reader");
   const [isAuthorizedSuccess, setIsAuthorizedSuccess] = useState(false);
+  const [scannedCode, setScannedCode] = useState<string | null>(null);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
 
   const [fetchedInvoiceDetails, setFetchedInvoiceDetails] = useState<FetchedInvoiceDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -119,13 +121,19 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     }
   }, []);
 
+  // Set isMobileDevice on mount (client-side only to prevent SSR mismatch)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsMobileDevice(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    }
+  }, []);
+
   // Auto-detect device and select scanMode
   useEffect(() => {
     if (authStep === "active_verification" && selectedMethod === "scanning") {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      setScanMode(isMobile ? "camera" : "reader");
+      setScanMode(isMobileDevice ? "camera" : "reader");
     }
-  }, [authStep, selectedMethod]);
+  }, [authStep, selectedMethod, isMobileDevice]);
 
   // Focus the scanner input when the scanning screen is active in reader mode
   useEffect(() => {
@@ -178,8 +186,16 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
           });
 
           const qrCodeSuccessCallback = async (decodedText: string) => {
-            const cleanedText = decodedText.trim().toUpperCase();
-            const targetInvoice = remainingInvoices.find(inv => inv.id.toUpperCase() === cleanedText);
+            const trimmed = decodedText.trim();
+            const normalizedText = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
+            
+            // Fuzzy search on remaining invoices
+            const targetInvoice = remainingInvoices.find(inv => {
+              const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
+              return cleanedId === normalizedText || 
+                     cleanedId.endsWith(normalizedText) || 
+                     normalizedText.endsWith(cleanedId);
+            });
             
             if (targetInvoice) {
               if (navigator.vibrate) navigator.vibrate(200);
@@ -192,8 +208,11 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
               } catch (stopErr) {
                 console.error("Error stopping scanner after success:", stopErr);
               }
+              setScannedCode(null);
+              setIsError(false);
               handleVerificationSuccess(targetInvoice.id);
             } else {
+              setScannedCode(trimmed);
               setIsError(true);
             }
           };
@@ -202,19 +221,23 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
             // Ignore frame analysis errors
           };
 
+          const scanConfig = {
+            fps: 15,
+            qrbox: (width: number, height: number) => {
+              const boxWidth = Math.floor(width * 0.9);
+              const boxHeight = Math.min(Math.floor(height * 0.7), 160);
+              return { width: boxWidth, height: boxHeight };
+            },
+            videoConstraints: {
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          };
+
           await html5QrcodeScanner.start(
             { facingMode: "environment" },
-            {
-              fps: 15,
-              // Taller scanning box to make it much easier to fit/align 1D barcodes on mobile devices
-              qrbox: (width, height) => {
-                const boxWidth = Math.floor(width * 0.9);
-                const boxHeight = Math.min(Math.floor(height * 0.7), 160);
-                return { width: boxWidth, height: boxHeight };
-              }
-              // Omit aspectRatio constraint to let the device use its native video aspect ratio,
-              // which is much better for focus and resolution on portrait mobile screens.
-            },
+            scanConfig,
             qrCodeSuccessCallback,
             qrCodeErrorCallback
           );
@@ -243,19 +266,64 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
   const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      const scannedCode = scannerInputRef.current?.value.trim().toUpperCase() || "";
-      if (scannedCode) {
-        const targetInvoice = remainingInvoices.find(inv => inv.id.toUpperCase() === scannedCode);
+      const inputVal = scannerInputRef.current?.value.trim() || "";
+      const scannedCodeVal = inputVal.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (scannedCodeVal) {
+        const targetInvoice = remainingInvoices.find(inv => {
+          const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
+          return cleanedId === scannedCodeVal || 
+                 cleanedId.endsWith(scannedCodeVal) || 
+                 scannedCodeVal.endsWith(cleanedId);
+        });
         if (targetInvoice) {
+          setScannedCode(null);
+          setIsError(false);
           handleVerificationSuccess(targetInvoice.id);
         } else {
+          setScannedCode(inputVal);
           setIsError(true);
-          alert(`La factura "${scannedCode}" no pertenece a este viaje.`);
+          alert(`La factura "${inputVal}" no pertenece a este viaje.`);
         }
       }
       if (scannerInputRef.current) {
         scannerInputRef.current.value = "";
       }
+    }
+  };
+
+  const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    setIsLoadingDetails(true);
+    try {
+      const fileScanner = new Html5Qrcode("file-reader-temp");
+      const decodedText = await fileScanner.scanFile(file, false);
+      const trimmed = decodedText.trim();
+      const normalizedText = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      
+      const targetInvoice = remainingInvoices.find(inv => {
+        const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        return cleanedId === normalizedText || 
+               cleanedId.endsWith(normalizedText) || 
+               normalizedText.endsWith(cleanedId);
+      });
+
+      if (targetInvoice) {
+        if (navigator.vibrate) navigator.vibrate(200);
+        setScannedCode(null);
+        setIsError(false);
+        handleVerificationSuccess(targetInvoice.id);
+      } else {
+        setScannedCode(trimmed);
+        setIsError(true);
+      }
+    } catch (err) {
+      console.error("Failed to scan file:", err);
+      alert("No se pudo detectar ningún código de barras en la foto. Asegúrate de enfocar bien el código de barras y que no tenga sombras ni reflejos.");
+    } finally {
+      setIsLoadingDetails(false);
+      e.target.value = "";
     }
   };
 
@@ -290,12 +358,20 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   };
 
   const handleManualVerify = () => {
-    const normalizedInput = invoiceInput.trim().toUpperCase();
-    const targetInvoice = remainingInvoices.find(inv => inv.id.toUpperCase() === normalizedInput);
+    const normalizedInput = invoiceInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const targetInvoice = remainingInvoices.find(inv => {
+      const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      return cleanedId === normalizedInput || 
+             cleanedId.endsWith(normalizedInput) || 
+             normalizedInput.endsWith(cleanedId);
+    });
 
     if (targetInvoice) {
+      setScannedCode(null);
+      setIsError(false);
       handleVerificationSuccess(targetInvoice.id);
     } else {
+      setScannedCode(invoiceInput.trim());
       setIsError(true);
     }
   };
@@ -308,6 +384,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     setIsError(false);
     setIsAuthorizedSuccess(false);
     setFetchedInvoiceDetails(null);
+    setScannedCode(null);
   };
 
   const handleFinalAuthorization = () => {
@@ -583,7 +660,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                       {scanMode === "camera" ? (
                         /* Camera Scanning View */
                         <div className="flex flex-col gap-3">
-                          <div className="relative h-[220px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner">
+                          <div className="relative min-h-[260px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner">
                             {cameraError ? (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
                                 <ScanLine className="size-8 text-slate-700 opacity-30" />
@@ -604,6 +681,37 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                                 </div>
                               </div>
                             )}
+                          </div>
+                          {isError && scannedCode && (
+                            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl p-4 text-center animate-in fade-in duration-300">
+                              <p className="text-xs font-bold text-red-500">
+                                Código leído: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
+                              </p>
+                              <p className="text-[10px] text-red-400 mt-1 font-semibold">
+                                No pertenece a las facturas pendientes de este viaje.
+                              </p>
+                            </div>
+                          )}
+                          {/* File Scanner Fallback for Mobile Devices */}
+                          <div className="flex flex-col gap-2 mt-1">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={handleFileScan}
+                              className="hidden"
+                              id="file-scanner-input"
+                            />
+                            <Button
+                              variant="outline"
+                              onClick={() => document.getElementById("file-scanner-input")?.click()}
+                              className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-xs font-black uppercase tracking-wider transition-all"
+                              disabled={isLoadingDetails}
+                            >
+                              <ScanLine className="size-4 text-emerald-500" />
+                              Tomar Foto para Escanear
+                            </Button>
+                            <div id="file-reader-temp" className="hidden" />
                           </div>
                         </div>
                       ) : (
@@ -653,17 +761,19 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                         </>
                       )}
 
-                      {/* Manual Toggle Button at the bottom */}
-                      <div className="flex justify-center pt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setScanMode(prev => prev === "camera" ? "reader" : "camera")}
-                          className="h-9 px-4 rounded-xl border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-all"
-                        >
-                          {scanMode === "camera" ? "Cambiar a Lector USB" : "Cambiar a Cámara"}
-                        </Button>
-                      </div>
+                      {/* Manual Toggle Button at the bottom (Only on Mobile/Tablets) */}
+                      {isMobileDevice && (
+                        <div className="flex justify-center pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setScanMode(prev => prev === "camera" ? "reader" : "camera")}
+                            className="h-9 px-4 rounded-xl border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-all"
+                          >
+                            {scanMode === "camera" ? "Cambiar a Lector USB" : "Cambiar a Cámara"}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
 
