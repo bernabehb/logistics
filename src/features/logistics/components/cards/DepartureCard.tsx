@@ -70,9 +70,12 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
   const [invoiceInput, setInvoiceInput] = useState("");
   const [isError, setIsError] = useState(false);
+  const [isScannerFocused, setIsScannerFocused] = useState(false);
+  const scannerInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [scanMode, setScanMode] = useState<"camera" | "reader">("reader");
   const [isAuthorizedSuccess, setIsAuthorizedSuccess] = useState(false);
 
   const [fetchedInvoiceDetails, setFetchedInvoiceDetails] = useState<FetchedInvoiceDetails | null>(null);
@@ -115,7 +118,50 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     }
   }, []);
 
-  // Handle camera stream for "Scanning" step
+  // Auto-detect device and select scanMode
+  useEffect(() => {
+    const detectDevice = async () => {
+      if (authStep === "active_verification" && selectedMethod === "scanning") {
+        const isMobileDevice = window.matchMedia("(pointer: coarse)").matches;
+        if (isMobileDevice && navigator.mediaDevices) {
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const hasBackCamera = devices.some(device => 
+              device.kind === 'videoinput' && 
+              (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trasera'))
+            );
+            setScanMode(hasBackCamera ? "camera" : "reader");
+          } catch (e) {
+            setScanMode("reader");
+          }
+        } else {
+          setScanMode("reader");
+        }
+      }
+    };
+    detectDevice();
+  }, [authStep, selectedMethod]);
+
+  // Focus the scanner input when the scanning screen is active in reader mode
+  useEffect(() => {
+    if (authStep === "active_verification" && selectedMethod === "scanning" && scanMode === "reader") {
+      const focusInput = () => {
+        if (scannerInputRef.current) {
+          scannerInputRef.current.focus();
+          setIsScannerFocused(document.activeElement === scannerInputRef.current);
+        }
+      };
+
+      focusInput();
+      const interval = setInterval(focusInput, 500);
+
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [authStep, selectedMethod, scanMode]);
+
+  // Handle camera stream for "Scanning" step when camera mode is active
   useEffect(() => {
     let stream: MediaStream | null = null;
 
@@ -132,11 +178,11 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
       }
     };
 
-    if (authStep === "active_verification" && selectedMethod === "scanning") {
+    if (authStep === "active_verification" && selectedMethod === "scanning" && scanMode === "camera") {
       startCamera();
       setIsCameraActive(true);
 
-      // Simulate an automatic scan after 2 seconds for demo purposes
+      // Simulate scan after 2 seconds
       const timer = setTimeout(() => {
         if (remainingInvoices.length > 0) {
           const autoCode = remainingInvoices[0].id;
@@ -152,7 +198,25 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
         setIsCameraActive(false);
       };
     }
-  }, [authStep, selectedMethod, remainingInvoices, handleVerificationSuccess]);
+  }, [authStep, selectedMethod, scanMode, remainingInvoices, handleVerificationSuccess]);
+
+  const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const scannedCode = scannerInputRef.current?.value.trim().toUpperCase() || "";
+      if (scannedCode) {
+        const targetInvoice = remainingInvoices.find(inv => inv.id.toUpperCase() === scannedCode);
+        if (targetInvoice) {
+          handleVerificationSuccess(targetInvoice.id);
+        } else {
+          setIsError(true);
+          alert(`La factura "${scannedCode}" no pertenece a este viaje.`);
+        }
+      }
+      if (scannerInputRef.current) {
+        scannerInputRef.current.value = "";
+      }
+    }
+  };
 
   const confirmInvoiceVerification = async () => {
     if (currentInvoiceId && !verifiedInvoiceIds.includes(currentInvoiceId)) {
@@ -452,11 +516,6 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                           )}
                         </div>
 
-                        <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">
-                            Factura de prueba: <span className="text-slate-900 dark:text-slate-100 font-black tracking-normal">{remainingInvoices[0]?.id}</span>
-                          </p>
-                        </div>
 
                         <Button
                           className="w-full h-14 rounded-2xl text-md font-black uppercase tracking-widest bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xl transition-all active:scale-95"
@@ -475,37 +534,97 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                         <Button variant="ghost" size="icon" onClick={() => setAuthStep("method_select")} className="rounded-full">
                           <ArrowLeft className="size-5" />
                         </Button>
-                        <DialogTitle className="text-lg font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-
-                          Escaneando Factura...
+                        <DialogTitle className="text-lg font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                          {scanMode === "camera" ? "Escaneando Factura..." : "Escanear con Lector"}
                         </DialogTitle>
                       </div>
 
-                      <div className="relative h-[75px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner group/video">
-                        {cameraError ? (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
-                            <ScanLine className="size-8 text-slate-700 opacity-30" />
-                          </div>
-                        ) : (
-                          <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            className="w-full h-full object-cover grayscale opacity-60"
-                          />
-                        )}
-
-                        {!cameraError && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-[85%] h-10 border-2 border-emerald-500/50 rounded-xl relative">
-                              <div className="absolute left-0 w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-scan-line" />
-                              <div className="absolute -top-1 -left-1 size-4 border-t-2 border-l-2 border-emerald-500 rounded-tl-lg" />
-                              <div className="absolute -top-1 -right-1 size-4 border-t-2 border-r-2 border-emerald-500 rounded-tr-lg" />
-                              <div className="absolute -bottom-1 -left-1 size-4 border-b-2 border-l-2 border-emerald-500 rounded-bl-lg" />
-                              <div className="absolute -bottom-1 -right-1 size-4 border-b-2 border-r-2 border-emerald-500 rounded-br-lg" />
+                      {scanMode === "camera" ? (
+                        /* Camera Scanning View */
+                        <div className="relative h-[220px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner group/video">
+                          {cameraError ? (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
+                              <ScanLine className="size-8 text-slate-700 opacity-30" />
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">{cameraError}</p>
                             </div>
-                          </div>
-                        )}
+                          ) : (
+                            <video
+                              ref={videoRef}
+                              autoPlay
+                              playsInline
+                              className="w-full h-full object-cover grayscale opacity-60"
+                            />
+                          )}
+
+                          {!cameraError && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-[85%] h-24 border-2 border-emerald-500/50 rounded-xl relative">
+                                <div className="absolute left-0 w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-scan-line" />
+                                <div className="absolute -top-1 -left-1 size-4 border-t-2 border-l-2 border-emerald-500 rounded-tl-lg" />
+                                <div className="absolute -top-1 -right-1 size-4 border-t-2 border-r-2 border-emerald-500 rounded-tr-lg" />
+                                <div className="absolute -bottom-1 -left-1 size-4 border-b-2 border-l-2 border-emerald-500 rounded-bl-lg" />
+                                <div className="absolute -bottom-1 -right-1 size-4 border-b-2 border-r-2 border-emerald-500 rounded-br-lg" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        /* Physical USB Barcode Scanner View */
+                        <>
+                          <input
+                            ref={scannerInputRef}
+                            type="text"
+                            className="absolute opacity-0 pointer-events-none w-0 h-0"
+                            onKeyDown={handleBarcodeKeyDown}
+                            autoFocus
+                          />
+
+                          {isScannerFocused ? (
+                            <div className="flex flex-col items-center justify-center p-6 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-3xl border-2 border-emerald-200 dark:border-emerald-500/20 text-center gap-4 transition-all">
+                              <div className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400 font-black text-xs uppercase tracking-widest bg-emerald-100 dark:bg-emerald-500/20 px-4 py-2 rounded-xl">
+                                <span className="size-2 rounded-full bg-emerald-500 animate-ping" />
+                                ESPERANDO ESCANEO
+                              </div>
+                              <div className="relative p-4 bg-white dark:bg-slate-900 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <QrCode className="size-10 text-emerald-500" />
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
+                                Apunta al código de barras de la factura y presiona el gatillo para escanear de forma automática.
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center p-6 bg-amber-50/50 dark:bg-amber-500/5 rounded-3xl border-2 border-amber-200 dark:border-amber-500/20 text-center gap-4 transition-all">
+                              <div className="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400 font-black text-xs uppercase tracking-widest bg-amber-100 dark:bg-amber-500/20 px-4 py-2 rounded-xl">
+                                ESCANEO DESACTIVADO
+                              </div>
+                              <div className="relative p-4 bg-white dark:bg-slate-900 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <X className="size-10 text-amber-500" />
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
+                                La ventana del navegador perdió el foco para capturar el lector.
+                              </p>
+                              <Button
+                                variant="outline"
+                                onClick={() => scannerInputRef.current?.focus()}
+                                className="h-10 rounded-xl font-bold border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 transition-all text-xs"
+                              >
+                                Haga clic aquí para reactivar el lector
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Manual Toggle Button at the bottom */}
+                      <div className="flex justify-center pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setScanMode(prev => prev === "camera" ? "reader" : "camera")}
+                          className="h-9 px-4 rounded-xl border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-all"
+                        >
+                          {scanMode === "camera" ? "Cambiar a Lector USB" : "Cambiar a Cámara"}
+                        </Button>
                       </div>
                     </div>
                   )}

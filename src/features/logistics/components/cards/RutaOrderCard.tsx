@@ -29,11 +29,18 @@ export interface RutaPedido {
 interface RutaOrderCardProps {
   pedido: RutaPedido;
   activeStatusFilters?: RutaStatus[];
+  onClick?: () => void;
 }
 
-export function RutaOrderCard({ pedido, activeStatusFilters }: RutaOrderCardProps) {
+export function RutaOrderCard({ pedido, activeStatusFilters, onClick }: RutaOrderCardProps) {
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] overflow-hidden">
+    <Card 
+      onClick={onClick}
+      className={cn(
+        "group hover:shadow-lg transition-all duration-300 border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] overflow-hidden",
+        onClick && "cursor-pointer hover:border-blue-500/50 dark:hover:border-blue-500/30 transition-all"
+      )}
+    >
       <CardContent className="px-3 py-4 flex flex-col gap-3">
         {/* Header: ID and Anticipada Badge */}
         <div className="flex items-center justify-between">

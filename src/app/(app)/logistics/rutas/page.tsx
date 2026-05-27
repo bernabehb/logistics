@@ -15,6 +15,12 @@ import {
   PopoverContent, 
   PopoverTrigger 
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { LogisticsFilters, LogisticsDateFilters, LogisticsStatusFilters, LogisticsTypeFilters, StatusCircle, StatusPill } from "@/features/logistics/components";
 import { isAfter, isBefore, startOfDay, endOfDay, parse } from "date-fns";
 import { es } from "date-fns/locale";
@@ -73,6 +79,18 @@ interface AvailableUnit {
   iId: number;
 }
 
+interface FetchedInvoiceDetails {
+  factura: string;
+  almacenes: {
+    almacen: string;
+    materiales: {
+      material: string;
+      cantidad: number;
+      unidadVenta: string;
+    }[];
+  }[];
+}
+
 interface ApiBlockStatus {
   iIdDeliveryBlock: number;
   sDeliveryBlock: string;
@@ -113,6 +131,27 @@ export default function RutasPage() {
   const [apiBlocks, setApiBlocks] = useState<ApiBlockStatus[]>(cachedBlocks || []);
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [invoiceDetails, setInvoiceDetails] = useState<FetchedInvoiceDetails | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  const handleOpenDetails = async (invoiceId: string) => {
+    const invoiceNum = invoiceId.startsWith('ORDER-') ? invoiceId.split('-')[1] : invoiceId;
+    setSelectedInvoiceId(invoiceId);
+    setIsLoadingDetails(true);
+    setInvoiceDetails(null);
+    try {
+      const res = await fetch(`/api/logistics/invoice-details/${invoiceNum}`);
+      if (res.ok) {
+        const data = await res.json();
+        setInvoiceDetails(data);
+      }
+    } catch (err) {
+      console.error("Error fetching invoice details:", err);
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
 
   const lastRequestRef = useRef<number>(0);
 
@@ -783,7 +822,7 @@ export default function RutasPage() {
                       const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
                       
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+                        <tr key={p.id} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                           <td className="px-6 py-5">
                             <div className="flex flex-col">
                               <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
@@ -849,7 +888,7 @@ export default function RutasPage() {
                           const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
                           
                           return (
-                            <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+                            <tr key={p.id} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                               <td className="px-6 py-5">
                                 <div className="flex flex-col">
                                   <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
@@ -1045,7 +1084,7 @@ export default function RutasPage() {
                     )}>
                       {items.map(p => (
                         <div key={p.id} className="shrink-0">
-                          <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} />
+                          <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
                         </div>
                       ))}
                     </div>
@@ -1075,7 +1114,7 @@ export default function RutasPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filteredPedidos.length > 0 ? (
               filteredPedidos.map(p => (
-                <RutaOrderCard key={p.id} pedido={p} activeStatusFilters={statusFilters} />
+                <RutaOrderCard key={p.id} pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
               ))
             ) : (
               <div className="col-span-full py-20 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center opacity-50">
@@ -1085,6 +1124,71 @@ export default function RutasPage() {
           </div>
         </div>
       )}
+
+      {/* Invoice Details Dialog Modal */}
+      <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
+        <DialogContent className="w-full h-full sm:h-auto sm:max-w-[500px] p-0 overflow-y-auto sm:overflow-hidden bg-white dark:bg-slate-900 border-none shadow-2xl rounded-none sm:rounded-3xl">
+          <div className="p-4 sm:p-6 space-y-6">
+            <div className="text-center space-y-2 px-2">
+              <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+                Detalles de Factura
+              </DialogTitle>
+              <p className="text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
+                {selectedInvoiceId?.startsWith('ORDER-') ? `Orden: ${selectedInvoiceId.split('-')[1]}` : `Factura: ${selectedInvoiceId}`}
+              </p>
+            </div>
+
+            <div className="space-y-4 max-h-[60vh] sm:max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+              {isLoadingDetails ? (
+                <div className="flex flex-col justify-center items-center py-20 gap-3">
+                  <RefreshCw className="size-8 text-blue-500 animate-spin" />
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Cargando detalles...</p>
+                </div>
+              ) : invoiceDetails && invoiceDetails.almacenes?.length > 0 ? (
+                invoiceDetails.almacenes.map((group, gIdx) => (
+                  <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
+                    <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                        Almacén: {group.almacen}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 capitalize">
+                        {group.materiales.length} productos
+                      </span>
+                    </div>
+                    <table className="w-full text-left">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {group.materiales.map((mat, mIdx) => (
+                          <tr key={mIdx}>
+                            <td className="px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200">
+                              {mat.material}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100 text-right">
+                              {mat.cantidad} {mat.unidadVenta}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-20 text-slate-500 font-bold uppercase text-xs">
+                  No se encontraron detalles para esta factura
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                className="w-full h-12 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-950 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 shadow-md"
+                onClick={() => setSelectedInvoiceId(null)}
+              >
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
