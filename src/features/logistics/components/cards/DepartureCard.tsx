@@ -239,13 +239,15 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
           const scanConfig = {
             fps: 15,
-            // Request 1080p camera resolution to make barcode lines sharper and easier to decode.
-            // Omit qrbox to scan the full frame instead of cropping. This maintains high resolution
-            // and lets the user capture the barcode even if it's not perfectly centered.
+            qrbox: (width: number, height: number) => {
+              const boxWidth = Math.floor(width * 0.95);
+              const boxHeight = Math.min(Math.floor(height * 0.85), 180);
+              return { width: boxWidth, height: boxHeight };
+            },
             videoConstraints: {
               facingMode: "environment",
-              width: { ideal: 1920, min: 1280 },
-              height: { ideal: 1080, min: 720 }
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
             }
           };
 
@@ -757,20 +759,6 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                             </div>
                           )}
                         </>
-                      )}
-
-                      {/* Manual Toggle Button at the bottom (Only on Mobile/Tablets) */}
-                      {isMobileDevice && (
-                        <div className="flex justify-center pt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setScanMode(prev => prev === "camera" ? "reader" : "camera")}
-                            className="h-9 px-4 rounded-xl border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-all"
-                          >
-                            {scanMode === "camera" ? "Cambiar a Lector USB" : "Cambiar a Cámara"}
-                          </Button>
-                        </div>
                       )}
                     </div>
                   )}
