@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
@@ -145,35 +146,100 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     }
   }, [authStep, selectedMethod, scanMode]);
 
-  // Handle camera stream for "Scanning" step when camera mode is active
+  // Handle camera stream for "Scanning" step with html5-qrcode
   useEffect(() => {
-    let stream: MediaStream | null = null;
-
-    const startCamera = async () => {
-      try {
-        setCameraError(null);
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err: any) {
-        console.warn("Camera access failed:", err.name);
-        setCameraError(err.name === "NotFoundError" ? "Dispositivo no encontrado" : "Error de cámara");
-      }
-    };
+    let html5QrcodeScanner: Html5Qrcode | null = null;
+    let isMounted = true;
 
     if (authStep === "active_verification" && selectedMethod === "scanning" && scanMode === "camera") {
-      startCamera();
-      setIsCameraActive(true);
+      setCameraError(null);
+
+      const startScanner = async () => {
+        try {
+          // Wait slightly to ensure the DOM element "camera-reader" is fully rendered
+          await new Promise(resolve => setTimeout(resolve, 300));
+          if (!isMounted) return;
+
+          // Instantiate Html5Qrcode with formats specific to barcodes + QR Code and optimize detector usage
+          html5QrcodeScanner = new Html5Qrcode("camera-reader", {
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.CODE_128,
+              Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.CODE_93,
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E,
+              Html5QrcodeSupportedFormats.ITF,
+              Html5QrcodeSupportedFormats.QR_CODE
+            ],
+            verbose: false,
+            useBarCodeDetectorIfSupported: true
+          });
+
+          const qrCodeSuccessCallback = async (decodedText: string) => {
+            const cleanedText = decodedText.trim().toUpperCase();
+            const targetInvoice = remainingInvoices.find(inv => inv.id.toUpperCase() === cleanedText);
+            
+            if (targetInvoice) {
+              if (navigator.vibrate) navigator.vibrate(200);
+
+              // Stop scanning first, then proceed to success state
+              try {
+                if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+                  await html5QrcodeScanner.stop();
+                }
+              } catch (stopErr) {
+                console.error("Error stopping scanner after success:", stopErr);
+              }
+              handleVerificationSuccess(targetInvoice.id);
+            } else {
+              setIsError(true);
+            }
+          };
+
+          const qrCodeErrorCallback = () => {
+            // Ignore frame analysis errors
+          };
+
+          await html5QrcodeScanner.start(
+            { facingMode: "environment" },
+            {
+              fps: 15,
+              // Taller scanning box to make it much easier to fit/align 1D barcodes on mobile devices
+              qrbox: (width, height) => {
+                const boxWidth = Math.floor(width * 0.9);
+                const boxHeight = Math.min(Math.floor(height * 0.7), 160);
+                return { width: boxWidth, height: boxHeight };
+              }
+              // Omit aspectRatio constraint to let the device use its native video aspect ratio,
+              // which is much better for focus and resolution on portrait mobile screens.
+            },
+            qrCodeSuccessCallback,
+            qrCodeErrorCallback
+          );
+        } catch (err: any) {
+          console.error("Failed to start html5-qrcode scanner:", err);
+          if (isMounted) {
+            setCameraError("No se pudo conectar a la cámara");
+          }
+        }
+      };
+
+      startScanner();
 
       return () => {
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
+        isMounted = false;
+        if (html5QrcodeScanner) {
+          if (html5QrcodeScanner.isScanning) {
+            html5QrcodeScanner.stop().catch(err => {
+              console.error("Error stopping html5-qrcode scanner on cleanup:", err);
+            });
+          }
         }
-        setIsCameraActive(false);
       };
     }
-  }, [authStep, selectedMethod, scanMode]);
+  }, [authStep, selectedMethod, scanMode, remainingInvoices, handleVerificationSuccess]);
 
   const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -517,23 +583,18 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                       {scanMode === "camera" ? (
                         /* Camera Scanning View */
                         <div className="flex flex-col gap-3">
-                          <div className="relative h-[220px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner group/video">
+                          <div className="relative h-[220px] w-full bg-slate-950 rounded-2xl overflow-hidden border-2 border-slate-100 dark:border-slate-800 shadow-inner">
                             {cameraError ? (
                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
                                 <ScanLine className="size-8 text-slate-700 opacity-30" />
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">{cameraError}</p>
                               </div>
                             ) : (
-                              <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                className="w-full h-full object-cover grayscale opacity-60"
-                              />
+                              <div id="camera-reader" className="w-full h-full overflow-hidden" />
                             )}
 
                             {!cameraError && (
-                              <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-10">
                                 <div className="w-[85%] h-24 border-2 border-emerald-500/50 rounded-xl relative">
                                   <div className="absolute left-0 w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-scan-line" />
                                   <div className="absolute -top-1 -left-1 size-4 border-t-2 border-l-2 border-emerald-500 rounded-tl-lg" />
