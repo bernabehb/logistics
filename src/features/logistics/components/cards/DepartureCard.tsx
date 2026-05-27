@@ -154,6 +154,31 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     }
   }, [authStep, selectedMethod, scanMode]);
 
+  // Helper to match a scanned or typed invoice number against remaining invoices in a fuzzy, robust way
+  const matchInvoice = React.useCallback((scannedText: string): Invoice | undefined => {
+    const trimmed = scannedText.trim();
+    const normalizedText = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    
+    // Split by hyphen to get the first part (e.g. "233252-3163.01" -> "233252")
+    const hyphenPrefix = trimmed.split("-")[0].trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+    return remainingInvoices.find(inv => {
+      const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      
+      // Match if equal, starts with, ends with, or contains (fuzzy matching)
+      return cleanedId === normalizedText ||
+             cleanedId === hyphenPrefix ||
+             normalizedText.startsWith(cleanedId) ||
+             hyphenPrefix.startsWith(cleanedId) ||
+             cleanedId.startsWith(normalizedText) ||
+             cleanedId.startsWith(hyphenPrefix) ||
+             normalizedText.endsWith(cleanedId) ||
+             cleanedId.endsWith(normalizedText) ||
+             hyphenPrefix.endsWith(cleanedId) ||
+             cleanedId.endsWith(hyphenPrefix);
+    });
+  }, [remainingInvoices]);
+
   // Handle camera stream for "Scanning" step with html5-qrcode
   useEffect(() => {
     let html5QrcodeScanner: Html5Qrcode | null = null;
@@ -186,16 +211,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
           });
 
           const qrCodeSuccessCallback = async (decodedText: string) => {
-            const trimmed = decodedText.trim();
-            const normalizedText = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
-            
-            // Fuzzy search on remaining invoices
-            const targetInvoice = remainingInvoices.find(inv => {
-              const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
-              return cleanedId === normalizedText || 
-                     cleanedId.endsWith(normalizedText) || 
-                     normalizedText.endsWith(cleanedId);
-            });
+            const targetInvoice = matchInvoice(decodedText);
             
             if (targetInvoice) {
               if (navigator.vibrate) navigator.vibrate(200);
@@ -212,7 +228,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
               setIsError(false);
               handleVerificationSuccess(targetInvoice.id);
             } else {
-              setScannedCode(trimmed);
+              setScannedCode(decodedText.trim());
               setIsError(true);
             }
           };
@@ -260,19 +276,13 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
         }
       };
     }
-  }, [authStep, selectedMethod, scanMode, remainingInvoices, handleVerificationSuccess]);
+  }, [authStep, selectedMethod, scanMode, matchInvoice, handleVerificationSuccess]);
 
   const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       const inputVal = scannerInputRef.current?.value.trim() || "";
-      const scannedCodeVal = inputVal.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      if (scannedCodeVal) {
-        const targetInvoice = remainingInvoices.find(inv => {
-          const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
-          return cleanedId === scannedCodeVal || 
-                 cleanedId.endsWith(scannedCodeVal) || 
-                 scannedCodeVal.endsWith(cleanedId);
-        });
+      if (inputVal) {
+        const targetInvoice = matchInvoice(inputVal);
         if (targetInvoice) {
           setScannedCode(null);
           setIsError(false);
@@ -297,15 +307,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     try {
       const fileScanner = new Html5Qrcode("file-reader-temp");
       const decodedText = await fileScanner.scanFile(file, false);
-      const trimmed = decodedText.trim();
-      const normalizedText = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      
-      const targetInvoice = remainingInvoices.find(inv => {
-        const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
-        return cleanedId === normalizedText || 
-               cleanedId.endsWith(normalizedText) || 
-               normalizedText.endsWith(cleanedId);
-      });
+      const targetInvoice = matchInvoice(decodedText);
 
       if (targetInvoice) {
         if (navigator.vibrate) navigator.vibrate(200);
@@ -313,7 +315,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
         setIsError(false);
         handleVerificationSuccess(targetInvoice.id);
       } else {
-        setScannedCode(trimmed);
+        setScannedCode(decodedText.trim());
         setIsError(true);
       }
     } catch (err) {
@@ -356,13 +358,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   };
 
   const handleManualVerify = () => {
-    const normalizedInput = invoiceInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const targetInvoice = remainingInvoices.find(inv => {
-      const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      return cleanedId === normalizedInput || 
-             cleanedId.endsWith(normalizedInput) || 
-             normalizedInput.endsWith(cleanedId);
-    });
+    const targetInvoice = matchInvoice(invoiceInput);
 
     if (targetInvoice) {
       setScannedCode(null);
@@ -690,6 +686,10 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                               </p>
                             </div>
                           )}
+                          {/* Rotation helper tip */}
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium text-center italic mt-1 leading-normal">
+                            Tip: Si el escáner en vivo tarda en leer en vertical, gira el teléfono en horizontal (acostado).
+                          </p>
                           {/* File Scanner Fallback for Mobile Devices */}
                           <div className="flex flex-col gap-2 mt-1">
                             <input
