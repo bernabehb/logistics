@@ -182,7 +182,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
               Html5QrcodeSupportedFormats.QR_CODE
             ],
             verbose: false,
-            useBarCodeDetectorIfSupported: true
+            useBarCodeDetectorIfSupported: false // Set to false to avoid Safari WebKit native detector bugs
           });
 
           const qrCodeSuccessCallback = async (decodedText: string) => {
@@ -223,15 +223,13 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
           const scanConfig = {
             fps: 15,
-            qrbox: (width: number, height: number) => {
-              const boxWidth = Math.floor(width * 0.9);
-              const boxHeight = Math.min(Math.floor(height * 0.7), 160);
-              return { width: boxWidth, height: boxHeight };
-            },
+            // Request 1080p camera resolution to make barcode lines sharper and easier to decode.
+            // Omit qrbox to scan the full frame instead of cropping. This maintains high resolution
+            // and lets the user capture the barcode even if it's not perfectly centered.
             videoConstraints: {
               facingMode: "environment",
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
+              width: { ideal: 1920, min: 1280 },
+              height: { ideal: 1080, min: 720 }
             }
           };
 
