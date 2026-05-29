@@ -24,4 +24,5 @@ export const API_ENDPOINTS = {
   authorizationsBranch: `${EXTERNAL_API_BASE_URL}/Logistics/GetDepartureAuthorizationsBranch`,
   invoiceDetails: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/GetInvoiceDetails/${invoiceNum}`,
   authorizeInvoice: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeInvoice/${invoiceNum}`,
+  toggleUnitMaintenance: `${EXTERNAL_API_BASE_URL}/Logistics/ToggleUnitMaintenance`,
 };

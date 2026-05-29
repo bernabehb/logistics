@@ -57,6 +57,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       roles: ["Logistica", "Guardia"],
     },
     {
+      name: "Unidades",
+      href: "/logistics/unidades",
+      icon: Truck,
+      roles: ["Logistica"],
+    },
+    {
       name: "Panel de Control",
       href: "/admin",
       icon: ShieldCheck,

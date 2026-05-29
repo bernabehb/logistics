@@ -304,7 +304,7 @@ export default function RutasPage() {
         if (unitsRes.ok) {
           const unitsData = await unitsRes.json();
           const availableUnits = unitsData
-            .filter((u: any) => u.sEstatus === "Disponible")
+            .filter((u: any) => u.sEstatus !== "Asignado" && u.sEstatus !== "Mantenimiento")
             .map((u: any, i: number) => ({
               id: `${u.sNombre_Unidad}-${u.sSucursal}-${i}`,
               name: u.sNombre_Unidad,

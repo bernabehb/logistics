@@ -1,7 +1,8 @@
-export type UnitStatus = "Disponible" | "Asignado" | "Mantenimiento" | "Fuera de Servicio";
+export type UnitStatus = "Disponible" | "Asignado" | "Mantenimiento";
 
 export interface Unit {
   id: string;
+  iId: number; // ID numérico para peticiones del backend
   name: string;
   plate: string;
   type: string;
@@ -17,6 +18,9 @@ export interface Unit {
 }
 
 export interface ApiUnit {
+  sId?: string;
+  iId?: number;
+  iIdUnit?: number;
   sNombre_Unidad: string;
   sSucursal: string;
   iCombustible: number;
@@ -33,14 +37,14 @@ export interface ApiUnit {
 export function mapApiUnitToUnit(apiUnit: ApiUnit, index: number): Unit {
   // Normalizar el estado del backend a nuestro UnitStatus
   let status: UnitStatus = "Disponible";
-  const apiStatus = apiUnit.sEstatus?.trim();
+  const apiStatus = apiUnit.sEstatus?.trim().toLowerCase();
   
-  if (apiStatus === "Asignado") status = "Asignado";
-  else if (apiStatus === "En Taller" || apiStatus === "Mantenimiento") status = "Mantenimiento";
-  else if (apiStatus === "Fuera de Servicio") status = "Fuera de Servicio";
+  if (apiStatus === "asignado") status = "Asignado";
+  else if (apiStatus === "en taller" || apiStatus === "mantenimiento" || apiStatus === "fuera de servicio" || apiStatus === "taller") status = "Mantenimiento";
 
   return {
     id: `unidad-api-${index}`,
+    iId: Number(apiUnit.sId || apiUnit.iId || apiUnit.iIdUnit || index),
     name: apiUnit.sNombre_Unidad.trim(),
     plate: apiUnit.sPlaca.trim(),
     type: apiUnit.sModelo.trim(),
@@ -49,7 +53,7 @@ export function mapApiUnitToUnit(apiUnit: ApiUnit, index: number): Unit {
     lastLocation: apiUnit.sUbicacion.trim(),
     fuelLevel: apiUnit.iCombustible,
     mileage: apiUnit.iKilometraje,
-    sucursal: apiUnit.sSucursal.trim(),
+    sucursal: apiUnit.sSucursal?.trim().toUpperCase() === "SIN SUCURSAL" ? "SANTA CATARINA" : apiUnit.sSucursal?.trim(),
     latitud: apiUnit.fLatitud,
     longitud: apiUnit.fLongitud,
     apiDriverName: apiUnit.sChofer?.trim() || undefined,
@@ -57,5 +61,9 @@ export function mapApiUnitToUnit(apiUnit: ApiUnit, index: number): Unit {
 }
 
 import unitsData from "@/lib/units.json";
-export const MOCK_UNITS: Unit[] = unitsData as Unit[];
+// Ensure mock units have numeric iId
+export const MOCK_UNITS: Unit[] = (unitsData as any[]).map((u, index) => ({
+  ...u,
+  iId: u.iId || index + 1
+}));
 
