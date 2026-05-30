@@ -154,6 +154,7 @@ export default function RutasPage() {
   };
 
   const lastRequestRef = useRef<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
 
   // Sincronizar asignaciones con la caché
   useEffect(() => {
@@ -173,12 +174,13 @@ export default function RutasPage() {
   }, [branchFilter]);
 
   // Polling para actualizaciones silenciosas cada 10 segundos
+  // Polling para actualizaciones silenciosas cada 30 segundos
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         fetchAllData(true, true);
       }
-    }, 10000);
+    }, 30000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -242,12 +244,18 @@ export default function RutasPage() {
 
   // Data Fetching and Mapping
   const fetchAllData = async (forceRefresh = false, silent = false) => {
+    if (isFetchingRef.current) {
+      console.log("Fetch en progreso, omitiendo petición concurrente.");
+      return;
+    }
+    isFetchingRef.current = true;
     const requestId = ++lastRequestRef.current;
     
     // Si ya tenemos datos para ESTE chofer y no es force ni silent, usar caché
     if (!forceRefresh && !silent && cachedInvoicesByDriver[driverFilter]) {
       setInvoices(cachedInvoicesByDriver[driverFilter]);
       setIsLoading(false);
+      isFetchingRef.current = false;
       return;
     }
 
@@ -358,7 +366,7 @@ export default function RutasPage() {
               date: isFactura ? row.fecha : row.orderDate,
               warehouses: [],
               vendedor: row.vendedor,
-              deliveryType: (row.metodo === 'EAD' || (row.bloque && row.bloque.includes("ZONA"))) ? 'domicilio' : 'sucursal',
+              deliveryType: (row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'))) ? 'sucursal' : 'domicilio',
               block: (row.bloque || "GENERAL").trim().toUpperCase(),
               estadoGeneral: status, // Use current row's status for general state initial value
               type: type,
@@ -420,6 +428,7 @@ export default function RutasPage() {
         console.error("Error fetching routes:", err);
         setError("Error al cargar la información de rutas dinámica");
       } finally {
+        isFetchingRef.current = false;
         setIsRefreshing(false);
         if (requestId === lastRequestRef.current) {
           setIsLoading(false);
