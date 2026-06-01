@@ -103,7 +103,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
     setIsError(false);
     setIsLoadingDetails(true);
     setAuthStep("invoice_review");
-    
+
     try {
       const res = await fetch(`/api/logistics/invoice-details/${code}`);
       if (res.ok) {
@@ -158,24 +158,24 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   const matchInvoice = React.useCallback((scannedText: string): Invoice | undefined => {
     const trimmed = scannedText.trim();
     const normalizedText = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    
+
     // Split by hyphen to get the first part (e.g. "233252-3163.01" -> "233252")
     const hyphenPrefix = trimmed.split("-")[0].trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 
     return remainingInvoices.find(inv => {
       const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      
+
       // Match if equal, starts with, ends with, or contains (fuzzy matching)
       return cleanedId === normalizedText ||
-             cleanedId === hyphenPrefix ||
-             normalizedText.startsWith(cleanedId) ||
-             hyphenPrefix.startsWith(cleanedId) ||
-             cleanedId.startsWith(normalizedText) ||
-             cleanedId.startsWith(hyphenPrefix) ||
-             normalizedText.endsWith(cleanedId) ||
-             cleanedId.endsWith(normalizedText) ||
-             hyphenPrefix.endsWith(cleanedId) ||
-             cleanedId.endsWith(hyphenPrefix);
+        cleanedId === hyphenPrefix ||
+        normalizedText.startsWith(cleanedId) ||
+        hyphenPrefix.startsWith(cleanedId) ||
+        cleanedId.startsWith(normalizedText) ||
+        cleanedId.startsWith(hyphenPrefix) ||
+        normalizedText.endsWith(cleanedId) ||
+        cleanedId.endsWith(normalizedText) ||
+        hyphenPrefix.endsWith(cleanedId) ||
+        cleanedId.endsWith(hyphenPrefix);
     });
   }, [remainingInvoices]);
 
@@ -212,7 +212,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
           const qrCodeSuccessCallback = async (decodedText: string) => {
             const targetInvoice = matchInvoice(decodedText);
-            
+
             if (targetInvoice) {
               if (navigator.vibrate) navigator.vibrate(200);
 
@@ -304,7 +304,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    
+
     setIsLoadingDetails(true);
     try {
       const fileScanner = new Html5Qrcode("file-reader-temp");
@@ -337,7 +337,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
           method: 'POST'
         });
         if (!res.ok) throw new Error("Failed to authorize");
-        
+
         // Authorization successful, proceed
         const newVerified = [...verifiedInvoiceIds, currentInvoiceId];
         setVerifiedInvoiceIds(newVerified);
@@ -614,7 +614,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Número de Factura</label>
                           <Input
                             autoFocus
-                            placeholder="Ej: FAC-1001"
+                            placeholder="Ej: 223899"
                             value={invoiceInput}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                               setInvoiceInput(e.target.value);
@@ -668,7 +668,8 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
 
                             {!cameraError && (
                               <>
-                                <style dangerouslySetInnerHTML={{ __html: `
+                                <style dangerouslySetInnerHTML={{
+                                  __html: `
                                   #camera-reader video {
                                     width: 100% !important;
                                     height: 100% !important;
@@ -676,14 +677,14 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
                                   }
                                 ` }} />
                                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-10">
-                                <div className="w-[85%] h-24 border-2 border-emerald-500/50 rounded-xl relative">
-                                  <div className="absolute left-0 w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-scan-line" />
-                                  <div className="absolute -top-1 -left-1 size-4 border-t-2 border-l-2 border-emerald-500 rounded-tl-lg" />
-                                  <div className="absolute -top-1 -right-1 size-4 border-t-2 border-r-2 border-emerald-500 rounded-tr-lg" />
-                                  <div className="absolute -bottom-1 -left-1 size-4 border-b-2 border-l-2 border-emerald-500 rounded-bl-lg" />
-                                  <div className="absolute -bottom-1 -right-1 size-4 border-b-2 border-r-2 border-emerald-500 rounded-br-lg" />
+                                  <div className="w-[85%] h-24 border-2 border-emerald-500/50 rounded-xl relative">
+                                    <div className="absolute left-0 w-full h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] animate-scan-line" />
+                                    <div className="absolute -top-1 -left-1 size-4 border-t-2 border-l-2 border-emerald-500 rounded-tl-lg" />
+                                    <div className="absolute -top-1 -right-1 size-4 border-t-2 border-r-2 border-emerald-500 rounded-tr-lg" />
+                                    <div className="absolute -bottom-1 -left-1 size-4 border-b-2 border-l-2 border-emerald-500 rounded-bl-lg" />
+                                    <div className="absolute -bottom-1 -right-1 size-4 border-b-2 border-r-2 border-emerald-500 rounded-br-lg" />
+                                  </div>
                                 </div>
-                              </div>
                               </>
                             )}
                           </div>
