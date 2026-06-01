@@ -136,7 +136,7 @@ export default function RutasPage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   const handleOpenDetails = async (invoiceId: string) => {
-    const invoiceNum = invoiceId.startsWith('ORDER-') ? invoiceId.split('-')[1] : invoiceId;
+    const invoiceNum = invoiceId;
     setSelectedInvoiceId(invoiceId);
     setIsLoadingDetails(true);
     setInvoiceDetails(null);
