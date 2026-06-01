@@ -66,8 +66,13 @@ export default function UnidadesPage() {
 
       const apiUnits: ApiUnit[] = await res.json();
 
+      // Filter duplicates by unique sId
+      const uniqueApiUnits = apiUnits.filter(
+        (unit, index, self) => self.findIndex((u) => u.sId === unit.sId) === index
+      );
+
       // Map API units
-      const mapped: Unit[] = apiUnits.map((u, idx) => mapApiUnitToUnit(u, idx));
+      const mapped: Unit[] = uniqueApiUnits.map((u, idx) => mapApiUnitToUnit(u, idx));
       setUnits(mapped);
       cachedUnits = mapped;
     } catch (err) {
@@ -236,9 +241,6 @@ export default function UnidadesPage() {
                         {unit.status}
                       </span>
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                      Modelo: {unit.type}
-                    </span>
                   </div>
                   <div className="p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl transition-colors shrink-0 ml-2">
                     <Truck className="size-4.5 text-slate-400" />
