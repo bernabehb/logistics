@@ -20,7 +20,7 @@ const buttonVariants = cva(
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
         "logistics-action":
-          "bg-slate-100 hover:bg-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 hover:text-white dark:text-slate-400 dark:hover:text-white transition-all border border-slate-400/80 dark:border-slate-500 hover:border-slate-600 active:scale-95 disabled:opacity-50 shadow-sm",
+          "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all border border-slate-400/80 dark:border-slate-500 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 disabled:opacity-50 shadow-sm",
         "logistics-ghost":
           "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
         "logistics-success":

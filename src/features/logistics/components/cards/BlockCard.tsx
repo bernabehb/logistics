@@ -125,7 +125,7 @@ export function BlockCard({
               {block.status === "Disponible" ? (
                 <button
                   onClick={() => setIsAssigning(true)}
-                  className="w-full bg-slate-100 hover:bg-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 hover:text-white dark:text-slate-400 dark:hover:text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all border border-slate-400/80 dark:border-slate-500 hover:border-slate-600 active:scale-95 shadow-sm"
+                  className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all border border-slate-400/80 dark:border-slate-500 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 shadow-sm cursor-pointer"
                 >
                   Asignar Chofer
                 </button>
@@ -270,7 +270,7 @@ export function BlockCard({
                     });
                   }}
                   disabled={!selectedDriverId}
-                  className="flex-[2] h-11 bg-slate-100 hover:bg-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 hover:text-white dark:text-slate-400 dark:hover:text-white rounded-xl font-bold text-xs uppercase tracking-widest border border-slate-400/80 dark:border-slate-500 hover:border-slate-600 active:scale-95 disabled:opacity-50 transition-all shadow-sm"
+                  className="flex-[2] h-11 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl font-bold text-xs uppercase tracking-widest border border-slate-400/80 dark:border-slate-500 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 disabled:opacity-50 transition-all shadow-sm cursor-pointer"
                 >
                   Asignar
                 </button>

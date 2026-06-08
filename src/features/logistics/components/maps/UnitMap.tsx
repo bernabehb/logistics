@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Truck } from "lucide-react";
@@ -13,8 +13,14 @@ function MapController({ center }: { center: [number, number] }) {
   
   useEffect(() => {
     const timer = setTimeout(() => {
-      map.invalidateSize();
-      map.setView(center, map.getZoom(), { animate: true });
+      try {
+        if (map && typeof map.getContainer === 'function' && map.getContainer()) {
+          map.invalidateSize();
+          map.setView(center, map.getZoom(), { animate: false });
+        }
+      } catch (e) {
+        console.warn("Leaflet map container was unmounted before update.", e);
+      }
     }, 200);
 
     return () => clearTimeout(timer);
@@ -30,29 +36,27 @@ interface UnitMapProps {
 }
 
 export default function UnitMap({ lat, lng, unitName }: UnitMapProps) {
+  const [mapType, setMapType] = useState<"roadmap" | "hybrid">("roadmap");
   const center: [number, number] = [lat, lng];
 
   const customIcon = typeof window !== 'undefined' ? L.divIcon({
     html: renderToString(
       <div className="relative flex items-center justify-center">
-        {/* Sombra proyectada */}
-        <div className="absolute inset-x-0 bottom-0 top-1/2 bg-black/20 blur-md rounded-full scale-x-150" />
-        
         {/* Pulso de señal (Ping) */}
-        <div className="absolute inset-0 animate-ping rounded-full bg-blue-500/40 h-10 w-10" />
+        <div className="absolute inset-0 animate-ping rounded-full bg-blue-500/30 h-12 w-12" />
         
-        {/* Contenedor del Icono Principal */}
-        <div className="relative bg-white dark:bg-slate-900 p-2.5 rounded-2xl shadow-2xl border-2 border-blue-500 transform transition-shadow duration-300">
-          <Truck className="size-6 text-blue-600 dark:text-blue-400" />
+        {/* Contenedor principal de la chincheta circular */}
+        <div className="relative bg-gradient-to-br from-blue-600 to-blue-500 text-white p-2.5 rounded-full shadow-[0_4px_16px_rgba(37,99,235,0.4)] border-2 border-white dark:border-slate-900 flex items-center justify-center transition-all duration-300 hover:scale-110">
+          <Truck className="size-5.5 text-white" />
           
-          {/* Indicador de frente */}
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-blue-500" />
+          {/* Cola/Puntero inferior de la chincheta */}
+          <div className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-500 rotate-45 border-r-2 border-b-2 border-white dark:border-slate-900 z-[-1]" />
         </div>
       </div>
     ),
     className: "custom-unit-marker",
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
+    iconSize: [46, 46],
+    iconAnchor: [23, 23],
   }) : null;
 
   return (
@@ -65,10 +69,14 @@ export default function UnitMap({ lat, lng, unitName }: UnitMapProps) {
         style={{ height: '100%', width: '100%' }}
       >
         {/* CAPA REAL DE GOOGLE MAPS (Street View Tiles) */}
-        {/* lyrs=m significa "Standard Roadmap" de Google. Esto da el aspecto IDÉNTICO que el usuario desea */}
         <TileLayer
+          key={mapType}
           attribution='&copy; Google Maps'
-          url="https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+          url={
+            mapType === "roadmap"
+              ? "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+              : "https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+          }
           subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
           maxZoom={20}
         />
@@ -88,6 +96,31 @@ export default function UnitMap({ lat, lng, unitName }: UnitMapProps) {
         
         <MapController center={center} />
       </MapContainer>
+
+      {/* Selector de Capa Flotante */}
+      <div className="absolute top-3 right-3 z-[400] flex items-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-1 rounded-xl shadow-lg border border-slate-200/80 dark:border-slate-800/80 transition-all select-none">
+        <button
+          onClick={() => setMapType("roadmap")}
+          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+            mapType === "roadmap"
+              ? "bg-blue-600 text-white shadow-sm font-bold"
+              : "text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800"
+          }`}
+        >
+          Mapa
+        </button>
+        <div className="w-[1px] h-3.5 bg-slate-200 dark:bg-slate-800 mx-1" />
+        <button
+          onClick={() => setMapType("hybrid")}
+          className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+            mapType === "hybrid"
+              ? "bg-blue-600 text-white shadow-sm font-bold"
+              : "text-slate-600 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800"
+          }`}
+        >
+          Satélite
+        </button>
+      </div>
       
       {/* Sutil overlay de contraste para que se sienta integrado al dashboard */}
       <div className="absolute inset-0 pointer-events-none border-[1px] border-black/5 dark:border-white/5" />

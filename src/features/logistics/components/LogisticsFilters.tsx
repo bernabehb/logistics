@@ -58,14 +58,14 @@ interface TypeFiltersProps {
 
 export function LogisticsTypeFilters({ invoiceTypeFilter, onInvoiceTypeChange }: TypeFiltersProps) {
   return (
-    <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700/50 h-9 flex-nowrap">
+    <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700/50 h-9 flex-nowrap w-full md:w-auto">
       {(['normal', 'anticipada'] as const).map((type) => (
         <Button
           variant="ghost"
           key={type}
           onClick={() => onInvoiceTypeChange(type)}
           className={cn(
-            "h-auto px-4 py-1.5 text-[13px] font-semibold rounded-lg transition-all",
+            "h-auto px-4 py-1.5 text-[13px] font-semibold rounded-lg transition-all flex-1 md:flex-initial",
             invoiceTypeFilter === type
               ? "bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-600 hover:bg-white dark:hover:bg-[#1E293B]"
               : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-transparent"
@@ -87,8 +87,8 @@ interface StatusFiltersProps {
 export function LogisticsStatusFilters({ activeStatusFilters, onToggleStatusFilter, compact }: StatusFiltersProps) {
   return (
     <div className={cn(
-      "flex items-center gap-1 md:gap-2 bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 p-1 rounded-xl shadow-sm h-9",
-      compact ? "justify-start" : "justify-around md:justify-start md:p-1.5"
+      "flex items-center gap-1 md:gap-2 bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 p-1 rounded-xl shadow-sm h-9 w-full md:w-auto",
+      compact ? "justify-between md:justify-start" : "justify-around md:justify-start md:p-1.5"
     )}>
       {(['pending', 'in-progress', 'ready'] as const).map((status) => (
         <Button
@@ -96,10 +96,10 @@ export function LogisticsStatusFilters({ activeStatusFilters, onToggleStatusFilt
           variant="ghost"
           onClick={() => onToggleStatusFilter(status)}
           className={cn(
-            "h-auto flex items-center justify-center transition-all border border-transparent rounded-lg",
+            "h-auto flex items-center justify-center transition-all border border-transparent rounded-lg flex-1 md:flex-none",
             compact 
               ? "gap-1.5 px-2.5 py-1 text-[11px]" 
-              : "gap-1.5 md:gap-2.5 text-[12px] md:text-[14px] px-2 md:px-4 py-1 md:py-1.5 flex-1 md:flex-none",
+              : "gap-1.5 md:gap-2.5 text-[12px] md:text-[14px] px-2 md:px-4 py-1 md:py-1.5 md:flex-none",
             activeStatusFilters.includes(status)
               ? "bg-slate-100 dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 shadow-sm border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-[#1E293B]"
               : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50"

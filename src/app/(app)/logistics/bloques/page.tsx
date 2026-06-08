@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Block, BlockStatus } from "@/features/logistics/models/blocks";
 import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
 import { BlockCard } from "@/features/logistics/components/cards/BlockCard";
@@ -46,6 +46,13 @@ export default function BloquesPage() {
   const [errorDialog, setErrorDialog] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const blocksRef = useRef<Block[]>(blocks);
+  const lastLocalUpdatesRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    blocksRef.current = blocks;
+  }, [blocks]);
+
   const fetchAllData = async (silent: boolean | any = false) => {
     const isManualRefresh = typeof silent === 'object' && silent !== null;
     const isSilent = typeof silent === 'boolean' ? silent : false;
@@ -69,13 +76,27 @@ export default function BloquesPage() {
       const driversData: ApiDriver[] = await driversRes.json();
       
       // Map Blocks
-      const mappedBlocks: Block[] = blocksData.map(b => ({
-        id: b.iIdDeliveryBlock.toString(),
-        iId: b.iIdDeliveryBlock,
-        name: b.sDeliveryBlock,
-        status: (b.sEstatus || "Disponible") === "Asignado" ? "Asignado" : "Disponible",
-        apiDriverName: b.sChofer || undefined
-      }));
+      const mappedBlocks: Block[] = blocksData.map(b => {
+        const blockId = b.iIdDeliveryBlock.toString();
+        const lastUpdate = lastLocalUpdatesRef.current[blockId];
+        const now = Date.now();
+
+        // Si hubo una actualización local hace menos de 4 segundos, conservar el estado local optimista
+        if (lastUpdate && now - lastUpdate < 4000) {
+          const currentBlock = blocksRef.current.find(x => x.id === blockId);
+          if (currentBlock) {
+            return currentBlock;
+          }
+        }
+
+        return {
+          id: blockId,
+          iId: b.iIdDeliveryBlock,
+          name: b.sDeliveryBlock,
+          status: (b.sEstatus || "Disponible") === "Asignado" ? "Asignado" : "Disponible",
+          apiDriverName: b.sChofer || undefined
+        };
+      });
       setBlocks(mappedBlocks);
       cachedBlocks = mappedBlocks;
 
@@ -147,6 +168,9 @@ export default function BloquesPage() {
     const originalBlocks = [...blocks];
     const targetDriver = drivers.find(d => d.id === driverId);
 
+    // Guardar timestamp de la actualización local
+    lastLocalUpdatesRef.current[blockId] = Date.now();
+
     // Actualización Optimista: Reflejar el cambio inmediatamente en la UI
     setBlocks(prev => prev.map(b => {
       if (b.id === blockId) {
@@ -180,6 +204,7 @@ export default function BloquesPage() {
         setTimeout(() => fetchAllData(true), 2000);
       } catch (err: any) {
         console.warn("Validation/Error assigning block:", err?.message || err);
+        delete lastLocalUpdatesRef.current[blockId];
         setBlocks(originalBlocks); // Revertir en caso de error
         
         if (err && err.message) {
@@ -212,6 +237,7 @@ export default function BloquesPage() {
       setTimeout(() => fetchAllData(true), 2000);
     } catch (err) {
       console.error("Error assigning block:", err);
+      delete lastLocalUpdatesRef.current[blockId];
       setBlocks(originalBlocks); // Revertir en caso de error
       alert("Hubo un error al procesar la asignación.");
     }
@@ -261,7 +287,7 @@ export default function BloquesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
-          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 shrink-0">
+          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
             {[
               { id: "Disponible", label: "Disponibles" },
               { id: "Asignado", label: "Asignados" },
@@ -270,7 +296,7 @@ export default function BloquesPage() {
                 key={status.id}
                 onClick={() => setStatusFilter(status.id as any)}
                 className={cn(
-                  "h-auto px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
+                  "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center justify-center cursor-pointer",
                   statusFilter === status.id
                     ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
                     : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
@@ -283,12 +309,12 @@ export default function BloquesPage() {
 
           <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden min-[1400px]:block"></div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex-1 sm:flex-initial bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2">
               <span className="text-sm leading-none">{counts.Disponible}</span>
               <span className="opacity-70 uppercase tracking-widest text-[9px]">Disponibles</span>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-500/10 border border-slate-100 dark:border-slate-500/20 text-slate-600 dark:text-slate-400 font-bold px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-2">
+            <div className="flex-1 sm:flex-initial bg-slate-50 dark:bg-slate-500/10 border border-slate-100 dark:border-slate-500/20 text-slate-600 dark:text-slate-400 font-bold px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2">
               <span className="text-sm leading-none">{counts.Todas}</span>
               <span className="opacity-70 uppercase tracking-widest text-[9px]">Total</span>
             </div>

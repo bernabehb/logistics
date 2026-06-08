@@ -12,6 +12,8 @@ interface FacturaObj {
   Factura?: string;
   autorizada?: boolean;
   Autorizada?: boolean;
+  esNueva?: boolean;
+  EsNueva?: boolean;
 }
 
 interface ApiDepartureHome {
@@ -57,7 +59,11 @@ export default function AutorizarSalidaPage() {
               const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
               return !isAuth;
             })
-            .map(f => ({ id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), groups: [] }));
+            .map(f => ({ 
+              id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), 
+              groups: [],
+              isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva)
+            }));
             
           const isFullyAuthorized = (d.facturas && d.facturas.length > 0) && mappedInvoices.length === 0;
           let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
@@ -193,7 +199,7 @@ export default function AutorizarSalidaPage() {
         </div>
 
         {/* 2. Filters Group (Right) */}
-        <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto justify-between lg:justify-end">
+        <div className="flex flex-wrap items-center gap-2.5 lg:gap-1.5 w-full lg:w-auto justify-between lg:justify-end">
           <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden min-[1400px]:block"></div>
 
           {/* Delivery Type (Domicilio/Sucursal) */}
@@ -206,7 +212,7 @@ export default function AutorizarSalidaPage() {
                 key={btn.id}
                 onClick={() => setDeliveryTypeFilter(btn.id as any)}
                 className={cn(
-                  "h-auto px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
+                  "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap text-center flex items-center justify-center cursor-pointer",
                   deliveryTypeFilter === btn.id
                     ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
                     : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
@@ -229,7 +235,7 @@ export default function AutorizarSalidaPage() {
                 key={status.id}
                 onClick={() => setStatusFilter(status.id as any)}
                 className={cn(
-                  "h-auto px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2",
+                  "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer",
                   statusFilter === status.id
                     ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
                     : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"

@@ -29,6 +29,7 @@ interface WarehouseGroup {
 export interface Invoice {
   id: string;
   groups: WarehouseGroup[];
+  isNew?: boolean;
 }
 
 export interface FetchedInvoiceDetails {
@@ -84,6 +85,12 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
   const [fetchedInvoiceDetails, setFetchedInvoiceDetails] = useState<FetchedInvoiceDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
+
+  // Detección de facturas agregadas posteriormente (desde el backend)
+  const addedInvoicesCount = React.useMemo(() =>
+    departure.invoices.filter(inv => inv.isNew).length,
+    [departure.invoices]
+  );
 
   // Derived state
   const isTripComplete = verifiedInvoiceIds.length === departure.invoices.length;
@@ -371,6 +378,7 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
       setIsError(true);
     }
   };
+
   const resetAuth = () => {
     setAuthStep("method_select");
     setSelectedMethod(null);
@@ -397,20 +405,24 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
         {/* Header: Unit/Invoice Name */}
         <div className="flex justify-between items-start shrink-0 w-full">
           <div className="flex flex-col min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1 flex-nowrap">
-              <CardTitle className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-colors truncate">
+            <div className="flex items-center justify-between w-full mb-1 flex-nowrap gap-2">
+              <CardTitle className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-colors truncate flex-1 min-w-0">
                 {departure.deliveryType === 'sucursal'
                   ? (departure.clientName || "Entrega Cliente")
                   : departure.unitName}
               </CardTitle>
-              <span className={cn(
-                "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-colors shrink-0 whitespace-nowrap",
-                departure.status === "Pendiente"
-                  ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/20"
-                  : "bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20"
-              )}>
-                {departure.status === "Pendiente" ? "PENDIENTE" : "EN RUTA"}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                {addedInvoicesCount > 0 && departure.status === "Pendiente" && (
+                  <span className="px-2 py-1 bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-lg text-[9px] font-black uppercase tracking-widest animate-pulse shrink-0 whitespace-nowrap shadow-sm shadow-amber-500/10">
+                    +{addedInvoicesCount} {addedInvoicesCount === 1 ? 'Factura agregada' : 'Facturas agregadas'}
+                  </span>
+                )}
+                {departure.status !== "Pendiente" && (
+                  <span className="px-2 py-1 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors shrink-0 whitespace-nowrap">
+                    EN RUTA
+                  </span>
+                )}
+              </div>
             </div>
             {/* Subtitle removed as requested */}
           </div>
@@ -448,11 +460,22 @@ export function DepartureCard({ departure, onAuthorize }: DepartureCardProps) {
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5 pl-1">
-              {departure.invoices.map((inv, idx) => (
-                <span key={`${inv.id}-${idx}`} className="text-[10px] font-bold px-2 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-600 dark:text-slate-300">
-                  #{inv.id}
-                </span>
-              ))}
+              {departure.invoices.map((inv, idx) => {
+                const isNew = !!inv.isNew;
+                return (
+                  <span
+                    key={`${inv.id}-${idx}`}
+                    className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 border rounded-md transition-all duration-300",
+                      isNew
+                        ? "bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/50 dark:border-amber-500/50 text-amber-600 dark:text-amber-400 animate-pulse shadow-sm shadow-amber-500/10"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    )}
+                  >
+                    #{inv.id}
+                  </span>
+                );
+              })}
             </div>
           </div>
 

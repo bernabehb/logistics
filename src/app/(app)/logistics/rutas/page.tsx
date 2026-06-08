@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, Fragment, useRef } from "react";
-import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User } from "lucide-react";
+import { useState, useMemo, useEffect, Fragment, useRef, ReactNode } from "react";
+import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check } from "lucide-react";
 import { API_ENDPOINTS, API_HEADERS } from "@/lib/apiConfig";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,16 +10,19 @@ import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/mo
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
 } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { LogisticsFilters, LogisticsDateFilters, LogisticsStatusFilters, LogisticsTypeFilters, StatusCircle, StatusPill } from "@/features/logistics/components";
 import { isAfter, isBefore, startOfDay, endOfDay, parse } from "date-fns";
@@ -69,9 +72,6 @@ interface ApiRutaInvoice {
   estatusEmbarque: string;
 }
 
-// Helper to generate dynamic data from API is now inside the component using state.
-
-
 interface AvailableUnit {
   id: string;
   name: string;
@@ -99,9 +99,9 @@ interface ApiBlockStatus {
   sUnidad: string | null;
   iIdDriver: number | null;
   iIdUnit: number | null;
+  bAuthorized?: boolean;
 }
 
-// Client-side cache para persistencia rápida al navegar
 let cachedInvoices: RutaPedido[] | null = null;
 let cachedUnidades: AvailableUnit[] | null = null;
 let cachedAssignedUnits: Record<string, AvailableUnit> | null = null;
@@ -116,7 +116,7 @@ export default function RutasPage() {
   const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
   const [isLoading, setIsLoading] = useState(!cachedInvoices);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<'sucursal' | 'domicilio'>('domicilio');
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
@@ -134,6 +134,31 @@ export default function RutasPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [invoiceDetails, setInvoiceDetails] = useState<FetchedInvoiceDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [authorizingBlockName, setAuthorizingBlockName] = useState<string | null>(null);
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean;
+    title: string;
+    description: ReactNode;
+    actionLabel: string;
+    onConfirm: () => void;
+  }>({
+    show: false,
+    title: "",
+    description: "",
+    actionLabel: "Confirmar",
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (options: Partial<typeof confirmDialog>) => {
+    setConfirmDialog({
+      show: true,
+      title: options.title || "Confirmar acción",
+      description: options.description || "¿Estás seguro?",
+      actionLabel: options.actionLabel || "Confirmar",
+      onConfirm: options.onConfirm || (() => {})
+    });
+  };
 
   const handleOpenDetails = async (invoiceId: string) => {
     const invoiceNum = invoiceId;
@@ -156,25 +181,19 @@ export default function RutasPage() {
   const lastRequestRef = useRef<number>(0);
   const isFetchingRef = useRef<boolean>(false);
 
-  // Sincronizar asignaciones con la caché
   useEffect(() => {
     cachedAssignedUnits = assignedUnits;
   }, [assignedUnits]);
 
-  // Sincronizar con el cambio de filtro de chofer
   useEffect(() => {
     lastDriverFilter = driverFilter;
-    // Siempre refrescamos en silencio al cambiar de filtro o al montar
-    fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]); 
+    fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
   }, [driverFilter]);
 
-  // Sincronizar con el cambio de filtro de sucursal
   useEffect(() => {
     lastBranchFilter = branchFilter;
   }, [branchFilter]);
 
-  // Polling para actualizaciones silenciosas cada 10 segundos
-  // Polling para actualizaciones silenciosas cada 30 segundos
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -196,9 +215,8 @@ export default function RutasPage() {
   }, [driverFilter]);
 
   const handleAssignUnit = async (blockName: string, unit: AvailableUnit | null) => {
-    // Find the block iId from our fetched blocks
     const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
-    
+
     if (!apiBlock) {
       alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
       return;
@@ -206,7 +224,6 @@ export default function RutasPage() {
 
     const originalAssignments = { ...assignedUnits };
 
-    // Optimistic update
     setAssignedUnits(prev => {
       const next = { ...prev };
       if (unit) {
@@ -229,8 +246,7 @@ export default function RutasPage() {
       });
 
       if (!response.ok) throw new Error("Error en la asignación");
-      
-      // Refresh silently in background
+
       fetchAllData(true, true);
     } catch (err) {
       console.error("Error assigning unit to block:", err);
@@ -242,7 +258,53 @@ export default function RutasPage() {
     }
   };
 
-  // Data Fetching and Mapping
+  const executeAuthorizeBlock = async (blockName: string, authorize: boolean) => {
+    const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
+
+    if (!apiBlock) {
+      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
+      return;
+    }
+
+    try {
+      setAuthorizingBlockName(blockName);
+      setIsRefreshing(true);
+      const response = await fetch('/api/logistics/authorize-block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
+          bAuthorize: authorize
+        })
+      });
+
+      if (!response.ok) throw new Error("Error al autorizar el bloque");
+
+      await fetchAllData(true, true);
+    } catch (err) {
+      console.error("Error authorizing block:", err);
+      alert("Hubo un error al cambiar la autorización del bloque.");
+    } finally {
+      setIsRefreshing(false);
+      setAuthorizingBlockName(null);
+    }
+  };
+
+  const handleAuthorizeBlock = (blockName: string, authorize: boolean) => {
+    const title = authorize ? "Confirmar Autorización" : "Cancelar Autorización";
+    const description = authorize
+      ? `¿Deseas autorizar las salidas del bloque ${blockName}?`
+      : `¿Deseas cancelar la autorización de salidas del bloque ${blockName}?`;
+    const actionLabel = authorize ? "Autorizar" : "Confirmar";
+
+    showConfirm({
+      title,
+      description,
+      actionLabel,
+      onConfirm: () => executeAuthorizeBlock(blockName, authorize)
+    });
+  };
+
   const fetchAllData = async (forceRefresh = false, silent = false) => {
     if (isFetchingRef.current) {
       console.log("Fetch en progreso, omitiendo petición concurrente.");
@@ -250,8 +312,7 @@ export default function RutasPage() {
     }
     isFetchingRef.current = true;
     const requestId = ++lastRequestRef.current;
-    
-    // Si ya tenemos datos para ESTE chofer y no es force ni silent, usar caché
+
     if (!forceRefresh && !silent && cachedInvoicesByDriver[driverFilter]) {
       setInvoices(cachedInvoicesByDriver[driverFilter]);
       setIsLoading(false);
@@ -264,35 +325,32 @@ export default function RutasPage() {
       if (!silent) setIsLoading(true);
       setError(null);
 
-      // 1. Iniciar peticiones en paralelo para ganar velocidad
       const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedDrivers || !cachedBlocks;
-      
+
       let routesUrl = '/api/routes';
       if (driverFilter && driverFilter !== 'all') {
         routesUrl += `?iIdDriver=${driverFilter}`;
       }
 
-      // Disparamos todo al mismo tiempo
       const [catalogsResults, routesResponse] = await Promise.all([
-        catalogsNeeded 
+        catalogsNeeded
           ? Promise.all([
-              fetch('/api/logistics/blocks-status'),
-              fetch('/api/units'),
-              fetch('/api/logistics/assigned-drivers')
-            ])
+            fetch('/api/logistics/blocks-status'),
+            fetch('/api/units'),
+            fetch('/api/logistics/assigned-drivers')
+          ])
           : Promise.resolve(null),
         fetch(routesUrl)
       ]);
 
-      // 2. Procesar Catálogos (si se pidieron)
       if (catalogsResults) {
         const [blocksRes, unitsRes, driversRes] = catalogsResults;
-        
+
         if (blocksRes.ok) {
           const blocksData: ApiBlockStatus[] = await blocksRes.json();
           setApiBlocks(blocksData);
           cachedBlocks = blocksData;
-          
+
           const initialAssignments: Record<string, AvailableUnit> = {};
           blocksData.forEach(b => {
             if (b.sUnidad && b.iIdUnit) {
@@ -300,7 +358,7 @@ export default function RutasPage() {
               initialAssignments[blockKey] = {
                 id: `${b.sUnidad}-${b.iIdUnit}`,
                 name: b.sUnidad,
-                sucursal: "", 
+                sucursal: "",
                 iId: Number(b.iIdUnit || 0)
               };
             }
@@ -331,115 +389,96 @@ export default function RutasPage() {
         }
       }
 
-      // 3. Procesar Rutas
-      // Protección contra Race Conditions
       if (requestId !== lastRequestRef.current) return;
 
       if (!routesResponse.ok) throw new Error('No se pudo conectar con el servidor de rutas');
       const data: ApiRutaInvoice[] = await routesResponse.json();
 
-      // Mapeo de datos (optimizado)
       const groupedMap = new Map<string, RutaPedido & { block: string }>();
-      
+
       data.forEach((row) => {
         const isFactura = row.factura && row.factura.trim() !== "";
         const groupKey = isFactura ? row.factura : `ORDER-${row.orderNum}`;
-        
+
         if (!groupedMap.has(groupKey)) {
-          // ... resto del mapeo ...
-            // Determine invoice type
-            const type: RutaInvoiceType = row.tipoFactura === "ANTICIPADA" ? "anticipada" : "normal";
-            
-            // Map status from estatusEmbarque
-            let status: RutaStatus = 'pending';
-            const rawStatus = (row.estatusEmbarque || "").toLowerCase();
-            if (rawStatus === 'listo') status = 'ready';
-            else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') status = 'in-progress';
-            else status = 'pending';
+          const type: RutaInvoiceType = row.tipoFactura === "ANTICIPADA" ? "anticipada" : "normal";
 
-            const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
-            const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
+          let status: RutaStatus = 'pending';
+          const rawStatus = (row.estatusEmbarque || "").toLowerCase();
+          if (rawStatus === 'listo') status = 'ready';
+          else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') status = 'in-progress';
+          else status = 'pending';
 
-            groupedMap.set(groupKey, {
-              id: groupKey,
-              clientName: row.cliente,
-              date: isFactura ? row.fecha : row.orderDate,
-              warehouses: [],
-              vendedor: row.vendedor,
-              deliveryType: (row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'))) ? 'sucursal' : 'domicilio',
-              block: (row.bloque || "GENERAL").trim().toUpperCase(),
-              estadoGeneral: status, // Use current row's status for general state initial value
-              type: type,
-              completedDeliveries: type === 'anticipada' ? (row.montoAnticipado > 0 ? 1 : 0) : undefined,
-              hasGlassCut: false,
-              montoTotal: row.monto_Factura,
-              orderNum: row.orderNum,
-              sucursal: mappedSucursal
-            });
-          }
+          const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
+          const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
 
-          const current = groupedMap.get(groupKey)!;
-          
-          // Determine Warehouse
-          let warehouseName = (row.almacen || "").trim().toUpperCase();
-          let warehouseId: string | null = null;
-          
-          if (warehouseName.includes("ALUMINIO")) warehouseId = "Aluminio";
-          else if (warehouseName.includes("VIDRIO")) warehouseId = "Vidrio";
-          else if (warehouseName.includes("HERRAJE")) warehouseId = "Herrajes";
-
-          if (warehouseId) {
-             // Map status from estatusEmbarque
-            let itemStatus: RutaStatus = 'pending';
-            const rawStatus = (row.estatusEmbarque || "").toLowerCase();
-            if (rawStatus === 'listo') itemStatus = 'ready';
-            else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') itemStatus = 'in-progress';
-            else itemStatus = 'pending';
-
-            // Aggregate warehouse if not already present
-            if (!current.warehouses.some(w => w.id === warehouseId)) {
-              current.warehouses.push({
-                id: warehouseId,
-                status: itemStatus
-              });
-            } else {
-                // Logic to consolidate statuses for the same warehouse category
-                const existing = current.warehouses.find(w => w.id === warehouseId)!;
-                // Priority: pending > in-progress > ready (if one is pending, whole category is pending)
-                if (itemStatus === 'pending') existing.status = 'pending';
-                else if (itemStatus === 'in-progress' && existing.status === 'ready') existing.status = 'in-progress';
-            }
-
-            // Specific "CORTE" logic for VIDRIO
-            if (warehouseId === "Vidrio" && row.corte === 1) {
-              current.hasGlassCut = true;
-            }
-          }
-        });
-
-        const allData = Array.from(groupedMap.values());
-
-        // Mapeo final y guardado en caché específica por chofer
-        cachedInvoicesByDriver[driverFilter] = allData;
-        cachedInvoices = allData;
-        setInvoices(allData);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching routes:", err);
-        setError("Error al cargar la información de rutas dinámica");
-      } finally {
-        isFetchingRef.current = false;
-        setIsRefreshing(false);
-        if (requestId === lastRequestRef.current) {
-          setIsLoading(false);
+          groupedMap.set(groupKey, {
+            id: groupKey,
+            clientName: row.cliente,
+            date: isFactura ? row.fecha : row.orderDate,
+            warehouses: [],
+            vendedor: row.vendedor,
+            deliveryType: (row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'))) ? 'sucursal' : 'domicilio',
+            block: (row.bloque || "GENERAL").trim().toUpperCase(),
+            estadoGeneral: status,
+            type: type,
+            completedDeliveries: type === 'anticipada' ? (row.montoAnticipado > 0 ? 1 : 0) : undefined,
+            hasGlassCut: false,
+            montoTotal: row.monto_Factura,
+            orderNum: row.orderNum,
+            sucursal: mappedSucursal
+          });
         }
+
+        const current = groupedMap.get(groupKey)!;
+
+        let warehouseName = (row.almacen || "").trim().toUpperCase();
+        let warehouseId: string | null = null;
+
+        if (warehouseName.includes("ALUMINIO")) warehouseId = "Aluminio";
+        else if (warehouseName.includes("VIDRIO")) warehouseId = "Vidrio";
+        else if (warehouseName.includes("HERRAJE")) warehouseId = "Herrajes";
+
+        if (warehouseId) {
+          let itemStatus: RutaStatus = 'pending';
+          const rawStatus = (row.estatusEmbarque || "").toLowerCase();
+          if (rawStatus === 'listo') itemStatus = 'ready';
+          else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') itemStatus = 'in-progress';
+          else itemStatus = 'pending';
+          if (!current.warehouses.some(w => w.id === warehouseId)) {
+            current.warehouses.push({
+              id: warehouseId,
+              status: itemStatus
+            });
+          } else {
+            const existing = current.warehouses.find(w => w.id === warehouseId)!;
+            if (itemStatus === 'pending') existing.status = 'pending';
+            else if (itemStatus === 'in-progress' && existing.status === 'ready') existing.status = 'in-progress';
+          }
+          if (warehouseId === "Vidrio" && row.corte === 1) {
+            current.hasGlassCut = true;
+          }
+        }
+      });
+
+      const allData = Array.from(groupedMap.values());
+
+      cachedInvoicesByDriver[driverFilter] = allData;
+      cachedInvoices = allData;
+      setInvoices(allData);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching routes:", err);
+      setError("Error al cargar la información de rutas dinámica");
+    } finally {
+      isFetchingRef.current = false;
+      setIsRefreshing(false);
+      if (requestId === lastRequestRef.current) {
+        setIsLoading(false);
       }
+    }
   };
 
-  // Quitamos el useEffect de montaje redundante, ya que el useEffect de [driverFilter]
-  // se encarga de la carga inicial al activarse por primera vez.
-
-  // Compute Blocks from Data
   const BLOCKS_LIST = useMemo(() => {
     if (invoices.length === 0) return BLOCKS_LIST_FALLBACK;
     const blocks = new Set<string>();
@@ -452,9 +491,7 @@ export default function RutasPage() {
 
   const toggleStatusFilter = (status: RutaStatus) => {
     setStatusFilters((prev) =>
-      prev.includes(status)
-        ? prev.filter((s) => s !== status)
-        : [...prev, status]
+      prev.includes(status) ? [] : [status]
     );
   };
 
@@ -467,13 +504,11 @@ export default function RutasPage() {
 
   const filteredPedidos = useMemo(() => {
     const filtered = invoices.filter((p) => {
-      // 1. Delivery Type (Sucursal/Domicilio)
       if (p.deliveryType !== deliveryTypeFilter) return false;
 
-      // 2. Search Query
       if (searchQuery) {
         const lowerQuery = searchQuery.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           p.id.toLowerCase().includes(lowerQuery) ||
           p.clientName.toLowerCase().includes(lowerQuery) ||
           (p.block && p.block.toLowerCase().includes(lowerQuery)) ||
@@ -481,20 +516,16 @@ export default function RutasPage() {
         if (!matchesSearch) return false;
       }
 
-      // 3. Invoice Type
       if (p.type !== invoiceTypeFilter) return false;
 
-      // 4. Status Filters - Deep check within warehouses
       if (statusFilters.length > 0 && !p.warehouses.some(w => statusFilters.includes(w.status))) {
         return false;
       }
 
-      // 5. Date Filter (Single Day)
       if (fromDate) {
-        // Safe parsing: take only YYYY-MM-DD
         const cleanDateStr = p.date?.split('T')[0]?.split(' ')[0] || "";
         const parts = cleanDateStr.split('-');
-        
+
         if (parts.length === 3) {
           const year = parseInt(parts[0]);
           const month = parseInt(parts[1]) - 1;
@@ -506,7 +537,6 @@ export default function RutasPage() {
         }
       }
 
-      // 6. Branch Filter
       if (branchFilter !== 'all') {
         if (!p.sucursal || p.sucursal.toUpperCase() !== branchFilter.toUpperCase()) return false;
       }
@@ -514,7 +544,6 @@ export default function RutasPage() {
       return true;
     });
 
-    // Limit sucursal invoices as requested to avoid clutter
     if (deliveryTypeFilter === "sucursal") {
       return filtered.slice(0, 15);
     }
@@ -522,7 +551,6 @@ export default function RutasPage() {
     return filtered;
   }, [invoices, deliveryTypeFilter, searchQuery, fromDate, statusFilters, invoiceTypeFilter, branchFilter]);
 
-  // Grouping
   const groupedData = useMemo(() => {
     const groups: Record<string, RutaPedido[]> = {};
     BLOCKS_LIST.forEach(b => groups[b] = []);
@@ -536,26 +564,28 @@ export default function RutasPage() {
 
   return (
     <div className="w-full flex flex-col gap-4 h-full pb-12 -mt-2 md:-mt-4">
-      {/* Title Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors shrink-0">
           Gestión de rutas
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-row items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 pl-3 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all hover:bg-white dark:hover:bg-slate-900 shadow-sm min-w-[180px] justify-between group"
+                className="h-9 px-2 w-auto md:px-3 md:min-w-[180px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all hover:bg-white dark:hover:bg-slate-900 shadow-sm flex items-center justify-center gap-1.5 md:justify-between group shrink-0"
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
                   <Building2 className="size-3.5 text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
-                  <span className="truncate max-w-[200px]">
+                  <span className="truncate inline md:hidden">
+                    SUCURSAL
+                  </span>
+                  <span className="truncate max-w-[200px] hidden md:inline">
                     {branchFilter === 'all' ? 'TODAS LAS SUCURSALES' : branchFilter}
                   </span>
                 </div>
-                <ChevronDown className="size-3.5 text-slate-400 shrink-0 ml-2" />
+                <ChevronDown className="size-3 text-slate-400 shrink-0 ml-0.5 md:ml-2" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[240px] p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
@@ -609,15 +639,18 @@ export default function RutasPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 pl-3 pr-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all hover:bg-white dark:hover:bg-slate-900 shadow-sm min-w-[180px] justify-between group"
+                className="h-9 px-2 w-auto md:px-3 md:min-w-[180px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all hover:bg-white dark:hover:bg-slate-900 shadow-sm flex items-center justify-center gap-1.5 md:justify-between group shrink-0"
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
                   <User className="size-3.5 text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
-                  <span className="truncate max-w-[200px]">
+                  <span className="truncate inline md:hidden">
+                    CHOFER
+                  </span>
+                  <span className="truncate max-w-[200px] hidden md:inline">
                     {driverFilter === 'all' ? 'TODOS LOS CHOFERES' : drivers.find(d => d.id === driverFilter)?.name || 'TODOS LOS CHOFERES'}
                   </span>
                 </div>
-                <ChevronDown className="size-3.5 text-slate-400 shrink-0 ml-2" />
+                <ChevronDown className="size-3 text-slate-400 shrink-0 ml-0.5 md:ml-2" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[280px] p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
@@ -664,16 +697,15 @@ export default function RutasPage() {
             </PopoverContent>
           </Popover>
 
-          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1 hidden sm:block"></div>
-          {/* View Toggle */}
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1 hidden md:block"></div>
           <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9">
             <button
               onClick={() => setViewMode('cards')}
               title="Vista de Tarjetas"
               className={cn(
                 "p-1.5 rounded-lg transition-all",
-                viewMode === 'cards' 
-                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600" 
+                viewMode === 'cards'
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
                   : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               )}
             >
@@ -684,8 +716,8 @@ export default function RutasPage() {
               title="Vista de Tablero"
               className={cn(
                 "p-1.5 rounded-lg transition-all",
-                viewMode === 'table' 
-                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600" 
+                viewMode === 'table'
+                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
                   : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               )}
             >
@@ -693,36 +725,32 @@ export default function RutasPage() {
             </button>
           </div>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => fetchAllData(true)}
             disabled={isLoading}
-            className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
+            className="h-9 w-9 p-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-900 transition-all shadow-sm flex items-center justify-center shrink-0 cursor-pointer"
           >
-            <RefreshCw className={cn("size-3.5 mr-2", isRefreshing && "animate-spin text-blue-500")} />
-            Actualizar
+            <RefreshCw className={cn("size-3.5", isRefreshing && "animate-spin text-blue-500")} />
           </Button>
         </div>
       </div>
 
-      {/* Unified Single Row Filters */}
       <div className="flex flex-wrap items-center gap-3 md:gap-1.5 w-full bg-white/50 dark:bg-slate-900/40 py-2 px-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        {/* 1. Search Bar */}
-        <div className="relative group w-full md:w-[320px] shrink-0">
-          <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
-          <Input
-            type="text"
-            placeholder="Buscar por factura, cliente u orden"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 h-9 text-xs focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
-          />
-        </div>
+        <div className="flex flex-row items-center gap-2 w-full md:w-auto md:flex-1">
+          <div className="relative group flex-1 md:w-[320px] md:flex-initial">
+            <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 group-focus-within:text-slate-500 transition-colors pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Buscar por factura, cliente u orden"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 h-9 text-xs focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
+            />
+          </div>
 
-        {/* 2. Group A: Dates Only */}
-        <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-between md:justify-start">
-          <div className="flex items-center">
+          <div className="shrink-0">
             <LogisticsDateFilters
               fromDate={fromDate}
               onFromDateChange={setFromDate}
@@ -732,46 +760,42 @@ export default function RutasPage() {
           </div>
         </div>
 
-        {/* 3-5. Group B: Status, Type & Delivery */}
-        <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-between min-[1400px]:justify-end min-[1400px]:ml-auto">
-          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
-          <div className="scale-95 origin-left">
-            <LogisticsStatusFilters
-              activeStatusFilters={statusFilters as any}
-              onToggleStatusFilter={toggleStatusFilter as any}
-              compact={true}
-            />
-          </div>
-          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
-          <LogisticsTypeFilters
-            invoiceTypeFilter={invoiceTypeFilter as any}
-            onInvoiceTypeChange={setInvoiceTypeFilter as any}
-          />
-          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden min-[1400px]:block"></div>
-          <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 shrink-0">
-            {[
-              { id: 'domicilio', label: 'Domicilio', Icon: Home },
-              { id: 'sucursal', label: 'Sucursal', Icon: Building2 },
-            ].map((btn) => (
-              <button
-                key={btn.id}
-                onClick={() => setDeliveryTypeFilter(btn.id as any)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                  deliveryTypeFilter === btn.id
-                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                {btn.Icon && <btn.Icon className="size-3" />}
-                {btn.label}
-              </button>
-            ))}
-          </div>
+        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
+        <LogisticsStatusFilters
+          activeStatusFilters={statusFilters as any}
+          onToggleStatusFilter={toggleStatusFilter as any}
+          compact={true}
+        />
+
+        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
+        <LogisticsTypeFilters
+          invoiceTypeFilter={invoiceTypeFilter as any}
+          onInvoiceTypeChange={setInvoiceTypeFilter as any}
+        />
+
+        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
+        <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 shrink-0 w-full md:w-auto">
+          {[
+            { id: 'domicilio', label: 'Domicilio', Icon: Home },
+            { id: 'sucursal', label: 'Sucursal', Icon: Building2 },
+          ].map((btn) => (
+            <button
+              key={btn.id}
+              onClick={() => setDeliveryTypeFilter(btn.id as any)}
+              className={cn(
+                "flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex-1 md:flex-initial",
+                deliveryTypeFilter === btn.id
+                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              )}
+            >
+              {btn.Icon && <btn.Icon className="size-3" />}
+              {btn.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Content View */}
       {isLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white/30 dark:bg-slate-900/20 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 animate-pulse">
           <Truck className="size-10 text-slate-300 dark:text-slate-700 animate-bounce mb-4" />
@@ -785,7 +809,6 @@ export default function RutasPage() {
           </Button>
         </div>
       ) : viewMode === 'table' ? (
-        /* Table View */
         <div className="bg-white/50 dark:bg-[#0F172A]/40 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm backdrop-blur-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -814,9 +837,8 @@ export default function RutasPage() {
                   </tr>
                 ) : deliveryTypeFilter === 'sucursal' ? (
                   <>
-                    {/* Single header for sucursal as seen in user's image */}
-                    <tr className="bg-slate-50/80 dark:bg-slate-800/30 border-y border-slate-200/60 dark:border-slate-800/60">
-                      <td colSpan={6} className="px-6 py-2.5">
+                    <tr className="bg-slate-100/90 dark:bg-slate-800/70 border-y border-slate-300/80 dark:border-slate-700/80">
+                      <td colSpan={6} className="px-6 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">Entrega en Sucursal</span>
                           <div className="size-5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
@@ -829,7 +851,7 @@ export default function RutasPage() {
                       const aluminio = p.warehouses.find(w => w.id === 'Aluminio')?.status || 'none';
                       const vidrio = p.warehouses.find(w => w.id === 'Vidrio')?.status || 'none';
                       const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
-                      
+
                       return (
                         <tr key={p.id} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                           <td className="px-6 py-5">
@@ -842,13 +864,13 @@ export default function RutasPage() {
                           </td>
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-3">
-                                <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
-                                  {p.clientName.substring(0, 2).toUpperCase()}
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
-                                </div>
+                              <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
+                                {p.clientName.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-5">
@@ -878,15 +900,122 @@ export default function RutasPage() {
                 ) : (
                   BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
                     const items = groupedData[blockName] || [];
+                    const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
+                    const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
+                    const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready');
                     return (
                       <Fragment key={blockName}>
-                        {/* Block Separator Header */}
-                        <tr className="bg-slate-50/80 dark:bg-slate-800/30 border-y border-slate-200/60 dark:border-slate-800/60">
-                          <td colSpan={6} className="px-6 py-2.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">{blockName}</span>
-                              <div className="size-5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
-                                {items.length}
+                        <tr className="bg-slate-100/90 dark:bg-slate-800/70 border-y border-slate-300/80 dark:border-slate-700/80">
+                          <td colSpan={6} className="px-6 py-3.5">
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">{blockName}</span>
+                                <div className="size-5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
+                                  {items.length}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                  variant={canAuthorize ? "logistics-success" : "logistics-action"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAuthorizeBlock(blockName, !isAuthorized);
+                                  }}
+                                  disabled={!canAuthorize || authorizingBlockName === blockName}
+                                  size="sm"
+                                  className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
+                                >
+                                  {authorizingBlockName === blockName ? (
+                                    <RefreshCw className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <Check className="size-3.5 transition-colors" />
+                                  )}
+                                  {authorizingBlockName === blockName
+                                    ? "Procesando..."
+                                    : isAuthorized && canAuthorize
+                                    ? "Autorizado"
+                                    : "Autorizar"}
+                                </Button>
+
+                                <Popover
+                                  open={openPopoverId === `${blockName}-table`}
+                                  onOpenChange={(open) => setOpenPopoverId(open ? `${blockName}-table` : null)}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={isAssigning === blockName}
+                                      className={cn(
+                                        "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
+                                        assignedUnits[blockName]
+                                          ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
+                                          : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
+                                      )}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {isAssigning === blockName ? (
+                                        <RefreshCw className="size-3.5 animate-spin" />
+                                      ) : (
+                                        <Truck className="size-3.5" />
+                                      )}
+                                      <span className="uppercase tracking-widest truncate max-w-[100px]">
+                                        {assignedUnits[blockName] ? assignedUnits[blockName].name : "Unidad"}
+                                      </span>
+                                      <ChevronDown className="size-3 opacity-50" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-48 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex flex-col gap-1">
+                                      <p className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
+                                        Seleccionar Unidad
+                                      </p>
+                                      <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
+                                        <button
+                                          onClick={() => handleAssignUnit(blockName, null)}
+                                          className={cn(
+                                            "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
+                                            !assignedUnits[blockName]
+                                              ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
+                                              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                          )}
+                                        >
+                                          Sin Asignación
+                                        </button>
+                                        <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
+                                        {unidadesDisponibles.length > 0 ? (
+                                          unidadesDisponibles.map((unid) => (
+                                            <button
+                                              key={unid.id}
+                                              onClick={() => handleAssignUnit(blockName, unid)}
+                                              className={cn(
+                                                "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
+                                                assignedUnits[blockName]?.id === unid.id
+                                                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                              )}
+                                            >
+                                              <span>{unid.name}</span>
+                                              <span className={cn(
+                                                "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
+                                                assignedUnits[blockName]?.id === unid.id
+                                                  ? "bg-white/20 text-white"
+                                                  : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                                              )}>
+                                                {unid.sucursal}
+                                              </span>
+                                            </button>
+                                          ))
+                                        ) : (
+                                          <div className="px-3 py-4 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest">
+                                            No hay unidades disponibles
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                               </div>
                             </div>
                           </td>
@@ -895,7 +1024,7 @@ export default function RutasPage() {
                           const aluminio = p.warehouses.find(w => w.id === 'Aluminio')?.status || 'none';
                           const vidrio = p.warehouses.find(w => w.id === 'Vidrio')?.status || 'none';
                           const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
-                          
+
                           return (
                             <tr key={p.id} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                               <td className="px-6 py-5">
@@ -908,13 +1037,13 @@ export default function RutasPage() {
                               </td>
                               <td className="px-6 py-5">
                                 <div className="flex items-center gap-3">
-                                    <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
-                                      {p.clientName.substring(0, 2).toUpperCase()}
-                                    </div>
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
-                                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
-                                    </div>
+                                  <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
+                                    {p.clientName.substring(0, 2).toUpperCase()}
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
+                                  </div>
                                 </div>
                               </td>
                               <td className="px-6 py-5">
@@ -952,7 +1081,6 @@ export default function RutasPage() {
               </div>
             )}
           </div>
-          {/* Pagination Footer Placeholder as seen in Image 2 */}
           <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 flex items-center justify-between">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
               Mostrando {filteredPedidos.length} de {filteredPedidos.length} pedidos
@@ -965,7 +1093,6 @@ export default function RutasPage() {
           </div>
         </div>
       ) : deliveryTypeFilter === 'domicilio' ? (
-        /* 11 Block Cards Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 min-[2000px]:grid-cols-4 gap-4">
           {filteredPedidos.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-20 bg-white/50 dark:bg-slate-900/40 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 transition-all">
@@ -977,139 +1104,162 @@ export default function RutasPage() {
               <p className="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest text-center max-w-md px-6 leading-relaxed">
                 No hay facturas o pedidos que coincidan con los filtros seleccionados actualmente (chofer, fecha o estatus).
               </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => fetchAllData(true)}
                 className="mt-8 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm h-10 px-6"
               >
-                <RefreshCw className="size-3.5 mr-2" />
                 Reintentar carga
               </Button>
             </div>
           ) : (
             BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
-            const items = groupedData[blockName] || [];
-            return (
-              <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
-                <CardHeader className="p-4 pb-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider leading-none">
-                        {blockName}
-                      </CardTitle>
-                      <div className="flex items-center justify-center size-5 rounded-full bg-blue-600 dark:bg-blue-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
-                        {items.length}
-                      </div>
-                    </div>
+              const items = groupedData[blockName] || [];
+              const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
+              const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
+              const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready');
 
-                    <Popover 
-                      open={openPopoverId === blockName} 
-                      onOpenChange={(open) => setOpenPopoverId(open ? blockName : null)}
-                    >
-                      <PopoverTrigger asChild>
+              return (
+                <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
+                  <CardHeader className="p-4 pb-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider leading-none">
+                          {blockName}
+                        </CardTitle>
+                        <div className="flex items-center justify-center size-5 rounded-full bg-blue-600 dark:bg-blue-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
+                          {items.length}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
                         <Button
-                          variant="outline"
+                          variant={canAuthorize ? "logistics-success" : "logistics-action"}
+                          onClick={() => handleAuthorizeBlock(blockName, !isAuthorized)}
+                          disabled={!canAuthorize || authorizingBlockName === blockName}
                           size="sm"
-                          disabled={isAssigning === blockName}
-                          className={cn(
-                            "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
-                            assignedUnits[blockName] 
-                              ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100" 
-                              : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
-                          )}
+                          className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
                         >
-                          {isAssigning === blockName ? (
+                          {authorizingBlockName === blockName ? (
                             <RefreshCw className="size-3.5 animate-spin" />
                           ) : (
-                            <Truck className="size-3.5" />
+                            <Check className="size-3.5 transition-colors" />
                           )}
-                          <span className="uppercase tracking-widest truncate max-w-[100px]">
-                            {assignedUnits[blockName] ? assignedUnits[blockName].name : "Unidad"}
-                          </span>
-                          <ChevronDown className="size-3 opacity-50" />
+                          {authorizingBlockName === blockName
+                            ? "Procesando..."
+                            : isAuthorized && canAuthorize
+                            ? "Autorizado"
+                            : "Autorizar"}
                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-48 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
-                        <div className="flex flex-col gap-1">
-                          <p className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
-                            Seleccionar Unidad
-                          </p>
-                          <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
-                            <button
-                              onClick={() => handleAssignUnit(blockName, null)}
+
+                        <Popover
+                          open={openPopoverId === blockName}
+                          onOpenChange={(open) => setOpenPopoverId(open ? blockName : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isAssigning === blockName}
                               className={cn(
-                                "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
-                                !assignedUnits[blockName]
-                                  ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
-                                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
+                                assignedUnits[blockName]
+                                  ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
+                                  : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
                               )}
                             >
-                              Sin Asignación
-                            </button>
-                            <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
-                            {unidadesDisponibles.length > 0 ? (
-                              unidadesDisponibles.map((unid) => (
+                              {isAssigning === blockName ? (
+                                <RefreshCw className="size-3.5 animate-spin" />
+                              ) : (
+                                <Truck className="size-3.5" />
+                              )}
+                              <span className="uppercase tracking-widest truncate max-w-[100px]">
+                                {assignedUnits[blockName] ? assignedUnits[blockName].name : "Unidad"}
+                              </span>
+                              <ChevronDown className="size-3 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
+                            <div className="flex flex-col gap-1">
+                              <p className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
+                                Seleccionar Unidad
+                              </p>
+                              <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
                                 <button
-                                  key={unid.id}
-                                  onClick={() => handleAssignUnit(blockName, unid)}
+                                  onClick={() => handleAssignUnit(blockName, null)}
                                   className={cn(
-                                    "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
-                                    assignedUnits[blockName]?.id === unid.id
-                                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                    "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
+                                    !assignedUnits[blockName]
+                                      ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
                                       : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                   )}
                                 >
-                                  <span>{unid.name}</span>
-                                  <span className={cn(
-                                    "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
-                                    assignedUnits[blockName]?.id === unid.id
-                                      ? "bg-white/20 text-white"
-                                      : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-                                  )}>
-                                    {unid.sucursal}
-                                  </span>
+                                  Sin Asignación
                                 </button>
-                              ))
-                            ) : (
-                              <div className="px-3 py-4 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest">
-                                No hay unidades disponibles
+                                <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
+                                {unidadesDisponibles.length > 0 ? (
+                                  unidadesDisponibles.map((unid) => (
+                                    <button
+                                      key={unid.id}
+                                      onClick={() => handleAssignUnit(blockName, unid)}
+                                      className={cn(
+                                        "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
+                                        assignedUnits[blockName]?.id === unid.id
+                                          ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                      )}
+                                    >
+                                      <span>{unid.name}</span>
+                                      <span className={cn(
+                                        "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
+                                        assignedUnits[blockName]?.id === unid.id
+                                          ? "bg-white/20 text-white"
+                                          : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                                      )}>
+                                        {unid.sucursal}
+                                      </span>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="px-3 py-4 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest">
+                                    No hay unidades disponibles
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </CardHeader>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  </CardHeader>
 
-                <CardContent className="px-2 py-4 flex-1">
-                  {items.length > 0 ? (
-                    <div className={cn(
-                      "flex flex-col gap-3",
-                      items.length > 2 
-                        ? "max-h-[510px] overflow-y-auto pr-2 custom-scrollbar" 
-                        : "h-auto overflow-visible pr-0"
-                    )}>
-                      {items.map(p => (
-                        <div key={p.id} className="shrink-0">
-                          <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800/50 rounded-3xl opacity-40">
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Sin resultados</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
+                  <CardContent className="px-2 py-4 flex-1">
+                    {items.length > 0 ? (
+                      <div className={cn(
+                        "flex flex-col gap-3",
+                        items.length > 2
+                          ? "max-h-[510px] overflow-y-auto pr-2 custom-scrollbar"
+                          : "h-auto overflow-visible pr-0"
+                      )}>
+                        {items.map(p => (
+                          <div key={p.id} className="shrink-0">
+                            <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800/50 rounded-3xl opacity-40">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Sin resultados</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
       ) : (
-        /* Direct Order Grid for Sucursal */
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-4">
             <h2 className="text-xl font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
@@ -1134,7 +1284,6 @@ export default function RutasPage() {
         </div>
       )}
 
-      {/* Invoice Details Dialog Modal */}
       <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
         <DialogContent className="w-full h-full sm:h-auto sm:max-w-[500px] p-0 overflow-y-auto sm:overflow-hidden bg-white dark:bg-slate-900 border-none shadow-2xl rounded-none sm:rounded-3xl">
           <div className="p-4 sm:p-6 space-y-6">
@@ -1196,6 +1345,34 @@ export default function RutasPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmDialog.show} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, show: open }))}>
+        <DialogContent>
+          <DialogHeader className="text-left">
+            <DialogTitle>
+              {confirmDialog.title}
+            </DialogTitle>
+            <DialogDescription className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed pt-2">
+              {confirmDialog.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <DialogClose asChild>
+              <Button variant="outline" className="cursor-pointer">
+                Cancelar
+              </Button>
+            </DialogClose>
+            <DialogClose asChild>
+              <Button 
+                onClick={confirmDialog.onConfirm}
+                className="cursor-pointer"
+              >
+                {confirmDialog.actionLabel}
+              </Button>
+            </DialogClose>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
