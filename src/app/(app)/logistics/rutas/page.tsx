@@ -278,12 +278,15 @@ export default function RutasPage() {
         })
       });
 
-      if (!response.ok) throw new Error("Error al autorizar el bloque");
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || errJson.message || "Error al cambiar la autorización del bloque");
+      }
 
       await fetchAllData(true, true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error authorizing block:", err);
-      alert("Hubo un error al cambiar la autorización del bloque.");
+      alert(err.message || "Hubo un error al cambiar la autorización del bloque.");
     } finally {
       setIsRefreshing(false);
       setAuthorizingBlockName(null);
@@ -357,7 +360,7 @@ export default function RutasPage() {
 
           const initialAssignments: Record<string, AvailableUnit> = {};
           blocksData.forEach(b => {
-            if (b.sUnidad && b.iIdUnit) {
+            if (b.sUnidad && b.iIdUnit && b.sEstatus !== 'En Ruta') {
               const blockKey = b.sDeliveryBlock.trim().toUpperCase();
               initialAssignments[blockKey] = {
                 id: `${b.sUnidad}-${b.iIdUnit}`,
@@ -904,7 +907,7 @@ export default function RutasPage() {
                 ) : (
                   BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
                     const items = groupedData[blockName] || [];
-                    const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
+                    const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase() && b.sEstatus !== 'En Ruta');
                     const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
                     const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready');
                     return (
@@ -1126,7 +1129,7 @@ export default function RutasPage() {
           ) : (
             BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
               const items = groupedData[blockName] || [];
-              const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
+              const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase() && b.sEstatus !== 'En Ruta');
               const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
               const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready');
 

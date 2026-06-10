@@ -14,9 +14,18 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
+      let errorMessage = 'Error del servidor externo';
+      try {
+        const errJson = await response.json();
+        errorMessage = errJson.message || errJson.error || JSON.stringify(errJson);
+      } catch {
+        try {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        } catch {}
+      }
       return NextResponse.json(
-        { error: `Error del servidor externo: ${errorText}` },
+        { error: errorMessage },
         { status: response.status }
       );
     }

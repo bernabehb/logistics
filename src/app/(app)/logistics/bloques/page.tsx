@@ -26,6 +26,7 @@ interface ApiBlockStatus {
   sUnidad: string | null;
   iIdDriver: number | null;
   iIdUnit: number | null;
+  iTripNumber?: number;
 }
 
 // Cache persistente para navegación rápida
@@ -90,10 +91,10 @@ export default function BloquesPage() {
         }
 
         return {
-          id: blockId,
+          id: `${blockId}-${b.iTripNumber || 1}`, // Usar clave única incluyendo viaje para evitar duplicados en la lista de React
           iId: b.iIdDeliveryBlock,
           name: b.sDeliveryBlock,
-          status: (b.sEstatus || "Disponible") === "Asignado" ? "Asignado" : "Disponible",
+          status: (b.sEstatus === "Asignado" || b.sEstatus === "En Ruta") ? "Asignado" : "Disponible",
           apiDriverName: b.sChofer || undefined
         };
       });
