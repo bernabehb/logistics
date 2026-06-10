@@ -291,10 +291,14 @@ export default function RutasPage() {
   };
 
   const handleAuthorizeBlock = (blockName: string, authorize: boolean) => {
-    const title = authorize ? "Confirmar Autorización" : "Cancelar Autorización";
+    const title = authorize 
+      ? "Confirmar Autorización" 
+      : "Regresar Bloque para Re-autorizar";
+    
     const description = authorize
       ? `¿Deseas autorizar las salidas del bloque ${blockName}?`
-      : `¿Deseas cancelar la autorización de salidas del bloque ${blockName}?`;
+      : `¿Deseas regresar las facturas del bloque ${blockName} para incluir las nuevas y volver a autorizar la salida?`;
+      
     const actionLabel = authorize ? "Autorizar" : "Confirmar";
 
     showConfirm({
@@ -917,7 +921,13 @@ export default function RutasPage() {
 
                               <div className="flex items-center gap-2 shrink-0">
                                 <Button
-                                  variant={canAuthorize ? "logistics-success" : "logistics-action"}
+                                  variant={
+                                    isAuthorized && canAuthorize
+                                      ? "logistics-warning"
+                                      : canAuthorize
+                                      ? "logistics-success"
+                                      : "logistics-action"
+                                  }
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleAuthorizeBlock(blockName, !isAuthorized);
@@ -934,7 +944,7 @@ export default function RutasPage() {
                                   {authorizingBlockName === blockName
                                     ? "Procesando..."
                                     : isAuthorized && canAuthorize
-                                    ? "Autorizado"
+                                    ? "Regresar"
                                     : "Autorizar"}
                                 </Button>
 
@@ -1135,7 +1145,13 @@ export default function RutasPage() {
 
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
-                          variant={canAuthorize ? "logistics-success" : "logistics-action"}
+                          variant={
+                            isAuthorized && canAuthorize
+                              ? "logistics-warning"
+                              : canAuthorize
+                              ? "logistics-success"
+                              : "logistics-action"
+                          }
                           onClick={() => handleAuthorizeBlock(blockName, !isAuthorized)}
                           disabled={!canAuthorize || authorizingBlockName === blockName}
                           size="sm"
@@ -1149,7 +1165,7 @@ export default function RutasPage() {
                           {authorizingBlockName === blockName
                             ? "Procesando..."
                             : isAuthorized && canAuthorize
-                            ? "Autorizado"
+                            ? "Regresar"
                             : "Autorizar"}
                         </Button>
 
