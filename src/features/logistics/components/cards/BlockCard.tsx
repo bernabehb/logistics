@@ -59,6 +59,7 @@ export function BlockCard({
 
   const filteredDriversForSelect = allDrivers
     .filter(driver => !assignedDriverIds.includes(driver.id))
+    .filter(driver => driver.status?.trim().toLowerCase() !== "en ruta")
     .filter(d => 
       d.name.toLowerCase().includes(driverSearch.toLowerCase()) ||
       d.sucursal?.toLowerCase().includes(driverSearch.toLowerCase())
@@ -229,7 +230,17 @@ export function BlockCard({
                                     <span className="text-[9px] text-slate-400 group-hover:text-slate-500 uppercase font-bold">{d.sucursal}</span>
                                   )}
                                 </div>
-                                {selectedDriverId === d.id && <Check className="w-4 h-4" />}
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {(d.pendingInvoicesCount || 0) > 0 && (
+                                    <span
+                                      title={`${d.pendingInvoicesCount} facturas pendientes de salida`}
+                                      className="min-w-5 h-5 px-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 text-[10px] font-black flex items-center justify-center"
+                                    >
+                                      {d.pendingInvoicesCount}
+                                    </span>
+                                  )}
+                                  {selectedDriverId === d.id && <Check className="w-4 h-4" />}
+                                </div>
                               </button>
                             ))
                           ) : (

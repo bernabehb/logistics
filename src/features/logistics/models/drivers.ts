@@ -9,6 +9,7 @@ export interface ApiDriver {
   bActivo: boolean;
   sEstatus?: string;
   sUnidadAsignada?: string;
+  iPendingInvoicesCount?: number;
 }
 
 export interface Driver {
@@ -23,6 +24,7 @@ export interface Driver {
   status?: string;
   apiAssignedUnit?: string;
   iIdUnit?: number;
+  pendingInvoicesCount?: number;
 }
 
 export function mapApiDriverToDriver(apiDriver: ApiDriver): Driver {
@@ -35,5 +37,6 @@ export function mapApiDriverToDriver(apiDriver: ApiDriver): Driver {
     sucursal: apiDriver.sSucursal?.trim().toUpperCase() === "SIN SUCURSAL" ? "SANTA CATARINA" : apiDriver.sSucursal?.trim(),
     status: apiDriver.sEstatus,
     apiAssignedUnit: apiDriver.sUnidadAsignada,
+    pendingInvoicesCount: apiDriver.iPendingInvoicesCount || 0,
   };
 }

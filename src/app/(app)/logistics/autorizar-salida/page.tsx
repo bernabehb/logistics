@@ -53,24 +53,27 @@ export default function AutorizarSalidaPage() {
       if (homeRes.ok) {
         const homeData: ApiDepartureHome[] = await homeRes.json();
         const mappedHome = homeData.map((d, i) => {
-          const mappedInvoices = (d.facturas || [])
-            .filter(f => {
-              if (typeof f === 'string') return true; 
-              const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
-              return !isAuth;
-            })
-            .map(f => ({ 
-              id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), 
-              groups: [],
-              isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva)
-            }));
+          const allInvoices = d.facturas || [];
+          const pendingInvoices = allInvoices.filter(f => {
+            if (typeof f === 'string') return true; 
+            const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
+            return !isAuth;
+          });
             
-          const isFullyAuthorized = (d.facturas && d.facturas.length > 0) && mappedInvoices.length === 0;
+          const isFullyAuthorized = (allInvoices.length > 0) && pendingInvoices.length === 0;
           let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
           if (isFullyAuthorized) computedStatus = "En ruta";
 
+          const invoicesToMap = computedStatus === "En ruta" ? allInvoices : pendingInvoices;
+          const mappedInvoices = invoicesToMap.map(f => ({ 
+            id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), 
+            groups: [],
+            isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva)
+          }));
+
+          const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
           return {
-            id: `home-${i}-${d.unidad.trim()}`,
+            id: `home-${d.unidad.trim()}-${d.chofer.trim()}-${computedStatus}-${invoiceIds}-${i}`,
             unitName: d.unidad,
             type: "Reparto",
             driverName: d.chofer,
@@ -89,20 +92,26 @@ export default function AutorizarSalidaPage() {
       if (branchRes.ok) {
         const branchData: ApiDepartureBranch[] = await branchRes.json();
         const mappedBranch = branchData.map((d, i) => {
-          const mappedInvoices = (d.facturas || [])
-            .filter(f => {
-              if (typeof f === 'string') return true;
-              const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
-              return !isAuth;
-            })
-            .map(f => ({ id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), groups: [] }));
+          const allInvoices = d.facturas || [];
+          const pendingInvoices = allInvoices.filter(f => {
+            if (typeof f === 'string') return true;
+            const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
+            return !isAuth;
+          });
 
-          const isFullyAuthorized = (d.facturas && d.facturas.length > 0) && mappedInvoices.length === 0;
+          const isFullyAuthorized = (d.facturas && d.facturas.length > 0) && pendingInvoices.length === 0;
           let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
           if (isFullyAuthorized) computedStatus = "En ruta";
 
+          const invoicesToMap = computedStatus === "En ruta" ? allInvoices : pendingInvoices;
+          const mappedInvoices = invoicesToMap.map(f => ({ 
+            id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), 
+            groups: [] 
+          }));
+
+          const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
           return {
-            id: `branch-${i}-${d.cliente.trim()}`,
+            id: `branch-${d.cliente.trim()}-${computedStatus}-${invoiceIds}-${i}`,
             unitName: "SUCURSAL",
             type: "Recolección",
             driverName: "Cliente",

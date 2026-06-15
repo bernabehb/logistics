@@ -100,7 +100,28 @@ interface ApiBlockStatus {
   iIdDriver: number | null;
   iIdUnit: number | null;
   bAuthorized?: boolean;
+  iTripNumber?: number;
 }
+
+const normalizeBlockName = (value: string) => value.trim().toUpperCase();
+
+const routeBlockPriority = (block: ApiBlockStatus) => {
+  if (block.sEstatus === 'En Ruta') return 0;
+  if (block.bAuthorized && block.iIdUnit && block.sUnidad) return 4;
+  if (block.iIdUnit && block.sUnidad) return 3;
+  if (block.sEstatus === 'Asignado') return 2;
+  return 1;
+};
+
+const getActiveRouteBlock = (blocks: ApiBlockStatus[], blockName: string) => {
+  return blocks
+    .filter(b => normalizeBlockName(b.sDeliveryBlock) === normalizeBlockName(blockName))
+    .sort((a, b) => {
+      const priorityDiff = routeBlockPriority(b) - routeBlockPriority(a);
+      if (priorityDiff !== 0) return priorityDiff;
+      return (b.iTripNumber || 0) - (a.iTripNumber || 0);
+    })[0];
+};
 
 let cachedInvoices: RutaPedido[] | null = null;
 let cachedUnidades: AvailableUnit[] | null = null;
@@ -185,9 +206,18 @@ export default function RutasPage() {
     cachedAssignedUnits = assignedUnits;
   }, [assignedUnits]);
 
+  const isInitialMount = useRef(true);
+
   useEffect(() => {
     lastDriverFilter = driverFilter;
-    fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      // Al montar por primera vez, forzar un refresco silencioso en segundo plano
+      // para traer los catálogos y asignaciones más recientes de la BD
+      fetchAllData(true, true);
+    } else {
+      fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
+    }
   }, [driverFilter]);
 
   useEffect(() => {
@@ -215,7 +245,7 @@ export default function RutasPage() {
   }, [driverFilter]);
 
   const handleAssignUnit = async (blockName: string, unit: AvailableUnit | null) => {
-    const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
+    const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
 
     if (!apiBlock) {
       alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
@@ -259,7 +289,7 @@ export default function RutasPage() {
   };
 
   const executeAuthorizeBlock = async (blockName: string, authorize: boolean) => {
-    const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase());
+    const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
 
     if (!apiBlock) {
       alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
@@ -359,11 +389,13 @@ export default function RutasPage() {
           cachedBlocks = blocksData;
 
           const initialAssignments: Record<string, AvailableUnit> = {};
-          blocksData.forEach(b => {
+          const blockKeys = Array.from(new Set(blocksData.map(b => normalizeBlockName(b.sDeliveryBlock))));
+          blockKeys.forEach(blockKey => {
+            const b = getActiveRouteBlock(blocksData, blockKey);
+            if (!b) return;
             if (b.sUnidad && b.iIdUnit && b.sEstatus !== 'En Ruta') {
-              const blockKey = b.sDeliveryBlock.trim().toUpperCase();
               initialAssignments[blockKey] = {
-                id: `${b.sUnidad}-${b.iIdUnit}`,
+                id: `${b.sUnidad}-${b.iIdUnit}-${b.iTripNumber || 1}`,
                 name: b.sUnidad,
                 sucursal: "",
                 iId: Number(b.iIdUnit || 0)
@@ -907,7 +939,7 @@ export default function RutasPage() {
                 ) : (
                   BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
                     const items = groupedData[blockName] || [];
-                    const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase() && b.sEstatus !== 'En Ruta');
+                    const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
                     const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
                     const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready');
                     return (
@@ -1129,7 +1161,7 @@ export default function RutasPage() {
           ) : (
             BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
               const items = groupedData[blockName] || [];
-              const apiBlock = apiBlocks.find(b => b.sDeliveryBlock.trim().toUpperCase() === blockName.trim().toUpperCase() && b.sEstatus !== 'En Ruta');
+              const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
               const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
               const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready');
 

@@ -49,10 +49,20 @@ export default function BloquesPage() {
 
   const blocksRef = useRef<Block[]>(blocks);
   const lastLocalUpdatesRef = useRef<Record<string, number>>({});
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
+
+  // Limpiar temporizadores al desmontar el componente
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchAllData = async (silent: boolean | any = false) => {
     const isManualRefresh = typeof silent === 'object' && silent !== null;
@@ -84,7 +94,7 @@ export default function BloquesPage() {
 
         // Si hubo una actualización local hace menos de 4 segundos, conservar el estado local optimista
         if (lastUpdate && now - lastUpdate < 4000) {
-          const currentBlock = blocksRef.current.find(x => x.id === blockId);
+          const currentBlock = blocksRef.current.find(x => x.iId.toString() === blockId);
           if (currentBlock) {
             return currentBlock;
           }
@@ -168,9 +178,15 @@ export default function BloquesPage() {
 
     const originalBlocks = [...blocks];
     const targetDriver = drivers.find(d => d.id === driverId);
+    const baseBlockId = block.iId.toString();
 
-    // Guardar timestamp de la actualización local
-    lastLocalUpdatesRef.current[blockId] = Date.now();
+    // Limpiar cualquier refresco pendiente para evitar llamadas encimadas
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+
+    // Guardar timestamp de la actualización local usando el ID base
+    lastLocalUpdatesRef.current[baseBlockId] = Date.now();
 
     // Actualización Optimista: Reflejar el cambio inmediatamente en la UI
     setBlocks(prev => prev.map(b => {
@@ -202,10 +218,10 @@ export default function BloquesPage() {
         }
         
         // Refresco silencioso en segundo plano con retraso para dar tiempo a la BD
-        setTimeout(() => fetchAllData(true), 2000);
+        refreshTimeoutRef.current = setTimeout(() => fetchAllData(true), 2000);
       } catch (err: any) {
         console.warn("Validation/Error assigning block:", err?.message || err);
-        delete lastLocalUpdatesRef.current[blockId];
+        delete lastLocalUpdatesRef.current[baseBlockId];
         setBlocks(originalBlocks); // Revertir en caso de error
         
         if (err && err.message) {
@@ -235,10 +251,10 @@ export default function BloquesPage() {
       if (!response.ok) throw new Error("Error en la respuesta del servidor");
       
       // Refresco silencioso en segundo plano con retraso para dar tiempo a la BD
-      setTimeout(() => fetchAllData(true), 2000);
+      refreshTimeoutRef.current = setTimeout(() => fetchAllData(true), 2000);
     } catch (err) {
       console.error("Error assigning block:", err);
-      delete lastLocalUpdatesRef.current[blockId];
+      delete lastLocalUpdatesRef.current[baseBlockId];
       setBlocks(originalBlocks); // Revertir en caso de error
       alert("Hubo un error al procesar la asignación.");
     }
