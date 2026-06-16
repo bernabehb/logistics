@@ -55,18 +55,18 @@ export default function AutorizarSalidaPage() {
         const mappedHome = homeData.map((d, i) => {
           const allInvoices = d.facturas || [];
           const pendingInvoices = allInvoices.filter(f => {
-            if (typeof f === 'string') return true; 
+            if (typeof f === 'string') return true;
             const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
             return !isAuth;
           });
-            
+
           const isFullyAuthorized = (allInvoices.length > 0) && pendingInvoices.length === 0;
           let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
           if (isFullyAuthorized) computedStatus = "En ruta";
 
           const invoicesToMap = computedStatus === "En ruta" ? allInvoices : pendingInvoices;
-          const mappedInvoices = invoicesToMap.map(f => ({ 
-            id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), 
+          const mappedInvoices = invoicesToMap.map(f => ({
+            id: typeof f === 'string' ? f : (f.factura || f.Factura || ""),
             groups: [],
             isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva)
           }));
@@ -77,7 +77,7 @@ export default function AutorizarSalidaPage() {
             unitName: d.unidad,
             type: "Reparto",
             driverName: d.chofer,
-            destination: d.direccionesEntrega?.[0] || "Destinos múltiples",
+            destination: d.direccionesEntrega?.[0] || "Destinos mÃºltiples",
             invoices: mappedInvoices,
             totalWeightTons: d.pesoTotal,
             totalAmount: d.montoTotal,
@@ -104,16 +104,16 @@ export default function AutorizarSalidaPage() {
           if (isFullyAuthorized) computedStatus = "En ruta";
 
           const invoicesToMap = computedStatus === "En ruta" ? allInvoices : pendingInvoices;
-          const mappedInvoices = invoicesToMap.map(f => ({ 
-            id: typeof f === 'string' ? f : (f.factura || f.Factura || ""), 
-            groups: [] 
+          const mappedInvoices = invoicesToMap.map(f => ({
+            id: typeof f === 'string' ? f : (f.factura || f.Factura || ""),
+            groups: []
           }));
 
           const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
           return {
             id: `branch-${d.cliente.trim()}-${computedStatus}-${invoiceIds}-${i}`,
             unitName: "SUCURSAL",
-            type: "Recolección",
+            type: "RecolecciÃ³n",
             driverName: "Cliente",
             clientName: d.cliente,
             destination: "Sucursal",
@@ -151,8 +151,8 @@ export default function AutorizarSalidaPage() {
   const handleAuthorize = (id: string) => {
     const updated = departures.map(dep => {
       if (dep.id === id) {
-        return { 
-          ...dep, 
+        return {
+          ...dep,
           status: "En ruta" as ReadyDeparture["status"]
         };
       }
@@ -162,8 +162,15 @@ export default function AutorizarSalidaPage() {
     cachedDepartures = updated;
   };
 
-  const filteredDepartures = departures.filter(dep => 
-    dep.status === statusFilter && 
+  const handleDelivered = (id: string) => {
+    const updated = departures.filter(dep => dep.id !== id);
+    setDepartures(updated);
+    cachedDepartures = updated;
+    fetchDepartures(true);
+  };
+
+  const filteredDepartures = departures.filter(dep =>
+    dep.status === statusFilter &&
     dep.deliveryType === deliveryTypeFilter && (
       dep.driverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dep.unitName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -181,9 +188,9 @@ export default function AutorizarSalidaPage() {
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
           Autorizar Salidas
         </h1>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleRefresh}
           disabled={isRefreshing}
           className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
@@ -253,8 +260,8 @@ export default function AutorizarSalidaPage() {
                 {status.label}
                 <span className={cn(
                   "px-1.5 py-0.5 rounded-md text-[9px] min-w-[1.2rem] text-center",
-                  statusFilter === status.id 
-                    ? "bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300" 
+                  statusFilter === status.id
+                    ? "bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300"
                     : "bg-slate-200 dark:bg-slate-800 text-slate-500"
                 )}>
                   {status.count}
@@ -271,8 +278,8 @@ export default function AutorizarSalidaPage() {
           <div className="flex flex-col items-center justify-center h-64 text-slate-500 dark:text-slate-400 w-full">
             <CheckCircle2 className="size-12 mb-4 text-emerald-500 opacity-50" />
             <p className="text-lg font-medium">
-              {statusFilter === "Pendiente" 
-                ? "No hay salidas pendientes de autorización" 
+              {statusFilter === "Pendiente"
+                ? "No hay salidas pendientes"
                 : deliveryTypeFilter === "sucursal"
                   ? "No hay recolecciones autorizadas actualmente"
                   : "No hay unidades en ruta actualmente"}
@@ -281,7 +288,7 @@ export default function AutorizarSalidaPage() {
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-6 auto-rows-max">
             {filteredDepartures.map((dep) => (
-              <DepartureCard key={dep.id} departure={dep} onAuthorize={handleAuthorize} />
+              <DepartureCard key={dep.id} departure={dep} onAuthorize={handleAuthorize} onDelivered={handleDelivered} />
             ))}
           </div>
         )}
@@ -289,3 +296,4 @@ export default function AutorizarSalidaPage() {
     </div>
   );
 }
+

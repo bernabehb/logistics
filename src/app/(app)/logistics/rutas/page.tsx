@@ -168,16 +168,16 @@ export default function RutasPage() {
     title: "",
     description: "",
     actionLabel: "Confirmar",
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   const showConfirm = (options: Partial<typeof confirmDialog>) => {
     setConfirmDialog({
       show: true,
-      title: options.title || "Confirmar acción",
-      description: options.description || "¿Estás seguro?",
+      title: options.title || "Confirmar acciÃ³n",
+      description: options.description || "Â¿EstÃ¡s seguro?",
       actionLabel: options.actionLabel || "Confirmar",
-      onConfirm: options.onConfirm || (() => {})
+      onConfirm: options.onConfirm || (() => { })
     });
   };
 
@@ -213,7 +213,7 @@ export default function RutasPage() {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catálogos y asignaciones más recientes de la BD
+      // para traer los catÃ¡logos y asignaciones mÃ¡s recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
@@ -248,7 +248,7 @@ export default function RutasPage() {
     const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
 
     if (!apiBlock) {
-      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
+      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catÃ¡logo.`);
       return;
     }
 
@@ -275,7 +275,7 @@ export default function RutasPage() {
         })
       });
 
-      if (!response.ok) throw new Error("Error en la asignación");
+      if (!response.ok) throw new Error("Error en la asignaciÃ³n");
 
       fetchAllData(true, true);
     } catch (err) {
@@ -292,7 +292,7 @@ export default function RutasPage() {
     const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
 
     if (!apiBlock) {
-      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
+      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catÃ¡logo.`);
       return;
     }
 
@@ -310,13 +310,13 @@ export default function RutasPage() {
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || errJson.message || "Error al cambiar la autorización del bloque");
+        throw new Error(errJson.error || errJson.message || "Error al cambiar la autorizaciÃ³n del bloque");
       }
 
       await fetchAllData(true, true);
     } catch (err: any) {
       console.error("Error authorizing block:", err);
-      alert(err.message || "Hubo un error al cambiar la autorización del bloque.");
+      alert(err.message || "Hubo un error al cambiar la autorizaciÃ³n del bloque.");
     } finally {
       setIsRefreshing(false);
       setAuthorizingBlockName(null);
@@ -324,14 +324,14 @@ export default function RutasPage() {
   };
 
   const handleAuthorizeBlock = (blockName: string, authorize: boolean) => {
-    const title = authorize 
-      ? "Confirmar Autorización" 
+    const title = authorize
+      ? "Confirmar AutorizaciÃ³n"
       : "Regresar Bloque para Re-autorizar";
-    
+
     const description = authorize
-      ? `¿Deseas autorizar las salidas del bloque ${blockName}?`
-      : `¿Deseas regresar las facturas del bloque ${blockName} para incluir las nuevas y volver a autorizar la salida?`;
-      
+      ? `Â¿Deseas autorizar las salidas del bloque ${blockName}?`
+      : `Â¿Deseas regresar las facturas del bloque ${blockName} para incluir las nuevas y volver a autorizar la salida?`;
+
     const actionLabel = authorize ? "Autorizar" : "Confirmar";
 
     showConfirm({
@@ -344,7 +344,7 @@ export default function RutasPage() {
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
     if (isFetchingRef.current) {
-      console.log("Fetch en progreso, omitiendo petición concurrente.");
+      console.log("Fetch en progreso, omitiendo peticiÃ³n concurrente.");
       return;
     }
     isFetchingRef.current = true;
@@ -508,7 +508,7 @@ export default function RutasPage() {
       setError(null);
     } catch (err) {
       console.error("Error fetching routes:", err);
-      setError("Error al cargar la información de rutas dinámica");
+      setError("Error al cargar la informaciÃ³n de rutas dinÃ¡mica");
     } finally {
       isFetchingRef.current = false;
       setIsRefreshing(false);
@@ -870,7 +870,7 @@ export default function RutasPage() {
                           <Truck className="size-8 text-slate-300 dark:text-slate-600" />
                         </div>
                         <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de bÃºsqueda, estatus o fecha</p>
                       </div>
                     </td>
                   </tr>
@@ -941,7 +941,7 @@ export default function RutasPage() {
                     const items = groupedData[blockName] || [];
                     const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
                     const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
-                    const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready');
+                    const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
                     return (
                       <Fragment key={blockName}>
                         <tr className="bg-slate-100/90 dark:bg-slate-800/70 border-y border-slate-300/80 dark:border-slate-700/80">
@@ -960,8 +960,8 @@ export default function RutasPage() {
                                     isAuthorized && canAuthorize
                                       ? "logistics-warning"
                                       : canAuthorize
-                                      ? "logistics-success"
-                                      : "logistics-action"
+                                        ? "logistics-success"
+                                        : "logistics-action"
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -979,8 +979,8 @@ export default function RutasPage() {
                                   {authorizingBlockName === blockName
                                     ? "Procesando..."
                                     : isAuthorized && canAuthorize
-                                    ? "Regresar"
-                                    : "Autorizar"}
+                                      ? "Regresar"
+                                      : "Autorizar"}
                                 </Button>
 
                                 <Popover
@@ -1026,7 +1026,7 @@ export default function RutasPage() {
                                               : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                           )}
                                         >
-                                          Sin Asignación
+                                          Sin AsignaciÃ³n
                                         </button>
                                         <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
                                         {unidadesDisponibles.length > 0 ? (
@@ -1163,7 +1163,7 @@ export default function RutasPage() {
               const items = groupedData[blockName] || [];
               const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
               const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
-              const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready');
+              const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
 
               return (
                 <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
@@ -1184,8 +1184,8 @@ export default function RutasPage() {
                             isAuthorized && canAuthorize
                               ? "logistics-warning"
                               : canAuthorize
-                              ? "logistics-success"
-                              : "logistics-action"
+                                ? "logistics-success"
+                                : "logistics-action"
                           }
                           onClick={() => handleAuthorizeBlock(blockName, !isAuthorized)}
                           disabled={!canAuthorize || authorizingBlockName === blockName}
@@ -1200,8 +1200,8 @@ export default function RutasPage() {
                           {authorizingBlockName === blockName
                             ? "Procesando..."
                             : isAuthorized && canAuthorize
-                            ? "Regresar"
-                            : "Autorizar"}
+                              ? "Regresar"
+                              : "Autorizar"}
                         </Button>
 
                         <Popover
@@ -1246,7 +1246,7 @@ export default function RutasPage() {
                                       : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                   )}
                                 >
-                                  Sin Asignación
+                                  Sin AsignaciÃ³n
                                 </button>
                                 <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
                                 {unidadesDisponibles.length > 0 ? (
@@ -1358,7 +1358,7 @@ export default function RutasPage() {
                   <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                     <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
                       <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                        Almacén: {group.almacen}
+                        AlmacÃ©n: {group.almacen}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 capitalize">
                         {group.materiales.length} productos
@@ -1416,7 +1416,7 @@ export default function RutasPage() {
               </Button>
             </DialogClose>
             <DialogClose asChild>
-              <Button 
+              <Button
                 onClick={confirmDialog.onConfirm}
                 className="cursor-pointer"
               >

@@ -1,9 +1,9 @@
 /**
- * Configuración centralizada para la API externa.
+ * ConfiguraciÃ³n centralizada para la API externa.
  * Evita inconsistencias de URLs entre diferentes archivos.
  */
 
-// Usamos la URL del Túnel activa reportada en los logs de error
+// Usamos la URL del TÃºnel activa reportada en los logs de error
 export const EXTERNAL_API_BASE_URL = 'https://vjzmzlbx-5151.usw3.devtunnels.ms';
 
 export const API_HEADERS = {
@@ -24,6 +24,9 @@ export const API_ENDPOINTS = {
   authorizationsBranch: `${EXTERNAL_API_BASE_URL}/Logistics/GetDepartureAuthorizationsBranch`,
   invoiceDetails: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/GetInvoiceDetails/${invoiceNum}`,
   authorizeInvoice: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeInvoice/${invoiceNum}`,
+  deliverInvoices: `${EXTERNAL_API_BASE_URL}/Logistics/DeliverInvoices`,
   toggleUnitMaintenance: `${EXTERNAL_API_BASE_URL}/Logistics/ToggleUnitMaintenance`,
   authorizeBlock: `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeBlock`,
 };
+
+
