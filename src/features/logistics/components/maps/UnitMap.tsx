@@ -1,22 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Truck } from "lucide-react";
 import { renderToString } from "react-dom/server";
 
 
 
-function MapController({ center }: { center: [number, number] }) {
+function MapController({ unitPosition, recenterSignal }: { unitPosition: [number, number]; recenterSignal: number }) {
   const map = useMap();
   
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
         if (map && typeof map.getContainer === 'function' && map.getContainer()) {
-          map.invalidateSize();
-          map.setView(center, map.getZoom(), { animate: false });
+          map.invalidateSize({ pan: false });
         }
       } catch (e) {
         console.warn("Leaflet map container was unmounted before update.", e);
@@ -24,7 +23,19 @@ function MapController({ center }: { center: [number, number] }) {
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [center, map]);
+  }, [map]);
+
+  useEffect(() => {
+    if (recenterSignal === 0) return;
+
+    try {
+      if (map && typeof map.getContainer === 'function' && map.getContainer()) {
+        map.setView(unitPosition, Math.max(map.getZoom(), 16), { animate: true });
+      }
+    } catch (e) {
+      console.warn("Leaflet map container was unmounted before recenter.", e);
+    }
+  }, [map, recenterSignal, unitPosition]);
   
   return null;
 }
@@ -35,9 +46,19 @@ interface UnitMapProps {
   unitName: string;
 }
 
+const BRANCH_GEOFENCES = [
+  { name: "Monterrey", center: [25.7252285283997, -100.331439845859] as [number, number] },
+  { name: "Apodaca", center: [25.8229687425022, -100.254464247705] as [number, number] },
+  { name: "Guadalupe", center: [25.660257355526, -100.197998990038] as [number, number] },
+  { name: "Santa Catarina", center: [25.6742, -100.4624] as [number, number] },
+];
+
+const GEOFENCE_RADIUS_METERS = 200;
 export default function UnitMap({ lat, lng, unitName }: UnitMapProps) {
   const [mapType, setMapType] = useState<"roadmap" | "hybrid">("roadmap");
-  const center: [number, number] = [lat, lng];
+  const [recenterSignal, setRecenterSignal] = useState(0);
+  const [initialCenter] = useState<[number, number]>(() => [lat, lng]);
+  const unitPosition: [number, number] = [lat, lng];
 
   const customIcon = typeof window !== 'undefined' ? L.divIcon({
     html: renderToString(
@@ -62,7 +83,7 @@ export default function UnitMap({ lat, lng, unitName }: UnitMapProps) {
   return (
     <div className="h-full w-full relative overflow-hidden">
       <MapContainer
-        center={center}
+        center={initialCenter}
         zoom={16}
         scrollWheelZoom={true}
         className="h-full w-full z-0"
@@ -80,9 +101,31 @@ export default function UnitMap({ lat, lng, unitName }: UnitMapProps) {
           subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
           maxZoom={20}
         />
+        {BRANCH_GEOFENCES.map((branch) => (
+          <Circle
+            key={branch.name}
+            center={branch.center}
+            radius={GEOFENCE_RADIUS_METERS}
+            pathOptions={{
+              color: "#ef4444",
+              fillColor: "#ef4444",
+              fillOpacity: 0.12,
+              opacity: 0.75,
+              weight: 2,
+            }}
+          >
+            <Popup className="custom-popup">
+              <div className="p-2 min-w-[130px]">
+                <span className="text-[9px] font-black uppercase tracking-wider text-red-500/80">Geocerca</span>
+                <p className="mt-0.5 text-sm font-bold text-slate-800 leading-tight">{branch.name}</p>
+                <p className="mt-1 text-[10px] font-semibold text-slate-500">Radio operativo: {GEOFENCE_RADIUS_METERS} m</p>
+              </div>
+            </Popup>
+          </Circle>
+        ))}
         
         {customIcon && (
-          <Marker position={center} icon={customIcon}>
+          <Marker position={unitPosition} icon={customIcon}>
             <Popup className="custom-popup" offset={[0, -10]}>
               <div className="p-2 min-w-[120px]">
                 <div className="flex flex-col gap-0.5">
@@ -94,9 +137,17 @@ export default function UnitMap({ lat, lng, unitName }: UnitMapProps) {
           </Marker>
         )}
         
-        <MapController center={center} />
+        <MapController unitPosition={unitPosition} recenterSignal={recenterSignal} />
       </MapContainer>
 
+
+      <button
+        type="button"
+        onClick={() => setRecenterSignal((value) => value + 1)}
+        className="absolute top-16 left-3 z-[400] rounded-xl border border-blue-200/80 bg-white/95 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-blue-700 shadow-lg backdrop-blur-sm transition-all hover:bg-blue-50 dark:border-blue-500/30 dark:bg-slate-900/95 dark:text-blue-300 dark:hover:bg-slate-800"
+      >
+        Centrar unidad
+      </button>
       {/* Selector de Capa Flotante */}
       <div className="absolute top-3 right-3 z-[400] flex items-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-1 rounded-xl shadow-lg border border-slate-200/80 dark:border-slate-800/80 transition-all select-none">
         <button

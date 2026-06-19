@@ -77,7 +77,7 @@ export default function AutorizarSalidaPage() {
             unitName: d.unidad,
             type: "Reparto",
             driverName: d.chofer,
-            destination: d.direccionesEntrega?.[0] || "Destinos mÃºltiples",
+            destination: d.direccionesEntrega?.[0] || "Destinos múltiples",
             invoices: mappedInvoices,
             totalWeightTons: d.pesoTotal,
             totalAmount: d.montoTotal,
@@ -113,7 +113,7 @@ export default function AutorizarSalidaPage() {
           return {
             id: `branch-${d.cliente.trim()}-${computedStatus}-${invoiceIds}-${i}`,
             unitName: "SUCURSAL",
-            type: "RecolecciÃ³n",
+            type: "Recolección",
             driverName: "Cliente",
             clientName: d.cliente,
             destination: "Sucursal",

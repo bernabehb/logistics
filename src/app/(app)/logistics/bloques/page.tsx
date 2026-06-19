@@ -8,15 +8,7 @@ import { Search, Layers, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter
-} from "@/components/ui/dialog";
-import { API_ENDPOINTS, API_HEADERS } from "@/lib/apiConfig";
+import { closeSwal, showError, showLoading, showSuccess } from "@/lib/mySwal";
 
 interface ApiBlockStatus {
   iIdDeliveryBlock: number;
@@ -39,12 +31,10 @@ export default function BloquesPage() {
   const [statusFilter, setStatusFilter] = useState<BlockStatus>("Disponible");
 
   const [isLoadingBlocks, setIsLoadingBlocks] = useState(!cachedBlocks);
-  
+
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(!cachedDrivers);
   const [driverError, setDriverError] = useState<string | null>(null);
-  
-  const [errorDialog, setErrorDialog] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const blocksRef = useRef<Block[]>(blocks);
@@ -67,14 +57,14 @@ export default function BloquesPage() {
   const fetchAllData = async (silent: boolean | any = false) => {
     const isManualRefresh = typeof silent === 'object' && silent !== null;
     const isSilent = typeof silent === 'boolean' ? silent : false;
-    
+
     setIsRefreshing(true);
     if (isManualRefresh || (!isSilent && !cachedBlocks)) {
       setIsLoadingBlocks(true);
       setIsLoadingDrivers(true);
     }
     setDriverError(null);
-    
+
     try {
       const [blocksRes, driversRes] = await Promise.all([
         fetch('/api/logistics/blocks-status'),
@@ -82,10 +72,10 @@ export default function BloquesPage() {
       ]);
 
       if (!blocksRes.ok || !driversRes.ok) throw new Error('Error al conectar con los servidores');
-      
+
       const blocksData: ApiBlockStatus[] = await blocksRes.json();
       const driversData: ApiDriver[] = await driversRes.json();
-      
+
       // Map Blocks
       const mappedBlocks: Block[] = blocksData.map(b => {
         const blockId = b.iIdDeliveryBlock.toString();
@@ -124,7 +114,7 @@ export default function BloquesPage() {
         .sort((a, b) => {
           const priorityA = branchPriority[a.sucursal?.toUpperCase() || ''] ?? 99;
           const priorityB = branchPriority[b.sucursal?.toUpperCase() || ''] ?? 99;
-          
+
           if (priorityA !== priorityB) return priorityA - priorityB;
           return a.name.localeCompare(b.name);
         });
@@ -191,8 +181,8 @@ export default function BloquesPage() {
     // Actualización Optimista: Reflejar el cambio inmediatamente en la UI
     setBlocks(prev => prev.map(b => {
       if (b.id === blockId) {
-        return { 
-          ...b, 
+        return {
+          ...b,
           status: driverId ? "Asignado" : "Disponible",
           apiDriverName: driverId ? targetDriver?.name : undefined
         };
@@ -203,6 +193,11 @@ export default function BloquesPage() {
     // Si driverId es vacío, es una liberación
     if (!driverId) {
       try {
+        showLoading({
+          title: "Liberando bloque...",
+          html: `Estamos liberando el bloque <b>${block.name}</b>.`
+        });
+
         const response = await fetch('/api/logistics/unassign-block', {
           method: 'POST',
           headers: {
@@ -216,19 +211,24 @@ export default function BloquesPage() {
           const errorMsg = errData?.message || errData?.error || "Error en la liberación";
           throw new Error(errorMsg);
         }
-        
+
+        await showSuccess({
+          title: "Bloque liberado",
+          html: `El bloque <b>${block.name}</b> quedó libre correctamente.`
+        });
+
         // Refresco silencioso en segundo plano con retraso para dar tiempo a la BD
         refreshTimeoutRef.current = setTimeout(() => fetchAllData(true), 2000);
       } catch (err: any) {
         console.warn("Validation/Error assigning block:", err?.message || err);
         delete lastLocalUpdatesRef.current[baseBlockId];
         setBlocks(originalBlocks); // Revertir en caso de error
-        
-        if (err && err.message) {
-          setErrorDialog({ show: true, message: err.message });
-        } else {
-          setErrorDialog({ show: true, message: "Hubo un error al intentar liberar el bloque. Intenta de nuevo más tarde." });
-        }
+
+        closeSwal();
+        await showError({
+          title: "No se pudo liberar el bloque",
+          text: err?.message || "Hubo un error al intentar liberar el bloque. Intenta de nuevo más tarde."
+        });
       }
       return;
     }
@@ -237,6 +237,11 @@ export default function BloquesPage() {
     iIdDriver = parseInt(driverId);
 
     try {
+      showLoading({
+        title: "Asignando chofer...",
+        html: `Estamos asignando a <b>${targetDriver?.name || "chofer"}</b> al bloque <b>${block.name}</b>.`
+      });
+
       const response = await fetch('/api/logistics/assign-block', {
         method: 'POST',
         headers: {
@@ -249,14 +254,23 @@ export default function BloquesPage() {
       });
 
       if (!response.ok) throw new Error("Error en la respuesta del servidor");
-      
+
+      await showSuccess({
+        title: "Chofer asignado",
+        html: `<b>${targetDriver?.name || "El chofer"}</b> fue asignado al bloque <b>${block.name}</b>.`
+      });
+
       // Refresco silencioso en segundo plano con retraso para dar tiempo a la BD
       refreshTimeoutRef.current = setTimeout(() => fetchAllData(true), 2000);
     } catch (err) {
       console.error("Error assigning block:", err);
       delete lastLocalUpdatesRef.current[baseBlockId];
       setBlocks(originalBlocks); // Revertir en caso de error
-      alert("Hubo un error al procesar la asignación.");
+      closeSwal();
+      await showError({
+        title: "No se pudo asignar el bloque",
+        text: "Hubo un error al procesar la asignación."
+      });
     }
   };
 
@@ -279,9 +293,9 @@ export default function BloquesPage() {
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
           Asignación de Bloques
         </h1>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={fetchAllData}
           disabled={isLoadingBlocks}
           className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
@@ -341,13 +355,13 @@ export default function BloquesPage() {
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-6">
         {isLoadingBlocks ? (
-           <div className="col-span-full flex flex-col items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-500 mb-4" />
-              <p className="text-slate-500 font-medium">Cargando bloques...</p>
-           </div>
+          <div className="col-span-full flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-500 mb-4" />
+            <p className="text-slate-500 font-medium">Cargando bloques...</p>
+          </div>
         ) : filteredBlocks.length > 0 ? (
           filteredBlocks.map((block) => (
-            <BlockCard 
+            <BlockCard
               key={block.id}
               block={block}
               assignedDriverName={getAssignedDriverName(block)}
@@ -364,25 +378,8 @@ export default function BloquesPage() {
           </div>
         )}
       </div>
-
-      <Dialog open={errorDialog.show} onOpenChange={(open) => !open && setErrorDialog({ show: false, message: "" })}>
-        <DialogContent className="sm:max-w-md p-6 bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 rounded-3xl shadow-xl">
-          <DialogHeader className="mb-2">
-            <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">No se pudo liberar el bloque</DialogTitle>
-            <DialogDescription className="text-sm font-medium text-slate-500 dark:text-slate-400">
-              {errorDialog.message}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-6 flex justify-end">
-            <Button
-              onClick={() => setErrorDialog({ show: false, message: "" })}
-              className="px-6 py-2.5 rounded-xl font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 transition-colors"
-            >
-              Aceptar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
+
+

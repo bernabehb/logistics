@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useMemo, useEffect, Fragment, useRef, ReactNode } from "react";
+import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check } from "lucide-react";
 import { API_ENDPOINTS, API_HEADERS } from "@/lib/apiConfig";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import {
 import { LogisticsFilters, LogisticsDateFilters, LogisticsStatusFilters, LogisticsTypeFilters, StatusCircle, StatusPill } from "@/features/logistics/components";
 import { isAfter, isBefore, startOfDay, endOfDay, parse } from "date-fns";
 import { es } from "date-fns/locale";
+import { closeSwal, showConfirm, showError, showLoading, showSuccess } from "@/lib/mySwal";
 
 const BLOCKS_LIST_FALLBACK = [
   "AZTLAN 1", "AZTLAN 2", "AZTLAN 3", "AZTLAN 4",
@@ -156,31 +157,6 @@ export default function RutasPage() {
   const [invoiceDetails, setInvoiceDetails] = useState<FetchedInvoiceDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [authorizingBlockName, setAuthorizingBlockName] = useState<string | null>(null);
-
-  const [confirmDialog, setConfirmDialog] = useState<{
-    show: boolean;
-    title: string;
-    description: ReactNode;
-    actionLabel: string;
-    onConfirm: () => void;
-  }>({
-    show: false,
-    title: "",
-    description: "",
-    actionLabel: "Confirmar",
-    onConfirm: () => { }
-  });
-
-  const showConfirm = (options: Partial<typeof confirmDialog>) => {
-    setConfirmDialog({
-      show: true,
-      title: options.title || "Confirmar acciÃ³n",
-      description: options.description || "Â¿EstÃ¡s seguro?",
-      actionLabel: options.actionLabel || "Confirmar",
-      onConfirm: options.onConfirm || (() => { })
-    });
-  };
-
   const handleOpenDetails = async (invoiceId: string) => {
     const invoiceNum = invoiceId;
     setSelectedInvoiceId(invoiceId);
@@ -213,7 +189,7 @@ export default function RutasPage() {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catÃ¡logos y asignaciones mÃ¡s recientes de la BD
+      // para traer los catálogos y asignaciones más recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
@@ -248,7 +224,7 @@ export default function RutasPage() {
     const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
 
     if (!apiBlock) {
-      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catÃ¡logo.`);
+      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
       return;
     }
 
@@ -275,7 +251,7 @@ export default function RutasPage() {
         })
       });
 
-      if (!response.ok) throw new Error("Error en la asignaciÃ³n");
+      if (!response.ok) throw new Error("Error en la asignación");
 
       fetchAllData(true, true);
     } catch (err) {
@@ -287,64 +263,89 @@ export default function RutasPage() {
       setOpenPopoverId(null);
     }
   };
-
   const executeAuthorizeBlock = async (blockName: string, authorize: boolean) => {
     const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
 
     if (!apiBlock) {
-      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catÃ¡logo.`);
+      await showError({
+        title: "Bloque no encontrado",
+        text: `No se pudo encontrar el ID del bloque "${blockName}" en el catalogo.`
+      });
       return;
     }
 
     try {
       setAuthorizingBlockName(blockName);
       setIsRefreshing(true);
-      const response = await fetch('/api/logistics/authorize-block', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
-          bAuthorize: authorize
-        })
+
+      showLoading({
+        title: authorize ? "Sincronizando ruta con Samsara" : "Regresando bloque...",
+        html: authorize
+          ? `Estamos creando la ruta del bloque <b>${blockName}</b>.<br/>Esto puede tardar unos segundos.`
+          : `Estamos regresando las facturas del bloque <b>${blockName}</b>.`
       });
+
+      const response = await fetch(
+        authorize
+          ? '/api/logistics/authorize-block-with-samsara-route'
+          : '/api/logistics/authorize-block',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
+            bAuthorize: authorize
+          })
+        }
+      );
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || errJson.message || "Error al cambiar la autorizaciÃ³n del bloque");
+        throw new Error(errJson.error || errJson.message || "Error al cambiar la autorizacion del bloque");
       }
+
+      await showSuccess({
+        title: authorize ? "Ruta sincronizada" : "Bloque regresado",
+        html: authorize
+          ? `El bloque <b>${blockName}</b> fue autorizado y la ruta quedó lista en Samsara.`
+          : `Las facturas del bloque <b>${blockName}</b> regresaron correctamente.`,
+        timer: 1800
+      });
 
       await fetchAllData(true, true);
     } catch (err: any) {
       console.error("Error authorizing block:", err);
-      alert(err.message || "Hubo un error al cambiar la autorizaciÃ³n del bloque.");
+      closeSwal();
+      await showError({
+        title: authorize ? "No se pudo autorizar el bloque" : "No se pudo regresar el bloque",
+        text: err.message || "Hubo un error al cambiar la autorizacion del bloque."
+      });
     } finally {
       setIsRefreshing(false);
       setAuthorizingBlockName(null);
     }
   };
 
-  const handleAuthorizeBlock = (blockName: string, authorize: boolean) => {
-    const title = authorize
-      ? "Confirmar AutorizaciÃ³n"
-      : "Regresar Bloque para Re-autorizar";
-
-    const description = authorize
-      ? `Â¿Deseas autorizar las salidas del bloque ${blockName}?`
-      : `Â¿Deseas regresar las facturas del bloque ${blockName} para incluir las nuevas y volver a autorizar la salida?`;
-
-    const actionLabel = authorize ? "Autorizar" : "Confirmar";
-
-    showConfirm({
-      title,
-      description,
-      actionLabel,
-      onConfirm: () => executeAuthorizeBlock(blockName, authorize)
+  const handleAuthorizeBlock = async (blockName: string, authorize: boolean) => {
+    const confirmed = await showConfirm({
+      icon: authorize ? "question" : "warning",
+      iconColor: authorize ? "#60a5fa" : "#f59e0b",
+      title: authorize ? "¿Autorizar bloque?" : "¿Regresar bloque?",
+      html: authorize
+        ? `Se creará la ruta en Samsara y se autorizarán las facturas del bloque <b>${blockName}</b>.`
+        : `Se regresarán las facturas del bloque <b>${blockName}</b> para incluir nuevas facturas y volver a autorizar.`,
+      confirmButtonText: authorize ? "Sí, autorizar" : "Sí, regresar",
+      confirmButtonColor: authorize ? "#2563eb" : "#f59e0b"
     });
+
+    if (confirmed) {
+      await executeAuthorizeBlock(blockName, authorize);
+    }
   };
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
     if (isFetchingRef.current) {
-      console.log("Fetch en progreso, omitiendo peticiÃ³n concurrente.");
+      console.log("Fetch en progreso, omitiendo petición concurrente.");
       return;
     }
     isFetchingRef.current = true;
@@ -508,7 +509,7 @@ export default function RutasPage() {
       setError(null);
     } catch (err) {
       console.error("Error fetching routes:", err);
-      setError("Error al cargar la informaciÃ³n de rutas dinÃ¡mica");
+      setError("Error al cargar la información de rutas dinámica");
     } finally {
       isFetchingRef.current = false;
       setIsRefreshing(false);
@@ -870,7 +871,7 @@ export default function RutasPage() {
                           <Truck className="size-8 text-slate-300 dark:text-slate-600" />
                         </div>
                         <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de bÃºsqueda, estatus o fecha</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
                       </div>
                     </td>
                   </tr>
@@ -1026,7 +1027,7 @@ export default function RutasPage() {
                                               : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                           )}
                                         >
-                                          Sin AsignaciÃ³n
+                                          Sin Asignación
                                         </button>
                                         <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
                                         {unidadesDisponibles.length > 0 ? (
@@ -1246,7 +1247,7 @@ export default function RutasPage() {
                                       : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                   )}
                                 >
-                                  Sin AsignaciÃ³n
+                                  Sin Asignación
                                 </button>
                                 <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
                                 {unidadesDisponibles.length > 0 ? (
@@ -1358,7 +1359,7 @@ export default function RutasPage() {
                   <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                     <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
                       <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                        AlmacÃ©n: {group.almacen}
+                        Almacén: {group.almacen}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 capitalize">
                         {group.materiales.length} productos
@@ -1398,34 +1399,10 @@ export default function RutasPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={confirmDialog.show} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, show: open }))}>
-        <DialogContent>
-          <DialogHeader className="text-left">
-            <DialogTitle>
-              {confirmDialog.title}
-            </DialogTitle>
-            <DialogDescription className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed pt-2">
-              {confirmDialog.description}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <DialogClose asChild>
-              <Button variant="outline" className="cursor-pointer">
-                Cancelar
-              </Button>
-            </DialogClose>
-            <DialogClose asChild>
-              <Button
-                onClick={confirmDialog.onConfirm}
-                className="cursor-pointer"
-              >
-                {confirmDialog.actionLabel}
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
+
+
+
+

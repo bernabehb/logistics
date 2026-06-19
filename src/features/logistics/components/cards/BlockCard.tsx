@@ -1,21 +1,12 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
-import { User, BadgeCheck, LogOut, ChevronDown, Search as SearchIcon, Check, Layers } from "lucide-react";
+import { User, ChevronDown, Search as SearchIcon, Check, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Block } from "@/features/logistics/models/blocks";
 import { Driver } from "@/features/logistics/models/drivers";
+import { showConfirm } from "@/lib/mySwal";
 
 interface BlockCardProps {
   block: Block;
@@ -38,22 +29,6 @@ export function BlockCard({
 }: BlockCardProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedDriverId, setSelectedDriverId] = useState("");
-  const [confirmDialog, setConfirmDialog] = useState<{
-    show: boolean;
-    title: string;
-    description: React.ReactNode;
-    actionLabel: string;
-    onConfirm: () => void;
-    icon?: React.ElementType;
-    iconColor?: string;
-  }>({
-    show: false,
-    title: "",
-    description: "",
-    actionLabel: "Confirmar",
-    onConfirm: () => {}
-  });
-
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [driverSearch, setDriverSearch] = useState("");
 
@@ -67,17 +42,6 @@ export function BlockCard({
 
   const selectedDriverData = allDrivers.find(d => d.id === selectedDriverId);
 
-  const showConfirm = (options: Partial<typeof confirmDialog>) => {
-    setConfirmDialog({
-      show: true,
-      title: options.title || "Confirmar acción",
-      description: options.description || "¿Estás seguro?",
-      actionLabel: options.actionLabel || "Confirmar",
-      onConfirm: options.onConfirm || (() => {}),
-      icon: options.icon,
-      iconColor: options.iconColor
-    });
-  };
 
   const statusColors = {
     "Disponible": "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
@@ -88,6 +52,36 @@ export function BlockCard({
     if (selectedDriverId) {
       onAssign(selectedDriverId);
       setIsAssigning(false);
+    }
+  };
+
+  const confirmRelease = async () => {
+    const confirmed = await showConfirm({
+      icon: "warning",
+      iconColor: "#f59e0b",
+      title: "¿Liberar bloque?",
+      html: `Se liberará el bloque <b>${block.name}</b> y el chofer <b>${assignedDriverName || ""}</b> quedará sin bloque asignado.`,
+      confirmButtonText: "Sí, liberar",
+      confirmButtonColor: "#f59e0b"
+    });
+
+    if (confirmed) {
+      onAssign("");
+    }
+  };
+
+  const confirmAssign = async () => {
+    const driver = allDrivers.find(d => d.id === selectedDriverId);
+    const confirmed = await showConfirm({
+      icon: "question",
+      iconColor: "#60a5fa",
+      title: "¿Asignar chofer?",
+      html: `Se asignará a <b>${driver?.name || ""}</b> como chofer del bloque <b>${block.name}</b>.`,
+      confirmButtonText: "Sí, asignar"
+    });
+
+    if (confirmed) {
+      handleAssign();
     }
   };
 
@@ -144,16 +138,7 @@ export function BlockCard({
                     </div>
                   </div>
                   <button
-                    onClick={() => showConfirm({
-                      title: "Liberar Bloque",
-                      description: (
-                        <>¿Estás seguro que deseas liberar el bloque <strong className="text-slate-900 dark:text-slate-100">{block.name}</strong>? El chofer <strong className="text-slate-900 dark:text-slate-100">{assignedDriverName || ""}</strong> quedará sin bloque asignado.</>
-                      ),
-                      actionLabel: "Liberar",
-                      icon: LogOut,
-                      iconColor: "text-red-500",
-                      onConfirm: () => onAssign("")
-                    })}
+                    onClick={confirmRelease}
                     className="text-xs font-black text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors py-1 flex items-center justify-center"
                   >
                     Liberar Bloque
@@ -267,19 +252,7 @@ export function BlockCard({
                   Cancelar
                 </button>
                 <button
-                  onClick={() => {
-                    const driver = allDrivers.find(d => d.id === selectedDriverId);
-                    showConfirm({
-                      title: "Confirmar Asignación",
-                      description: (
-                        <>¿Deseas asignar a <strong className="text-slate-900 dark:text-slate-100">{driver?.name}</strong> como chofer del bloque <strong className="text-slate-900 dark:text-slate-100">{block.name}</strong>?</>
-                      ),
-                      actionLabel: "Asignar",
-                      icon: BadgeCheck,
-                      iconColor: "text-blue-500",
-                      onConfirm: handleAssign
-                    });
-                  }}
+                  onClick={confirmAssign}
                   disabled={!selectedDriverId}
                   className="flex-[2] h-11 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl font-bold text-xs uppercase tracking-widest border border-slate-400/80 dark:border-slate-500 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 hover:text-emerald-600 dark:hover:text-emerald-400 active:scale-95 disabled:opacity-50 transition-all shadow-sm cursor-pointer"
                 >
@@ -291,33 +264,9 @@ export function BlockCard({
         </div>
       </CardContent>
 
-      <Dialog open={confirmDialog.show} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, show: open }))}>
-        <DialogContent>
-          <DialogHeader className="text-left">
-            <DialogTitle>
-              {confirmDialog.title}
-            </DialogTitle>
-            <DialogDescription className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed pt-2">
-              {confirmDialog.description}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <DialogClose asChild>
-              <Button variant="outline" className="cursor-pointer">
-                Cancelar
-              </Button>
-            </DialogClose>
-            <DialogClose asChild>
-              <Button 
-                onClick={confirmDialog.onConfirm}
-                className="cursor-pointer"
-              >
-                {confirmDialog.actionLabel}
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
+   </Card>
   );
 }
+
+
+
