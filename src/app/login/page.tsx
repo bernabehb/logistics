@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useTransition, useState } from "react";
 import { loginAction } from "./actions";
@@ -45,7 +45,7 @@ export default function LoginPage() {
             priority
             className="mb-6 w-auto h-auto object-contain drop-shadow-2xl dark:brightness-0 dark:invert" 
           />
-          <p className="text-[10px] tracking-[0.3em] text-slate-500 font-medium uppercase ml-2">Sistema de Logística</p>
+          <p className="text-[10px] tracking-[0.3em] text-slate-500 font-medium uppercase ml-2">Sistema de LogÃ­stica</p>
         </div>
       </div>
 
@@ -78,7 +78,7 @@ export default function LoginPage() {
                 <input
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Contraseña"
+                  placeholder="ContraseÃ±a"
                   required
                   className="w-full h-[52px] bg-slate-50 dark:bg-[#1E293B]/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-[#64748B] rounded-xl px-5 text-[14px] pr-12 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:focus:ring-blue-500/50 focus:border-blue-500/30 dark:focus:border-blue-500/50 transition-all font-medium"
                 />
@@ -110,30 +110,9 @@ export default function LoginPage() {
                 <ArrowRight className="w-4 h-4 opacity-70 group-hover:translate-x-1 group-hover:opacity-100 transition-all duration-300" />
               )}
             </button>
-
-            {/* Test accounts merged seamlessly */}
             <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/60">
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                <div className="bg-slate-50 dark:bg-[#1E293B]/30 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/40 flex flex-col gap-1 items-center">
-                  <span className="text-slate-500 dark:text-[#64748B]">Logística</span>
-                  <span className="font-mono text-blue-600 dark:text-[#3B82F6]">logistica/123</span>
-                </div>
-                <div className="bg-slate-50 dark:bg-[#1E293B]/30 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/40 flex flex-col gap-1 items-center">
-                  <span className="text-slate-500 dark:text-[#64748B]">Chofer</span>
-                  <span className="font-mono text-emerald-600 dark:text-[#10B981]">chofer/123</span>
-                </div>
-                <div className="bg-slate-50 dark:bg-[#1E293B]/30 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/40 flex flex-col gap-1 items-center">
-                  <span className="text-slate-500 dark:text-[#64748B]">Guardia</span>
-                  <span className="font-mono text-amber-600 dark:text-[#F59E0B]">guardia/123</span>
-                </div>
-                <div className="bg-slate-50 dark:bg-[#1E293B]/30 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/40 flex flex-col gap-1 items-center">
-                  <span className="text-slate-500 dark:text-[#64748B]">Cajas</span>
-                  <span className="font-mono text-rose-600 dark:text-[#F43F5E]">cajas/123</span>
-                </div>
-                <div className="bg-slate-50 dark:bg-[#1E293B]/30 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/40 flex flex-col gap-1 items-center">
-                  <span className="text-slate-500 dark:text-[#64748B]">Admin</span>
-                  <span className="font-mono text-violet-600 dark:text-[#8B5CF6]">admin/123</span>
-                </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center text-[12px] text-slate-500 dark:border-slate-800/40 dark:bg-[#1E293B]/30 dark:text-slate-400">
+                Usa tu usuario y contraseña registrados en Compers.
               </div>
             </div>
           </form>
@@ -142,3 +121,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
