@@ -28,4 +28,5 @@ export const API_ENDPOINTS = {
   toggleUnitMaintenance: `${EXTERNAL_API_BASE_URL}/Logistics/ToggleUnitMaintenance`,
   authorizeBlock: `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeBlock`,
   authorizeBlockWithSamsaraRoute: `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeBlockWithSamsaraRoute`,
+  authorizeBlockInvoicesWithSamsaraRoute: `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeBlockInvoicesWithSamsaraRoute`,
 };

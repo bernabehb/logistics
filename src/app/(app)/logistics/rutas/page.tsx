@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check } from "lucide-react";
@@ -37,6 +37,15 @@ const BLOCKS_LIST_FALLBACK = [
 
 const BRANCHES = ["APODACA", "GUADALUPE", "MONTERREY", "SANTA CATARINA"];
 
+const getLogisticsBranchId = (branch?: string) => {
+  const normalized = branch?.trim().toUpperCase() || "";
+  if (normalized.includes("MONTERREY")) return 1;
+  if (normalized.includes("APODACA")) return 2;
+  if (normalized.includes("GUADALUPE")) return 3;
+  if (normalized.includes("SANTA CATARINA")) return 4;
+  return 0;
+};
+
 interface ApiRutaInvoice {
   tipoFactura: string;
   montoAnticipado: number;
@@ -71,6 +80,7 @@ interface ApiRutaInvoice {
   sucursal: string;
   bloque: string;
   estatusEmbarque: string;
+  iIdLogisticsBranch?: number;
 }
 
 interface AvailableUnit {
@@ -102,6 +112,9 @@ interface ApiBlockStatus {
   iIdUnit: number | null;
   bAuthorized?: boolean;
   iTripNumber?: number;
+  iIdLogisticsBranch?: number | null;
+  sLogisticsBranch?: string | null;
+  sAuthorizedInvoices?: string | null;
 }
 
 const normalizeBlockName = (value: string) => value.trim().toUpperCase();
@@ -114,9 +127,26 @@ const routeBlockPriority = (block: ApiBlockStatus) => {
   return 1;
 };
 
-const getActiveRouteBlock = (blocks: ApiBlockStatus[], blockName: string) => {
-  return blocks
-    .filter(b => normalizeBlockName(b.sDeliveryBlock) === normalizeBlockName(blockName))
+const getBlockScopeKey = (blockName: string, branchId?: number | null) => {
+  return `${normalizeBlockName(blockName)}|${branchId && branchId > 0 ? branchId : 'ALL'}`;
+};
+
+const parseInvoiceCsv = (value?: string | null) => {
+  return (value || "")
+    .split(",")
+    .map(x => x.trim().toUpperCase())
+    .filter(Boolean)
+    .filter((invoice, index, array) => array.indexOf(invoice) === index);
+};
+
+const getActiveRouteBlock = (blocks: ApiBlockStatus[], blockName: string, logisticsBranchId?: number | null) => {
+  const matchingBlocks = blocks.filter(b => {
+    if (normalizeBlockName(b.sDeliveryBlock) !== normalizeBlockName(blockName)) return false;
+    if (!logisticsBranchId || logisticsBranchId <= 0) return true;
+    return b.iIdLogisticsBranch === logisticsBranchId;
+  });
+
+  return matchingBlocks
     .sort((a, b) => {
       const priorityDiff = routeBlockPriority(b) - routeBlockPriority(a);
       if (priorityDiff !== 0) return priorityDiff;
@@ -178,6 +208,14 @@ export default function RutasPage() {
   const lastRequestRef = useRef<number>(0);
   const isFetchingRef = useRef<boolean>(false);
 
+  const currentLogisticsBranchId = () => {
+    return branchFilter !== 'all' ? getLogisticsBranchId(branchFilter) : 0;
+  };
+
+  const currentBlockScopeKey = (blockName: string) => {
+    return getBlockScopeKey(blockName, currentLogisticsBranchId());
+  };
+
   useEffect(() => {
     cachedAssignedUnits = assignedUnits;
   }, [assignedUnits]);
@@ -189,7 +227,7 @@ export default function RutasPage() {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catálogos y asignaciones más recientes de la BD
+      // para traer los catalogos y asignaciones mas recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
@@ -221,10 +259,12 @@ export default function RutasPage() {
   }, [driverFilter]);
 
   const handleAssignUnit = async (blockName: string, unit: AvailableUnit | null) => {
-    const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
+    const logisticsBranchId = currentLogisticsBranchId();
+    const blockScopeKey = currentBlockScopeKey(blockName);
+    const apiBlock = getActiveRouteBlock(apiBlocks, blockName, logisticsBranchId);
 
     if (!apiBlock) {
-      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
+      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catalogo.`);
       return;
     }
 
@@ -233,25 +273,26 @@ export default function RutasPage() {
     setAssignedUnits(prev => {
       const next = { ...prev };
       if (unit) {
-        next[blockName] = unit;
+        next[blockScopeKey] = unit;
       } else {
-        delete next[blockName];
+        delete next[blockScopeKey];
       }
       return next;
     });
 
     try {
-      setIsAssigning(blockName);
+      setIsAssigning(blockScopeKey);
       const response = await fetch('/api/logistics/assign-unit-to-block', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
-          iIdUnit: unit ? Number(unit.iId) : 0
+          iIdUnit: unit ? Number(unit.iId) : 0,
+          iIdLogisticsBranch: logisticsBranchId || null
         })
       });
 
-      if (!response.ok) throw new Error("Error en la asignación");
+      if (!response.ok) throw new Error("Error en la asignacion");
 
       fetchAllData(true, true);
     } catch (err) {
@@ -263,8 +304,22 @@ export default function RutasPage() {
       setOpenPopoverId(null);
     }
   };
+  const getVisibleBlockInvoiceNums = (blockName: string) => {
+    return (groupedData[blockName] || [])
+      .filter(p => !p.id.startsWith('ORDER-'))
+      .map(p => p.id.trim().toUpperCase())
+      .filter(Boolean)
+      .filter((value, index, array) => array.indexOf(value) === index);
+  };
+
+  const isBlockAuthorizedForCurrentTrip = (apiBlock: ApiBlockStatus | undefined) => {
+    return !!apiBlock?.bAuthorized && apiBlock.sEstatus !== 'En Ruta';
+  };
+
   const executeAuthorizeBlock = async (blockName: string, authorize: boolean) => {
-    const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
+    const logisticsBranchId = branchFilter !== 'all' ? getLogisticsBranchId(branchFilter) : 0;
+    const blockScopeKey = currentBlockScopeKey(blockName);
+    const apiBlock = getActiveRouteBlock(apiBlocks, blockName, logisticsBranchId);
 
     if (!apiBlock) {
       await showError({
@@ -275,7 +330,7 @@ export default function RutasPage() {
     }
 
     try {
-      setAuthorizingBlockName(blockName);
+      setAuthorizingBlockName(blockScopeKey);
       setIsRefreshing(true);
 
       showLoading({
@@ -285,17 +340,56 @@ export default function RutasPage() {
           : `Estamos regresando las facturas del bloque <b>${blockName}</b>.`
       });
 
+      const useInvoiceAuthorization = branchFilter !== 'all';
+      const authorizedInvoiceNums = parseInvoiceCsv(apiBlock.sAuthorizedInvoices);
+      const visibleInvoiceNums = getVisibleBlockInvoiceNums(blockName);
+      const invoiceNums = useInvoiceAuthorization
+        ? authorize
+          ? visibleInvoiceNums
+          : (authorizedInvoiceNums.length > 0 ? authorizedInvoiceNums : visibleInvoiceNums)
+        : [];
+
+      if (authorize && branchFilter === 'all') {
+        closeSwal();
+        await showError({
+          title: "Selecciona una sucursal",
+          text: "Para autorizar debes filtrar por una sucursal especifica.",
+          timer: 2600
+        });
+        return;
+      }
+
+      if (useInvoiceAuthorization && invoiceNums.length === 0) {
+        closeSwal();
+        await showError({
+          title: "Sin facturas visibles",
+          text: `No hay facturas visibles del bloque ${blockName} para autorizar en la sucursal seleccionada.`
+        });
+        return;
+      }
+
       const response = await fetch(
-        authorize
-          ? '/api/logistics/authorize-block-with-samsara-route'
-          : '/api/logistics/authorize-block',
+        useInvoiceAuthorization
+          ? '/api/logistics/authorize-block-invoices-with-samsara-route'
+          : authorize
+            ? '/api/logistics/authorize-block-with-samsara-route'
+            : '/api/logistics/authorize-block',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
-            bAuthorize: authorize
-          })
+          body: JSON.stringify(
+            useInvoiceAuthorization
+              ? {
+                iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
+                iIdLogisticsBranch: logisticsBranchId,
+                bAuthorize: authorize,
+                invoiceNums
+              }
+              : {
+                iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
+                bAuthorize: authorize
+              }
+          )
         }
       );
 
@@ -307,7 +401,7 @@ export default function RutasPage() {
       await showSuccess({
         title: authorize ? "Ruta sincronizada" : "Bloque regresado",
         html: authorize
-          ? `El bloque <b>${blockName}</b> fue autorizado y la ruta quedó lista en Samsara.`
+          ? `El bloque <b>${blockName}</b> fue autorizado y la ruta quedo lista en Samsara.`
           : `Las facturas del bloque <b>${blockName}</b> regresaron correctamente.`,
         timer: 1800
       });
@@ -332,9 +426,9 @@ export default function RutasPage() {
       iconColor: authorize ? "#60a5fa" : "#f59e0b",
       title: authorize ? "¿Autorizar bloque?" : "¿Regresar bloque?",
       html: authorize
-        ? `Se creará la ruta en Samsara y se autorizarán las facturas del bloque <b>${blockName}</b>.`
-        : `Se regresarán las facturas del bloque <b>${blockName}</b> para incluir nuevas facturas y volver a autorizar.`,
-      confirmButtonText: authorize ? "Sí, autorizar" : "Sí, regresar",
+        ? `Se creara la ruta en Samsara y se autorizaran solo las facturas visibles de la sucursal seleccionada para el bloque <b>${blockName}</b>.`
+        : `Se regresaran las facturas del bloque <b>${blockName}</b> para incluir nuevas facturas y volver a autorizar.`,
+      confirmButtonText: authorize ? "Si, autorizar" : "Si, regresar",
       confirmButtonColor: authorize ? "#2563eb" : "#f59e0b"
     });
 
@@ -345,7 +439,7 @@ export default function RutasPage() {
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
     if (isFetchingRef.current) {
-      console.log("Fetch en progreso, omitiendo petición concurrente.");
+      console.log("Fetch en progreso, omitiendo peticion concurrente.");
       return;
     }
     isFetchingRef.current = true;
@@ -390,12 +484,10 @@ export default function RutasPage() {
           cachedBlocks = blocksData;
 
           const initialAssignments: Record<string, AvailableUnit> = {};
-          const blockKeys = Array.from(new Set(blocksData.map(b => normalizeBlockName(b.sDeliveryBlock))));
-          blockKeys.forEach(blockKey => {
-            const b = getActiveRouteBlock(blocksData, blockKey);
-            if (!b) return;
+          blocksData.forEach(b => {
             if (b.sUnidad && b.iIdUnit && b.sEstatus !== 'En Ruta') {
-              initialAssignments[blockKey] = {
+              const blockScopeKey = getBlockScopeKey(b.sDeliveryBlock, b.iIdLogisticsBranch);
+              initialAssignments[blockScopeKey] = {
                 id: `${b.sUnidad}-${b.iIdUnit}-${b.iTripNumber || 1}`,
                 name: b.sUnidad,
                 sucursal: "",
@@ -438,7 +530,13 @@ export default function RutasPage() {
 
       data.forEach((row) => {
         const isFactura = row.factura && row.factura.trim() !== "";
-        const groupKey = isFactura ? row.factura : `ORDER-${row.orderNum}`;
+        const displayId = isFactura ? row.factura : `ORDER-${row.orderNum}`;
+        const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
+        const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
+        const logisticsBranchId = row.iIdLogisticsBranch ?? getLogisticsBranchId(mappedSucursal);
+        const groupKey = isFactura
+          ? `${displayId}|${logisticsBranchId || mappedSucursal || 'SIN_SUCURSAL'}`
+          : displayId;
 
         if (!groupedMap.has(groupKey)) {
           const type: RutaInvoiceType = row.tipoFactura === "ANTICIPADA" ? "anticipada" : "normal";
@@ -449,11 +547,8 @@ export default function RutasPage() {
           else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') status = 'in-progress';
           else status = 'pending';
 
-          const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
-          const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
-
           groupedMap.set(groupKey, {
-            id: groupKey,
+            id: displayId,
             clientName: row.cliente,
             date: isFactura ? row.fecha : row.orderDate,
             warehouses: [],
@@ -466,7 +561,8 @@ export default function RutasPage() {
             hasGlassCut: false,
             montoTotal: row.monto_Factura,
             orderNum: row.orderNum,
-            sucursal: mappedSucursal
+            sucursal: mappedSucursal,
+            logisticsBranchId
           });
         }
 
@@ -509,7 +605,7 @@ export default function RutasPage() {
       setError(null);
     } catch (err) {
       console.error("Error fetching routes:", err);
-      setError("Error al cargar la información de rutas dinámica");
+      setError("Error al cargar la informacion de rutas dinamica");
     } finally {
       isFetchingRef.current = false;
       setIsRefreshing(false);
@@ -606,7 +702,7 @@ export default function RutasPage() {
     <div className="w-full flex flex-col gap-4 h-full pb-12 -mt-2 md:-mt-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors shrink-0">
-          Gestión de rutas
+          Gestion de rutas
         </h1>
         <div className="flex flex-row items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
           <Popover>
@@ -789,15 +885,6 @@ export default function RutasPage() {
               className="w-full bg-white dark:bg-[#1E293B] border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 h-9 text-xs focus-visible:ring-slate-500/20 shadow-sm transition-all placeholder:text-slate-400 font-medium"
             />
           </div>
-
-          <div className="shrink-0">
-            <LogisticsDateFilters
-              fromDate={fromDate}
-              onFromDateChange={setFromDate}
-              onClearFilters={clearFilters}
-              isSingleDate={true}
-            />
-          </div>
         </div>
 
         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
@@ -871,7 +958,7 @@ export default function RutasPage() {
                           <Truck className="size-8 text-slate-300 dark:text-slate-600" />
                         </div>
                         <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de busqueda, estatus o fecha</p>
                       </div>
                     </td>
                   </tr>
@@ -893,7 +980,7 @@ export default function RutasPage() {
                       const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
 
                       return (
-                        <tr key={p.id} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
+                        <tr key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                           <td className="px-6 py-5">
                             <div className="flex flex-col">
                               <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
@@ -940,9 +1027,12 @@ export default function RutasPage() {
                 ) : (
                   BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
                     const items = groupedData[blockName] || [];
-                    const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
-                    const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
-                    const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
+                    const blockScopeKey = currentBlockScopeKey(blockName);
+                    const assignedUnit = assignedUnits[blockScopeKey];
+                    const apiBlock = getActiveRouteBlock(apiBlocks, blockName, currentLogisticsBranchId());
+                    const isAuthorized = isBlockAuthorizedForCurrentTrip(apiBlock);
+                    const canAuthorize = !!assignedUnit && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
+                    const isProcessing = authorizingBlockName === blockScopeKey;
                     return (
                       <Fragment key={blockName}>
                         <tr className="bg-slate-100/90 dark:bg-slate-800/70 border-y border-slate-300/80 dark:border-slate-700/80">
@@ -968,16 +1058,16 @@ export default function RutasPage() {
                                     e.stopPropagation();
                                     handleAuthorizeBlock(blockName, !isAuthorized);
                                   }}
-                                  disabled={!canAuthorize || authorizingBlockName === blockName}
+                                  disabled={!canAuthorize || isProcessing}
                                   size="sm"
                                   className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
                                 >
-                                  {authorizingBlockName === blockName ? (
+                                  {isProcessing ? (
                                     <RefreshCw className="size-3.5 animate-spin" />
                                   ) : (
                                     <Check className="size-3.5 transition-colors" />
                                   )}
-                                  {authorizingBlockName === blockName
+                                  {isProcessing
                                     ? "Procesando..."
                                     : isAuthorized && canAuthorize
                                       ? "Regresar"
@@ -985,29 +1075,29 @@ export default function RutasPage() {
                                 </Button>
 
                                 <Popover
-                                  open={openPopoverId === `${blockName}-table`}
-                                  onOpenChange={(open) => setOpenPopoverId(open ? `${blockName}-table` : null)}
+                                  open={openPopoverId === `${blockScopeKey}-table`}
+                                  onOpenChange={(open) => setOpenPopoverId(open ? `${blockScopeKey}-table` : null)}
                                 >
                                   <PopoverTrigger asChild>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      disabled={isAssigning === blockName}
+                                      disabled={isAssigning === blockScopeKey}
                                       className={cn(
                                         "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
-                                        assignedUnits[blockName]
+                                        assignedUnit
                                           ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
                                           : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
                                       )}
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      {isAssigning === blockName ? (
+                                      {isAssigning === blockScopeKey ? (
                                         <RefreshCw className="size-3.5 animate-spin" />
                                       ) : (
                                         <Truck className="size-3.5" />
                                       )}
                                       <span className="uppercase tracking-widest truncate max-w-[100px]">
-                                        {assignedUnits[blockName] ? assignedUnits[blockName].name : "Unidad"}
+                                        {assignedUnit ? assignedUnit.name : "Unidad"}
                                       </span>
                                       <ChevronDown className="size-3 opacity-50" />
                                     </Button>
@@ -1022,12 +1112,12 @@ export default function RutasPage() {
                                           onClick={() => handleAssignUnit(blockName, null)}
                                           className={cn(
                                             "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
-                                            !assignedUnits[blockName]
+                                            !assignedUnit
                                               ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
                                               : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                           )}
                                         >
-                                          Sin Asignación
+                                          Sin Asignacion
                                         </button>
                                         <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
                                         {unidadesDisponibles.length > 0 ? (
@@ -1037,7 +1127,7 @@ export default function RutasPage() {
                                               onClick={() => handleAssignUnit(blockName, unid)}
                                               className={cn(
                                                 "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
-                                                assignedUnits[blockName]?.id === unid.id
+                                                assignedUnit?.id === unid.id
                                                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                                                   : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                               )}
@@ -1045,7 +1135,7 @@ export default function RutasPage() {
                                               <span>{unid.name}</span>
                                               <span className={cn(
                                                 "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
-                                                assignedUnits[blockName]?.id === unid.id
+                                                assignedUnit?.id === unid.id
                                                   ? "bg-white/20 text-white"
                                                   : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                                               )}>
@@ -1072,7 +1162,7 @@ export default function RutasPage() {
                           const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
 
                           return (
-                            <tr key={p.id} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
+                            <tr key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                               <td className="px-6 py-5">
                                 <div className="flex flex-col">
                                   <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
@@ -1162,9 +1252,12 @@ export default function RutasPage() {
           ) : (
             BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
               const items = groupedData[blockName] || [];
-              const apiBlock = getActiveRouteBlock(apiBlocks, blockName);
-              const isAuthorized = apiBlock ? !!apiBlock.bAuthorized : false;
-              const canAuthorize = !!assignedUnits[blockName] && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
+              const blockScopeKey = currentBlockScopeKey(blockName);
+              const assignedUnit = assignedUnits[blockScopeKey];
+              const apiBlock = getActiveRouteBlock(apiBlocks, blockName, currentLogisticsBranchId());
+              const isAuthorized = isBlockAuthorizedForCurrentTrip(apiBlock);
+              const canAuthorize = !!assignedUnit && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
+              const isProcessing = authorizingBlockName === blockScopeKey;
 
               return (
                 <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
@@ -1189,16 +1282,16 @@ export default function RutasPage() {
                                 : "logistics-action"
                           }
                           onClick={() => handleAuthorizeBlock(blockName, !isAuthorized)}
-                          disabled={!canAuthorize || authorizingBlockName === blockName}
+                          disabled={!canAuthorize || isProcessing}
                           size="sm"
                           className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
                         >
-                          {authorizingBlockName === blockName ? (
+                          {isProcessing ? (
                             <RefreshCw className="size-3.5 animate-spin" />
                           ) : (
                             <Check className="size-3.5 transition-colors" />
                           )}
-                          {authorizingBlockName === blockName
+                          {isProcessing
                             ? "Procesando..."
                             : isAuthorized && canAuthorize
                               ? "Regresar"
@@ -1206,28 +1299,28 @@ export default function RutasPage() {
                         </Button>
 
                         <Popover
-                          open={openPopoverId === blockName}
-                          onOpenChange={(open) => setOpenPopoverId(open ? blockName : null)}
+                          open={openPopoverId === blockScopeKey}
+                          onOpenChange={(open) => setOpenPopoverId(open ? blockScopeKey : null)}
                         >
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={isAssigning === blockName}
+                              disabled={isAssigning === blockScopeKey}
                               className={cn(
                                 "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
-                                assignedUnits[blockName]
+                                assignedUnit
                                   ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
                                   : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
                               )}
                             >
-                              {isAssigning === blockName ? (
+                              {isAssigning === blockScopeKey ? (
                                 <RefreshCw className="size-3.5 animate-spin" />
                               ) : (
                                 <Truck className="size-3.5" />
                               )}
                               <span className="uppercase tracking-widest truncate max-w-[100px]">
-                                {assignedUnits[blockName] ? assignedUnits[blockName].name : "Unidad"}
+                                {assignedUnit ? assignedUnit.name : "Unidad"}
                               </span>
                               <ChevronDown className="size-3 opacity-50" />
                             </Button>
@@ -1242,12 +1335,12 @@ export default function RutasPage() {
                                   onClick={() => handleAssignUnit(blockName, null)}
                                   className={cn(
                                     "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
-                                    !assignedUnits[blockName]
+                                    !assignedUnit
                                       ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
                                       : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                   )}
                                 >
-                                  Sin Asignación
+                                  Sin Asignacion
                                 </button>
                                 <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
                                 {unidadesDisponibles.length > 0 ? (
@@ -1257,7 +1350,7 @@ export default function RutasPage() {
                                       onClick={() => handleAssignUnit(blockName, unid)}
                                       className={cn(
                                         "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
-                                        assignedUnits[blockName]?.id === unid.id
+                                        assignedUnit?.id === unid.id
                                           ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                                           : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                       )}
@@ -1265,7 +1358,7 @@ export default function RutasPage() {
                                       <span>{unid.name}</span>
                                       <span className={cn(
                                         "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
-                                        assignedUnits[blockName]?.id === unid.id
+                                        assignedUnit?.id === unid.id
                                           ? "bg-white/20 text-white"
                                           : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                                       )}>
@@ -1295,7 +1388,7 @@ export default function RutasPage() {
                           : "h-auto overflow-visible pr-0"
                       )}>
                         {items.map(p => (
-                          <div key={p.id} className="shrink-0">
+                          <div key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} className="shrink-0">
                             <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
                           </div>
                         ))}
@@ -1325,7 +1418,7 @@ export default function RutasPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filteredPedidos.length > 0 ? (
               filteredPedidos.map(p => (
-                <RutaOrderCard key={p.id} pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
+                <RutaOrderCard key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
               ))
             ) : (
               <div className="col-span-full py-20 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center opacity-50">
@@ -1359,7 +1452,7 @@ export default function RutasPage() {
                   <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                     <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
                       <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                        Almacén: {group.almacen}
+                        Almacen: {group.almacen}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 capitalize">
                         {group.materiales.length} productos
@@ -1402,7 +1495,3 @@ export default function RutasPage() {
     </div>
   );
 }
-
-
-
-

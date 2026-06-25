@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DepartureCard, ReadyDeparture } from "@/features/logistics/components/cards/DepartureCard";
+import { LogisticsBranchFilter } from "@/features/logistics/components";
 import { RefreshCw } from "lucide-react";
 interface FacturaObj {
   factura?: string;
@@ -19,6 +20,8 @@ interface FacturaObj {
 interface ApiDepartureHome {
   unidad: string;
   chofer: string;
+  sucursalLogistica?: string;
+  SucursalLogistica?: string;
   estatus: string;
   facturas: FacturaObj[];
   pesoTotal: number;
@@ -28,6 +31,8 @@ interface ApiDepartureHome {
 
 interface ApiDepartureBranch {
   cliente: string;
+  sucursalLogistica?: string;
+  SucursalLogistica?: string;
   estatus: string;
   facturas: FacturaObj[];
   pesoTotal: number;
@@ -35,6 +40,7 @@ interface ApiDepartureBranch {
 }
 
 let cachedDepartures: ReadyDeparture[] | null = null;
+let cachedBranchFilter: string = "all";
 
 export default function AutorizarSalidaPage() {
   const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || []);
@@ -72,6 +78,7 @@ export default function AutorizarSalidaPage() {
           }));
 
           const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
+          const logisticsBranch = (d.sucursalLogistica || d.SucursalLogistica || "").trim().toUpperCase();
           return {
             id: `home-${d.unidad.trim()}-${d.chofer.trim()}-${computedStatus}-${invoiceIds}-${i}`,
             unitName: d.unidad,
@@ -84,6 +91,7 @@ export default function AutorizarSalidaPage() {
             deliveryType: "domicilio" as const,
             locations: d.direccionesEntrega || [],
             status: computedStatus as ReadyDeparture["status"],
+            logisticsBranch,
           };
         }).filter(d => d.invoices.length > 0 || d.status === "En ruta");
         newDepartures = [...newDepartures, ...mappedHome];
@@ -110,6 +118,7 @@ export default function AutorizarSalidaPage() {
           }));
 
           const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
+          const logisticsBranch = (d.sucursalLogistica || d.SucursalLogistica || "").trim().toUpperCase();
           return {
             id: `branch-${d.cliente.trim()}-${computedStatus}-${invoiceIds}-${i}`,
             unitName: "SUCURSAL",
@@ -123,6 +132,7 @@ export default function AutorizarSalidaPage() {
             deliveryType: "sucursal" as const,
             locations: [],
             status: computedStatus as ReadyDeparture["status"],
+            logisticsBranch,
           };
         }).filter(d => d.invoices.length > 0 || d.status === "En ruta");
         newDepartures = [...newDepartures, ...mappedBranch];
@@ -147,6 +157,11 @@ export default function AutorizarSalidaPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Pendiente" | "En ruta">("Pendiente");
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<"domicilio" | "sucursal">("domicilio");
+  const [branchFilter, setBranchFilter] = useState<string>(cachedBranchFilter);
+
+  useEffect(() => {
+    cachedBranchFilter = branchFilter;
+  }, [branchFilter]);
 
   const handleAuthorize = (id: string) => {
     const updated = departures.map(dep => {
@@ -169,7 +184,12 @@ export default function AutorizarSalidaPage() {
     fetchDepartures(true);
   };
 
-  const filteredDepartures = departures.filter(dep =>
+  const branchFilteredDepartures = departures.filter(dep => {
+    if (branchFilter === "all") return true;
+    return (dep.logisticsBranch || "").trim().toUpperCase() === branchFilter;
+  });
+
+  const filteredDepartures = branchFilteredDepartures.filter(dep =>
     dep.status === statusFilter &&
     dep.deliveryType === deliveryTypeFilter && (
       dep.driverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -178,8 +198,8 @@ export default function AutorizarSalidaPage() {
     )
   );
 
-  const pendingCount = departures.filter(d => d.status === "Pendiente" && d.deliveryType === deliveryTypeFilter).length;
-  const enRutaCount = departures.filter(d => d.status === "En ruta" && d.deliveryType === deliveryTypeFilter).length;
+  const pendingCount = branchFilteredDepartures.filter(d => d.status === "Pendiente" && d.deliveryType === deliveryTypeFilter).length;
+  const enRutaCount = branchFilteredDepartures.filter(d => d.status === "En ruta" && d.deliveryType === deliveryTypeFilter).length;
 
   return (
     <div className="w-full flex flex-col gap-4 min-h-full pb-12 -mt-2 md:-mt-4">
@@ -216,6 +236,12 @@ export default function AutorizarSalidaPage() {
 
         {/* 2. Filters Group (Right) */}
         <div className="flex flex-wrap items-center gap-2.5 lg:gap-1.5 w-full lg:w-auto justify-between lg:justify-end">
+          <LogisticsBranchFilter
+            branchFilter={branchFilter}
+            onBranchChange={setBranchFilter}
+            className="h-8 w-full sm:w-auto justify-between"
+          />
+
           <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden min-[1400px]:block"></div>
 
           {/* Delivery Type (Domicilio/Sucursal) */}
@@ -296,4 +322,3 @@ export default function AutorizarSalidaPage() {
     </div>
   );
 }
-

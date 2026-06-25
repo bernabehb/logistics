@@ -1,4 +1,4 @@
-﻿import Swal from 'sweetalert2';
+import Swal from 'sweetalert2';
 import type { SweetAlertIcon, SweetAlertOptions } from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -129,6 +129,7 @@ export const showError = ({
   title,
   html,
   text,
+  timer = 0,
   confirmButtonText = 'Entendido'
 }: MessageOptions) => {
   return MySwal.fire({
@@ -137,8 +138,14 @@ export const showError = ({
     title,
     html,
     text,
+    timer: timer > 0 ? timer : undefined,
+    timerProgressBar: timer > 0,
+    showConfirmButton: timer <= 0,
     confirmButtonText,
-    confirmButtonColor: '#dc2626'
+    confirmButtonColor: '#dc2626',
+    didOpen: () => {
+      MySwal.hideLoading();
+    }
   });
 };
 

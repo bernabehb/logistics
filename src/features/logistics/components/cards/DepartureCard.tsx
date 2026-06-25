@@ -58,6 +58,7 @@ export interface ReadyDeparture {
   deliveryType: "domicilio" | "sucursal";
   locations: string[];
   status: "Pendiente" | "En ruta" | "Completado";
+  logisticsBranch?: string;
 }
 
 interface DepartureCardProps {
@@ -484,7 +485,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                 {departure.deliveryType === 'sucursal' ? "Cliente" : "Chofer"}
               </span>
             </div>
-            <span className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase truncate ml-2 text-right flex-1 min-w-0">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase truncate ml-2 text-right flex-1 min-w-0">
               {departure.deliveryType === 'sucursal' ? (departure.clientName || 'Cliente General') : departure.driverName}
             </span>
           </div>
@@ -514,7 +515,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                         : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                     )}
                   >
-                    #{inv.id}
+                    {inv.id}
                   </span>
                 );
               })}

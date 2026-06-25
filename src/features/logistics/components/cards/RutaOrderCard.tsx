@@ -24,6 +24,7 @@ export interface RutaPedido {
   montoTotal?: number;
   orderNum?: number;
   sucursal?: string;
+  logisticsBranchId?: number;
 }
 
 interface RutaOrderCardProps {

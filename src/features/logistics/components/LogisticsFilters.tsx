@@ -1,11 +1,105 @@
-import { Search, RotateCcw, Trash2 } from "lucide-react";
+import { Building2, ChevronDown, Search, RotateCcw, Trash2 } from "lucide-react";
 import { StatusCircle } from "./StatusIndicator";
 import { cn } from "@/lib/utils";
 import { SingleDatePicker } from "./DateRangePicker";
 export type InvoiceType = 'normal' | 'anticipada';
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@/components/ui/popover";
 
 type Status = 'pending' | 'in-progress' | 'ready' | 'none';
+
+const DEFAULT_BRANCHES = ["APODACA", "GUADALUPE", "MONTERREY", "SANTA CATARINA"];
+
+interface BranchFilterProps {
+  branchFilter: string;
+  onBranchChange: (branch: string) => void;
+  branches?: string[];
+  className?: string;
+  size?: "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg" | "logistics-card";
+}
+
+export function LogisticsBranchFilter({
+  branchFilter,
+  onBranchChange,
+  branches = DEFAULT_BRANCHES,
+  className,
+  size
+}: BranchFilterProps) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size={size}
+          className={cn(
+            "rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] px-3 text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all",
+            !size && !className?.includes("h-") && "h-10",
+            className
+          )}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Building2 className="size-3.5 text-slate-400 shrink-0" />
+            <span className="truncate">
+              {branchFilter === 'all' ? 'TODAS LAS SUCURSALES' : branchFilter}
+            </span>
+          </div>
+          <ChevronDown className="size-3 text-slate-400 shrink-0 ml-2" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-64 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] shadow-xl"
+      >
+        <div className="flex flex-col gap-1">
+          <p className="px-3 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+            Filtrar por Sucursal
+          </p>
+          <button
+            onClick={() => onBranchChange('all')}
+            className={cn(
+              "w-full text-left px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+              branchFilter === 'all'
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+            )}
+          >
+            <div className={cn("size-2 rounded-full", branchFilter === 'all' ? "bg-white animate-pulse" : "bg-blue-500")} />
+            TODAS LAS SUCURSALES
+          </button>
+          <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-2" />
+          <div className="flex flex-col gap-0.5">
+            {branches.map(branch => (
+              <button
+                key={branch}
+                onClick={() => onBranchChange(branch)}
+                className={cn(
+                  "w-full text-left px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 group",
+                  branchFilter === branch
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                )}
+              >
+                <div className={cn(
+                  "size-6 rounded-lg flex items-center justify-center text-[10px] shrink-0",
+                  branchFilter === branch
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600"
+                )}>
+                  {branch.substring(0, 2)}
+                </div>
+                {branch}
+              </button>
+            ))}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 interface DateFiltersProps {
   fromDate: Date | undefined;

@@ -9,10 +9,13 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { closeSwal, showError, showLoading, showSuccess } from "@/lib/mySwal";
+import { LogisticsBranchFilter } from "@/features/logistics/components";
 
 interface ApiBlockStatus {
   iIdDeliveryBlock: number;
   sDeliveryBlock: string;
+  iIdLogisticsBranch?: number | null;
+  sLogisticsBranch?: string | null;
   sEstatus: string;
   sChofer: string | null;
   sUnidad: string | null;
@@ -24,11 +27,24 @@ interface ApiBlockStatus {
 // Cache persistente para navegación rápida
 let cachedBlocks: Block[] | null = null;
 let cachedDrivers: Driver[] | null = null;
+let cachedBranchFilter: string = "all";
+
+const branchPriority: Record<string, number> = {
+  MONTERREY: 0,
+  APODACA: 1,
+  GUADALUPE: 2,
+  "SANTA CATARINA": 3,
+};
+
+const getBlockBranchPriority = (block: Block) => {
+  return branchPriority[(block.logisticsBranch || "").trim().toUpperCase()] ?? 99;
+};
 
 export default function BloquesPage() {
   const [blocks, setBlocks] = useState<Block[]>(cachedBlocks || []);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<BlockStatus>("Disponible");
+  const [branchFilter, setBranchFilter] = useState<string>(cachedBranchFilter);
 
   const [isLoadingBlocks, setIsLoadingBlocks] = useState(!cachedBlocks);
 
@@ -44,6 +60,10 @@ export default function BloquesPage() {
   useEffect(() => {
     blocksRef.current = blocks;
   }, [blocks]);
+
+  useEffect(() => {
+    cachedBranchFilter = branchFilter;
+  }, [branchFilter]);
 
   // Limpiar temporizadores al desmontar el componente
   useEffect(() => {
@@ -77,27 +97,44 @@ export default function BloquesPage() {
       const driversData: ApiDriver[] = await driversRes.json();
 
       // Map Blocks
-      const mappedBlocks: Block[] = blocksData.map(b => {
+      const mappedBlocksRaw: Block[] = blocksData.map(b => {
         const blockId = b.iIdDeliveryBlock.toString();
-        const lastUpdate = lastLocalUpdatesRef.current[blockId];
+        const branchId = b.iIdLogisticsBranch || 0;
+        const blockScopeId = `${blockId}-${branchId}-${b.iTripNumber || 1}`;
+        const lastUpdate = lastLocalUpdatesRef.current[blockScopeId];
         const now = Date.now();
 
         // Si hubo una actualización local hace menos de 4 segundos, conservar el estado local optimista
         if (lastUpdate && now - lastUpdate < 4000) {
-          const currentBlock = blocksRef.current.find(x => x.iId.toString() === blockId);
+          const currentBlock = blocksRef.current.find(x => x.id === blockScopeId);
           if (currentBlock) {
             return currentBlock;
           }
         }
 
         return {
-          id: `${blockId}-${b.iTripNumber || 1}`, // Usar clave única incluyendo viaje para evitar duplicados en la lista de React
+          id: blockScopeId,
           iId: b.iIdDeliveryBlock,
+          logisticsBranchId: b.iIdLogisticsBranch || undefined,
+          logisticsBranch: b.sLogisticsBranch || undefined,
           name: b.sDeliveryBlock,
           status: (b.sEstatus === "Asignado" || b.sEstatus === "En Ruta") ? "Asignado" : "Disponible",
           apiDriverName: b.sChofer || undefined
         };
       });
+      const mappedBlocksById = new Map<string, Block>();
+      mappedBlocksRaw.forEach((block) => {
+        const current = mappedBlocksById.get(block.id);
+        const shouldReplace =
+          !current ||
+          (current.status !== "Asignado" && block.status === "Asignado") ||
+          (!current.apiDriverName && !!block.apiDriverName);
+
+        if (shouldReplace) {
+          mappedBlocksById.set(block.id, block);
+        }
+      });
+      const mappedBlocks = Array.from(mappedBlocksById.values());
       setBlocks(mappedBlocks);
       cachedBlocks = mappedBlocks;
 
@@ -168,7 +205,7 @@ export default function BloquesPage() {
 
     const originalBlocks = [...blocks];
     const targetDriver = drivers.find(d => d.id === driverId);
-    const baseBlockId = block.iId.toString();
+    const baseBlockId = block.id;
 
     // Limpiar cualquier refresco pendiente para evitar llamadas encimadas
     if (refreshTimeoutRef.current) {
@@ -203,7 +240,10 @@ export default function BloquesPage() {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(block.iId)
+          body: JSON.stringify({
+            iIdDeliveryBlock: block.iId,
+            iIdLogisticsBranch: block.logisticsBranchId || null
+          })
         });
 
         if (!response.ok) {
@@ -249,7 +289,8 @@ export default function BloquesPage() {
         },
         body: JSON.stringify({
           iIdDeliveryBlock: block.iId,
-          iIdDriver: iIdDriver
+          iIdDriver: iIdDriver,
+          iIdLogisticsBranch: block.logisticsBranchId || null
         })
       });
 
@@ -274,18 +315,29 @@ export default function BloquesPage() {
     }
   };
 
+  const branchFilteredBlocks = blocks.filter(b => {
+    if (branchFilter === "all") return true;
+    return (b.logisticsBranch || "").trim().toUpperCase() === branchFilter;
+  });
+
   const counts = {
-    Todas: blocks.length,
-    Disponible: blocks.filter(b => b.status === "Disponible").length,
-    Asignado: blocks.filter(b => b.status === "Asignado").length,
+    Todas: branchFilteredBlocks.length,
+    Disponible: branchFilteredBlocks.filter(b => b.status === "Disponible").length,
+    Asignado: branchFilteredBlocks.filter(b => b.status === "Asignado").length,
   };
 
-  const filteredBlocks = blocks.filter(b => {
-    const q = searchQuery.toLowerCase().trim();
-    const matchesSearch = b.name.toLowerCase().includes(q);
-    const matchesStatus = b.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredBlocks = branchFilteredBlocks
+    .filter(b => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = b.name.toLowerCase().includes(q);
+      const matchesStatus = b.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      const branchDiff = getBlockBranchPriority(a) - getBlockBranchPriority(b);
+      if (branchDiff !== 0) return branchDiff;
+      return a.name.localeCompare(b.name, "es");
+    });
 
   return (
     <div className="w-full flex flex-col gap-4 h-full pb-12 -mt-2 md:-mt-4">
@@ -318,6 +370,12 @@ export default function BloquesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
+          <LogisticsBranchFilter
+            branchFilter={branchFilter}
+            onBranchChange={setBranchFilter}
+            className="h-8 w-full sm:w-auto justify-between"
+          />
+
           <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
             {[
               { id: "Disponible", label: "Disponibles" },
@@ -381,5 +439,3 @@ export default function BloquesPage() {
     </div>
   );
 }
-
-

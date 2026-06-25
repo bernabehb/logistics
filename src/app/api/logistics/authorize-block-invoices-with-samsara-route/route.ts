@@ -1,0 +1,42 @@
+﻿import { NextResponse } from 'next/server';
+import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const response = await fetch(API_ENDPOINTS.authorizeBlockInvoicesWithSamsaraRoute, {
+      method: 'POST',
+      headers: {
+        ...API_HEADERS,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Error del servidor externo';
+      try {
+        const errJson = await response.json();
+        errorMessage = errJson.message || errJson.error || JSON.stringify(errJson);
+      } catch {
+        try {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        } catch {}
+      }
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Proxy error (authorize-block-invoices-with-samsara-route):', error);
+    return NextResponse.json(
+      { error: 'Error interno al intentar autorizar facturas del bloque y sincronizar la ruta en Samsara' },
+      { status: 500 }
+    );
+  }
+}

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { User, ChevronDown, Search as SearchIcon, Check, Layers } from "lucide-react";
@@ -93,12 +93,14 @@ export function BlockCard({
       <CardHeader className="flex flex-row justify-between items-start pb-4 space-y-0">
         <div className="flex flex-col min-w-0 flex-1 mt-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">
-              Bloque:
-            </span>
             <CardTitle className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight transition-colors leading-tight">
               {block.name}
             </CardTitle>
+            {block.logisticsBranch && (
+              <span className="px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300 shrink-0 whitespace-nowrap">
+                {block.logisticsBranch}
+              </span>
+            )}
             <span className={cn(
               "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-colors shrink-0 whitespace-nowrap",
               statusColors[block.status]
