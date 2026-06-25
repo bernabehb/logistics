@@ -36,14 +36,14 @@ export default function LoginPage() {
 
         {/* Center Logo Area */}
         <div className="relative z-10 flex flex-col items-center animate-in zoom-in duration-700">
-          <Image 
-            src="/logo.png" 
-            alt="COMPERS Logo" 
-            width={280} 
-            height={120} 
-            quality={95} 
+          <Image
+            src="/logo.png"
+            alt="COMPERS Logo"
+            width={280}
+            height={120}
+            quality={95}
             priority
-            className="mb-6 w-auto h-auto object-contain drop-shadow-2xl dark:brightness-0 dark:invert" 
+            className="mb-6 w-auto h-auto object-contain drop-shadow-2xl dark:brightness-0 dark:invert"
           />
           <p className="text-[10px] tracking-[0.3em] text-slate-500 font-medium uppercase ml-2">Sistema de LogÃ­stica</p>
         </div>
@@ -78,7 +78,7 @@ export default function LoginPage() {
                 <input
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="ContraseÃ±a"
+                  placeholder="Contraseña"
                   required
                   className="w-full h-[52px] bg-slate-50 dark:bg-[#1E293B]/50 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-[#64748B] rounded-xl px-5 text-[14px] pr-12 focus:outline-none focus:ring-1 focus:ring-blue-500/30 dark:focus:ring-blue-500/50 focus:border-blue-500/30 dark:focus:border-blue-500/50 transition-all font-medium"
                 />
