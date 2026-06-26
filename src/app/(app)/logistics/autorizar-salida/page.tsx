@@ -13,6 +13,8 @@ interface FacturaObj {
   Factura?: string;
   autorizada?: boolean;
   Autorizada?: boolean;
+  escaneada?: boolean;
+  Escaneada?: boolean;
   esNueva?: boolean;
   EsNueva?: boolean;
 }
@@ -42,6 +44,20 @@ interface ApiDepartureBranch {
 let cachedDepartures: ReadyDeparture[] | null = null;
 let cachedBranchFilter: string = "all";
 
+const isAuthorizedInvoice = (invoice: FacturaObj | string) => {
+  if (typeof invoice === 'string') return false;
+  return typeof invoice.autorizada === 'boolean' ? invoice.autorizada : invoice.Autorizada === true;
+};
+
+const isScannedInvoice = (invoice: FacturaObj | string) => {
+  if (typeof invoice === 'string') return false;
+  return typeof invoice.escaneada === 'boolean' ? invoice.escaneada : invoice.Escaneada === true;
+};
+
+const getInvoiceId = (invoice: FacturaObj | string) => (
+  typeof invoice === 'string' ? invoice : (invoice.factura || invoice.Factura || "")
+);
+
 export default function AutorizarSalidaPage() {
   const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || []);
   const [isRefreshing, setIsRefreshing] = useState(!cachedDepartures);
@@ -60,21 +76,21 @@ export default function AutorizarSalidaPage() {
         const homeData: ApiDepartureHome[] = await homeRes.json();
         const mappedHome = homeData.map((d, i) => {
           const allInvoices = d.facturas || [];
-          const pendingInvoices = allInvoices.filter(f => {
-            if (typeof f === 'string') return true;
-            const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
-            return !isAuth;
-          });
+          const pendingInvoices = allInvoices.filter(f => !isAuthorizedInvoice(f) && !isScannedInvoice(f));
+          const scannedInvoices = allInvoices.filter(f => !isAuthorizedInvoice(f) && isScannedInvoice(f));
 
-          const isFullyAuthorized = (allInvoices.length > 0) && pendingInvoices.length === 0;
+          const isFullyAuthorized = allInvoices.length > 0 && allInvoices.every(isAuthorizedInvoice);
+          const isFullyScanned = allInvoices.length > 0 && !isFullyAuthorized && pendingInvoices.length === 0 && scannedInvoices.length > 0;
           let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
           if (isFullyAuthorized) computedStatus = "En ruta";
+          else if (isFullyScanned) computedStatus = "Escaneada";
 
-          const invoicesToMap = computedStatus === "En ruta" ? allInvoices : pendingInvoices;
+          const invoicesToMap = computedStatus === "En ruta" ? allInvoices : computedStatus === "Escaneada" ? scannedInvoices : pendingInvoices;
           const mappedInvoices = invoicesToMap.map(f => ({
-            id: typeof f === 'string' ? f : (f.factura || f.Factura || ""),
+            id: getInvoiceId(f),
             groups: [],
-            isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva)
+            isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva),
+            isScanned: isScannedInvoice(f)
           }));
 
           const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
@@ -101,20 +117,20 @@ export default function AutorizarSalidaPage() {
         const branchData: ApiDepartureBranch[] = await branchRes.json();
         const mappedBranch = branchData.map((d, i) => {
           const allInvoices = d.facturas || [];
-          const pendingInvoices = allInvoices.filter(f => {
-            if (typeof f === 'string') return true;
-            const isAuth = typeof f.autorizada === 'boolean' ? f.autorizada : (f.Autorizada === true);
-            return !isAuth;
-          });
+          const pendingInvoices = allInvoices.filter(f => !isAuthorizedInvoice(f) && !isScannedInvoice(f));
+          const scannedInvoices = allInvoices.filter(f => !isAuthorizedInvoice(f) && isScannedInvoice(f));
 
-          const isFullyAuthorized = (d.facturas && d.facturas.length > 0) && pendingInvoices.length === 0;
+          const isFullyAuthorized = allInvoices.length > 0 && allInvoices.every(isAuthorizedInvoice);
+          const isFullyScanned = allInvoices.length > 0 && !isFullyAuthorized && pendingInvoices.length === 0 && scannedInvoices.length > 0;
           let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
           if (isFullyAuthorized) computedStatus = "En ruta";
+          else if (isFullyScanned) computedStatus = "Escaneada";
 
-          const invoicesToMap = computedStatus === "En ruta" ? allInvoices : pendingInvoices;
+          const invoicesToMap = computedStatus === "En ruta" ? allInvoices : computedStatus === "Escaneada" ? scannedInvoices : pendingInvoices;
           const mappedInvoices = invoicesToMap.map(f => ({
-            id: typeof f === 'string' ? f : (f.factura || f.Factura || ""),
-            groups: []
+            id: getInvoiceId(f),
+            groups: [],
+            isScanned: isScannedInvoice(f)
           }));
 
           const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
@@ -151,11 +167,24 @@ export default function AutorizarSalidaPage() {
     fetchDepartures(!!cachedDepartures);
   }, []);
 
-  const handleRefresh = () => {
-    fetchDepartures();
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const syncResponse = await fetch("/api/logistics/sync-started-samsara-routes", {
+        method: "POST",
+      });
+
+      if (!syncResponse.ok) {
+        console.warn("No se pudo sincronizar rutas iniciadas desde Samsara.");
+      }
+    } catch (err) {
+      console.warn("Error sincronizando rutas iniciadas desde Samsara:", err);
+    } finally {
+      await fetchDepartures(true);
+    }
   };
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"Pendiente" | "En ruta">("Pendiente");
+  const [statusFilter, setStatusFilter] = useState<"Pendiente" | "Escaneada" | "En ruta">("Pendiente");
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<"domicilio" | "sucursal">("domicilio");
   const [branchFilter, setBranchFilter] = useState<string>(cachedBranchFilter);
 
@@ -165,16 +194,23 @@ export default function AutorizarSalidaPage() {
 
   const handleAuthorize = (id: string) => {
     const updated = departures.map(dep => {
-      if (dep.id === id) {
-        return {
-          ...dep,
-          status: "En ruta" as ReadyDeparture["status"]
-        };
-      }
-      return dep;
+      if (dep.id !== id) return dep;
+
+      return {
+        ...dep,
+        status: "Escaneada" as ReadyDeparture["status"],
+        invoices: dep.invoices.map(inv => ({
+          ...inv,
+          isScanned: true,
+        })),
+      };
     });
+
     setDepartures(updated);
     cachedDepartures = updated;
+    window.setTimeout(() => {
+      fetchDepartures(true);
+    }, 800);
   };
 
   const handleDelivered = (id: string) => {
@@ -199,6 +235,7 @@ export default function AutorizarSalidaPage() {
   );
 
   const pendingCount = branchFilteredDepartures.filter(d => d.status === "Pendiente" && d.deliveryType === deliveryTypeFilter).length;
+  const scannedCount = branchFilteredDepartures.filter(d => d.status === "Escaneada" && d.deliveryType === deliveryTypeFilter).length;
   const enRutaCount = branchFilteredDepartures.filter(d => d.status === "En ruta" && d.deliveryType === deliveryTypeFilter).length;
 
   return (
@@ -267,10 +304,11 @@ export default function AutorizarSalidaPage() {
 
           <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden min-[1400px]:block"></div>
 
-          {/* Status Filter (Pendientes/En Ruta) */}
+          {/* Status Filter (Pendientes/Escaneadas/En Ruta) */}
           <div className="flex items-center justify-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
             {[
               { id: "Pendiente", label: "Pendientes", count: pendingCount },
+              { id: "Escaneada", label: "Escaneadas", count: scannedCount },
               { id: "En ruta", label: deliveryTypeFilter === "sucursal" ? "Autorizadas" : "En Ruta", count: enRutaCount }
             ].map((status) => (
               <button
@@ -306,6 +344,8 @@ export default function AutorizarSalidaPage() {
             <p className="text-lg font-medium">
               {statusFilter === "Pendiente"
                 ? "No hay salidas pendientes"
+                : statusFilter === "Escaneada"
+                  ? "No hay cargas escaneadas"
                 : deliveryTypeFilter === "sucursal"
                   ? "No hay recolecciones autorizadas actualmente"
                   : "No hay unidades en ruta actualmente"}

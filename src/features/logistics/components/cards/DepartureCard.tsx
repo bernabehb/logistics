@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,7 @@ export interface Invoice {
   id: string;
   groups: WarehouseGroup[];
   isNew?: boolean;
+  isScanned?: boolean;
 }
 
 export interface FetchedInvoiceDetails {
@@ -57,7 +58,7 @@ export interface ReadyDeparture {
   totalAmount: number;
   deliveryType: "domicilio" | "sucursal";
   locations: string[];
-  status: "Pendiente" | "En ruta" | "Completado";
+  status: "Pendiente" | "Escaneada" | "En ruta" | "Completado";
   logisticsBranch?: string;
 }
 
@@ -91,7 +92,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isDelivering, setIsDelivering] = useState(false);
 
-  // Detección de facturas agregadas posteriormente (desde el backend)
+  // DetecciÃ³n de facturas agregadas posteriormente (desde el backend)
   const addedInvoicesCount = React.useMemo(() =>
     departure.invoices.filter(inv => inv.isNew).length,
     [departure.invoices]
@@ -272,7 +273,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
         } catch (err: any) {
           console.error("Failed to start html5-qrcode scanner:", err);
           if (isMounted) {
-            setCameraError("No se pudo conectar a la cámara");
+            setCameraError("No se pudo conectar a la cÃ¡mara");
           }
         }
       };
@@ -334,7 +335,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
       }
     } catch (err) {
       console.error("Failed to scan file:", err);
-      alert("No se pudo detectar ningún código de barras en la foto. Asegúrate de enfocar bien el código de barras y que no tenga sombras ni reflejos.");
+      alert("No se pudo detectar ningÃºn cÃ³digo de barras en la foto. AsegÃºrate de enfocar bien el cÃ³digo de barras y que no tenga sombras ni reflejos.");
     } finally {
       setIsLoadingDetails(false);
       e.target.value = "";
@@ -345,12 +346,12 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
     if (currentInvoiceId && !verifiedInvoiceIds.includes(currentInvoiceId)) {
       setIsAuthorizing(true);
       try {
-        const res = await fetch(`/api/logistics/authorize-invoice/${currentInvoiceId}`, {
+        const res = await fetch(`/api/logistics/scan-invoice-for-departure/${currentInvoiceId}`, {
           method: 'POST'
         });
-        if (!res.ok) throw new Error("Failed to authorize");
+        if (!res.ok) throw new Error("Failed to scan invoice");
 
-        // Authorization successful, proceed
+        // Scan successful, proceed
         const newVerified = [...verifiedInvoiceIds, currentInvoiceId];
         setVerifiedInvoiceIds(newVerified);
 
@@ -364,7 +365,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
         setFetchedInvoiceDetails(null);
       } catch (err) {
         console.error(err);
-        alert("Hubo un error al autorizar la carga de la factura.");
+        alert("Hubo un error al marcar la factura como escaneada.");
       } finally {
         setIsAuthorizing(false);
       }
@@ -398,15 +399,14 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
 
   const handleFinalAuthorization = async () => {
     setIsAuthDialogOpen(false);
+    onAuthorize(departure.id);
     await new Promise(resolve => setTimeout(resolve, 120));
 
     await showSuccess({
-      title: "Salida autorizada",
-      html: `La unidad <b>${departure.unitName}</b> quedó en ruta correctamente.`,
+      title: "Carga escaneada",
+      html: `La unidad <b>${departure.unitName}</b> quedo lista para sincronizarse con Samsara.`,
       timer: 1600
     });
-
-    onAuthorize(departure.id);
   };
 
   const handleDeliverTrip = async () => {
@@ -414,7 +414,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
     if (invoiceNums.length === 0) return;
 
     const confirmed = window.confirm(
-      `¿Deseas marcar como entregadas las facturas ${invoiceNums.join(", ")}?`
+      `Â¿Deseas marcar como entregadas las facturas ${invoiceNums.join(", ")}?`
     );
     if (!confirmed) return;
 
@@ -460,7 +460,12 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                     +{addedInvoicesCount} {addedInvoicesCount === 1 ? 'Factura agregada' : 'Facturas agregadas'}
                   </span>
                 )}
-                {departure.status !== "Pendiente" && (
+                {departure.status === "Escaneada" && (
+                  <span className="px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors shrink-0 whitespace-nowrap">
+                    ESCANEADA
+                  </span>
+                )}
+                {departure.status === "En ruta" && (
                   <span className="px-2 py-1 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors shrink-0 whitespace-nowrap">
                     EN RUTA
                   </span>
@@ -610,7 +615,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                     <div className="space-y-4 animate-in fade-in duration-500">
                       <div className="flex justify-between items-end">
                         <div className="space-y-1">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Progreso de Validación</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Progreso de ValidaciÃ³n</p>
                           <h4 className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100 uppercase leading-none">
                             {verifiedInvoiceIds.length} / {departure.invoices.length} <span className="text-[10px] sm:text-xs normal-case font-bold text-slate-400 ml-1 sm:ml-2">Facturas</span>
                           </h4>
@@ -635,7 +640,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                       <div className="text-center space-y-2 px-2 sm:px-0">
                         <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Validar Carga</DialogTitle>
                         <DialogDescription className="text-slate-500 dark:text-slate-400">
-                          Selecciona un método para validar las facturas de <strong>{departure.unitName}</strong>. Este método se mantendrá para todo el viaje.
+                          Selecciona un mÃ©todo para validar las facturas de <strong>{departure.unitName}</strong>. Este mÃ©todo se mantendrÃ¡ para todo el viaje.
                         </DialogDescription>
                       </div>
 
@@ -663,7 +668,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                           <div className="p-3 sm:p-4 rounded-full bg-white dark:bg-slate-800 shadow-sm group-hover:scale-110 transition-transform text-emerald-500">
                             <QrCode className="size-6 sm:size-8" />
                           </div>
-                          <span className="font-black text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-[0.15em] sm:tracking-[0.2em] text-center">Escanear Código</span>
+                          <span className="font-black text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-[0.15em] sm:tracking-[0.2em] text-center">Escanear CÃ³digo</span>
                         </button>
                       </div>
                     </div>
@@ -675,12 +680,12 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                         <Button variant="ghost" size="icon" onClick={() => setAuthStep("method_select")} className="rounded-full">
                           <ArrowLeft className="size-5" />
                         </Button>
-                        <DialogTitle className="text-lg font-bold uppercase tracking-widest">Validación Manual</DialogTitle>
+                        <DialogTitle className="text-lg font-bold uppercase tracking-widest">ValidaciÃ³n Manual</DialogTitle>
                       </div>
 
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Número de Factura</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NÃºmero de Factura</label>
                           <Input
                             autoFocus
                             placeholder="Ej: 223899"
@@ -760,7 +765,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                           {isError && scannedCode && (
                             <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl p-4 text-center animate-in fade-in duration-300">
                               <p className="text-xs font-bold text-red-500">
-                                Código leído: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
+                                CÃ³digo leÃ­do: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
                               </p>
                               <p className="text-[10px] text-red-400 mt-1 font-semibold">
                                 No pertenece a las facturas pendientes de este viaje.
@@ -769,7 +774,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                           )}
                           {/* Rotation helper tip */}
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium text-center italic mt-1 leading-normal">
-                            Tip: Si el escáner en vivo tarda en leer en vertical, gira el teléfono en horizontal (acostado).
+                            Tip: Si el escÃ¡ner en vivo tarda en leer en vertical, gira el telÃ©fono en horizontal (acostado).
                           </p>
                           {/* File Scanner Fallback for Mobile Devices */}
                           <div className="flex flex-col gap-2 mt-1">
@@ -814,7 +819,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                                 <QrCode className="size-10 text-emerald-500" />
                               </div>
                               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
-                                Apunta al código de barras de la factura y presiona el gatillo para escanear de forma automática.
+                                Apunta al cÃ³digo de barras de la factura y presiona el gatillo para escanear de forma automÃ¡tica.
                               </p>
                             </div>
                           ) : (
@@ -826,14 +831,14 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                                 <X className="size-10 text-amber-500" />
                               </div>
                               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
-                                La ventana del navegador perdió el foco para capturar el lector.
+                                La ventana del navegador perdiÃ³ el foco para capturar el lector.
                               </p>
                               <Button
                                 variant="outline"
                                 onClick={() => scannerInputRef.current?.focus()}
                                 className="h-10 rounded-xl font-bold border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 transition-all text-xs"
                               >
-                                Haga clic aquí para reactivar el lector
+                                Haga clic aquÃ­ para reactivar el lector
                               </Button>
                             </div>
                           )}
@@ -858,7 +863,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                           fetchedInvoiceDetails.almacenes.map((group, gIdx) => (
                             <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                               <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén: {group.almacen}</span>
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">AlmacÃ©n: {group.almacen}</span>
                                 <span className="text-[10px] font-bold text-slate-400 capitalize">{group.materiales.length} productos</span>
                               </div>
                               <table className="w-full text-left">
@@ -947,7 +952,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                             className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] transition-all active:scale-[0.98] hover:translate-y-[-2px]"
                             onClick={handleFinalAuthorization}
                           >
-                            Autorizar Salida Ahora
+                            Finalizar Escaneo
                           </Button>
                         </div>
                       ) : (
@@ -957,7 +962,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                           </div>
 
                           <div className="mt-12 text-center animate-in slide-in-from-bottom-4 duration-700 delay-200">
-                            <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">¡SALIDA AUTORIZADA!</h2>
+                            <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">Â¡CARGA ESCANEADA!</h2>
                           </div>
                         </div>
                       )}
@@ -966,6 +971,16 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
                 </div>
               </DialogContent>
             </Dialog>
+          ) : departure.status === "Escaneada" ? (
+            <Button
+              variant="logistics-action"
+              size="logistics-card"
+              disabled
+              className="bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 cursor-default opacity-100"
+            >
+              <CheckCircle className="size-4 mr-2" />
+              Carga Escaneada
+            </Button>
           ) : (
             <Button
               variant="logistics-action"
@@ -983,6 +998,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
     </Card>
   );
 }
+
 
 
 
