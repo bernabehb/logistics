@@ -220,6 +220,42 @@ export default function AutorizarSalidaPage() {
     fetchDepartures(true);
   };
 
+  const handleSendScannedInRouteManual = async (id: string) => {
+    const departure = departures.find(dep => dep.id === id);
+    const invoiceNums = departure?.invoices.map(inv => inv.id).filter(Boolean) || [];
+
+    if (!departure || invoiceNums.length === 0) {
+      throw new Error("No hay facturas escaneadas para mandar en ruta.");
+    }
+
+    const response = await fetch("/api/logistics/mark-scanned-invoices-in-route-manual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invoiceNums }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || data?.error || "No se pudo mandar la carga escaneada en ruta.");
+    }
+
+    const updated = departures.map(dep => {
+      if (dep.id !== id) return dep;
+
+      return {
+        ...dep,
+        status: "En ruta" as ReadyDeparture["status"],
+      };
+    });
+
+    setDepartures(updated);
+    cachedDepartures = updated;
+    window.setTimeout(() => {
+      fetchDepartures(true);
+    }, 600);
+  };
+
   const branchFilteredDepartures = departures.filter(dep => {
     if (branchFilter === "all") return true;
     return (dep.logisticsBranch || "").trim().toUpperCase() === branchFilter;
@@ -354,7 +390,13 @@ export default function AutorizarSalidaPage() {
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-6 auto-rows-max">
             {filteredDepartures.map((dep) => (
-              <DepartureCard key={dep.id} departure={dep} onAuthorize={handleAuthorize} onDelivered={handleDelivered} />
+              <DepartureCard
+                key={dep.id}
+                departure={dep}
+                onAuthorize={handleAuthorize}
+                onDelivered={handleDelivered}
+                onSendScannedInRouteManual={handleSendScannedInRouteManual}
+              />
             ))}
           </div>
         )}

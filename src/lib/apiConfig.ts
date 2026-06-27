@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
   scanInvoiceForDeparture: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/ScanInvoiceForDeparture/${invoiceNum}`,
   authorizeInvoice: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeInvoice/${invoiceNum}`,
   deliverInvoices: `${EXTERNAL_API_BASE_URL}/Logistics/DeliverInvoices`,
+  markScannedInvoicesInRouteManual: `${EXTERNAL_API_BASE_URL}/Logistics/MarkScannedInvoicesInRouteManual`,
   syncStartedSamsaraRoutes: `${EXTERNAL_API_BASE_URL}/Logistics/SamsaraRoutes/SyncStartedToLocal`,
   toggleUnitMaintenance: `${EXTERNAL_API_BASE_URL}/Logistics/ToggleUnitMaintenance`,
   authorizeBlock: `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeBlock`,

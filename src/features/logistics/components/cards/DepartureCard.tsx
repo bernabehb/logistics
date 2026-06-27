@@ -2,7 +2,7 @@
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { showSuccess } from "@/lib/mySwal";
+import { showConfirm, showError, showSuccess } from "@/lib/mySwal";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,9 +66,10 @@ interface DepartureCardProps {
   departure: ReadyDeparture;
   onAuthorize: (id: string) => void;
   onDelivered?: (id: string) => void;
+  onSendScannedInRouteManual?: (id: string) => Promise<void>;
 }
 
-export function DepartureCard({ departure, onAuthorize, onDelivered }: DepartureCardProps) {
+export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScannedInRouteManual }: DepartureCardProps) {
   const [authStep, setAuthStep] = useState<"method_select" | "active_verification" | "invoice_review" | "trip_verified">("method_select");
   const [selectedMethod, setSelectedMethod] = useState<"manual" | "scanning" | null>(null);
   const [verifiedInvoiceIds, setVerifiedInvoiceIds] = useState<string[]>([]);
@@ -91,6 +92,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isDelivering, setIsDelivering] = useState(false);
+  const [isSendingManualRoute, setIsSendingManualRoute] = useState(false);
 
   // DetecciÃ³n de facturas agregadas posteriormente (desde el backend)
   const addedInvoicesCount = React.useMemo(() =>
@@ -439,6 +441,41 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
       alert('No se pudieron marcar las facturas como entregadas.');
     } finally {
       setIsDelivering(false);
+    }
+  };
+
+  const handleSendScannedInRouteManual = async () => {
+    if (!onSendScannedInRouteManual || departure.invoices.length === 0) return;
+
+    const confirmed = await showConfirm({
+      title: "Mandar en ruta manual",
+      html: `Se marcaran como <b>En ruta</b> las facturas escaneadas de la unidad <b>${departure.unitName}</b>.`,
+      icon: "question",
+      iconColor: "#10b981",
+      confirmButtonText: "Si, mandar en ruta",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#059669"
+    });
+
+    if (!confirmed) return;
+
+    setIsSendingManualRoute(true);
+    try {
+      await onSendScannedInRouteManual(departure.id);
+
+      await showSuccess({
+        title: "Salida en ruta",
+        html: `La unidad <b>${departure.unitName}</b> se marco en ruta correctamente.`,
+        timer: 1600
+      });
+    } catch (err) {
+      console.error(err);
+      await showError({
+        title: "No se pudo mandar en ruta",
+        text: err instanceof Error ? err.message : "Ocurrio un error al mandar la carga escaneada en ruta."
+      });
+    } finally {
+      setIsSendingManualRoute(false);
     }
   };
 
@@ -975,11 +1012,12 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
             <Button
               variant="logistics-action"
               size="logistics-card"
-              disabled
-              className="bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 cursor-default opacity-100"
+              onClick={handleSendScannedInRouteManual}
+              disabled={isSendingManualRoute || !onSendScannedInRouteManual}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30 shadow-emerald-500/20"
             >
-              <CheckCircle className="size-4 mr-2" />
-              Carga Escaneada
+              {isSendingManualRoute ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <Truck className="size-4 mr-2" />}
+              Mandar en ruta manual
             </Button>
           ) : (
             <Button
@@ -998,7 +1036,6 @@ export function DepartureCard({ departure, onAuthorize, onDelivered }: Departure
     </Card>
   );
 }
-
 
 
 
