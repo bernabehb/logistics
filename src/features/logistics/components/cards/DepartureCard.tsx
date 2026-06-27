@@ -94,7 +94,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   const [isDelivering, setIsDelivering] = useState(false);
   const [isSendingManualRoute, setIsSendingManualRoute] = useState(false);
 
-  // DetecciÃ³n de facturas agregadas posteriormente (desde el backend)
+  // Detección de facturas agregadas posteriormente (desde el backend)
   const addedInvoicesCount = React.useMemo(() =>
     departure.invoices.filter(inv => inv.isNew).length,
     [departure.invoices]
@@ -275,7 +275,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         } catch (err: any) {
           console.error("Failed to start html5-qrcode scanner:", err);
           if (isMounted) {
-            setCameraError("No se pudo conectar a la cÃ¡mara");
+            setCameraError("No se pudo conectar a la cámara");
           }
         }
       };
@@ -337,7 +337,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       }
     } catch (err) {
       console.error("Failed to scan file:", err);
-      alert("No se pudo detectar ningÃºn cÃ³digo de barras en la foto. AsegÃºrate de enfocar bien el cÃ³digo de barras y que no tenga sombras ni reflejos.");
+      alert("No se pudo detectar ningún código de barras en la foto. Asegúrate de enfocar bien el código de barras y que no tenga sombras ni reflejos.");
     } finally {
       setIsLoadingDetails(false);
       e.target.value = "";
@@ -652,7 +652,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                     <div className="space-y-4 animate-in fade-in duration-500">
                       <div className="flex justify-between items-end">
                         <div className="space-y-1">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Progreso de ValidaciÃ³n</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Progreso de Validación</p>
                           <h4 className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100 uppercase leading-none">
                             {verifiedInvoiceIds.length} / {departure.invoices.length} <span className="text-[10px] sm:text-xs normal-case font-bold text-slate-400 ml-1 sm:ml-2">Facturas</span>
                           </h4>
@@ -677,7 +677,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                       <div className="text-center space-y-2 px-2 sm:px-0">
                         <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Validar Carga</DialogTitle>
                         <DialogDescription className="text-slate-500 dark:text-slate-400">
-                          Selecciona un mÃ©todo para validar las facturas de <strong>{departure.unitName}</strong>. Este mÃ©todo se mantendrÃ¡ para todo el viaje.
+                          Selecciona un método para validar las facturas de <strong>{departure.unitName}</strong>. Este método se mantendrá para todo el viaje.
                         </DialogDescription>
                       </div>
 
@@ -705,7 +705,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           <div className="p-3 sm:p-4 rounded-full bg-white dark:bg-slate-800 shadow-sm group-hover:scale-110 transition-transform text-emerald-500">
                             <QrCode className="size-6 sm:size-8" />
                           </div>
-                          <span className="font-black text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-[0.15em] sm:tracking-[0.2em] text-center">Escanear CÃ³digo</span>
+                          <span className="font-black text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-[0.15em] sm:tracking-[0.2em] text-center">Escanear Código</span>
                         </button>
                       </div>
                     </div>
@@ -717,12 +717,12 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                         <Button variant="ghost" size="icon" onClick={() => setAuthStep("method_select")} className="rounded-full">
                           <ArrowLeft className="size-5" />
                         </Button>
-                        <DialogTitle className="text-lg font-bold uppercase tracking-widest">ValidaciÃ³n Manual</DialogTitle>
+                        <DialogTitle className="text-lg font-bold uppercase tracking-widest">Validación Manual</DialogTitle>
                       </div>
 
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">NÃºmero de Factura</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Número de Factura</label>
                           <Input
                             autoFocus
                             placeholder="Ej: 223899"
@@ -802,7 +802,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           {isError && scannedCode && (
                             <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl p-4 text-center animate-in fade-in duration-300">
                               <p className="text-xs font-bold text-red-500">
-                                CÃ³digo leÃ­do: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
+                                Código leído: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
                               </p>
                               <p className="text-[10px] text-red-400 mt-1 font-semibold">
                                 No pertenece a las facturas pendientes de este viaje.
@@ -811,7 +811,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           )}
                           {/* Rotation helper tip */}
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium text-center italic mt-1 leading-normal">
-                            Tip: Si el escÃ¡ner en vivo tarda en leer en vertical, gira el telÃ©fono en horizontal (acostado).
+                            Tip: Si el escáner en vivo tarda en leer en vertical, gira el teléfono en horizontal (acostado).
                           </p>
                           {/* File Scanner Fallback for Mobile Devices */}
                           <div className="flex flex-col gap-2 mt-1">
@@ -856,7 +856,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                                 <QrCode className="size-10 text-emerald-500" />
                               </div>
                               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
-                                Apunta al cÃ³digo de barras de la factura y presiona el gatillo para escanear de forma automÃ¡tica.
+                                Apunta al código de barras de la factura y presiona el gatillo para escanear de forma automática.
                               </p>
                             </div>
                           ) : (
@@ -868,14 +868,14 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                                 <X className="size-10 text-amber-500" />
                               </div>
                               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
-                                La ventana del navegador perdiÃ³ el foco para capturar el lector.
+                                La ventana del navegador perdió el foco para capturar el lector.
                               </p>
                               <Button
                                 variant="outline"
                                 onClick={() => scannerInputRef.current?.focus()}
                                 className="h-10 rounded-xl font-bold border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 transition-all text-xs"
                               >
-                                Haga clic aquÃ­ para reactivar el lector
+                                Haga clic aquí para reactivar el lector
                               </Button>
                             </div>
                           )}
@@ -900,7 +900,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           fetchedInvoiceDetails.almacenes.map((group, gIdx) => (
                             <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                               <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">AlmacÃ©n: {group.almacen}</span>
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén: {group.almacen}</span>
                                 <span className="text-[10px] font-bold text-slate-400 capitalize">{group.materiales.length} productos</span>
                               </div>
                               <table className="w-full text-left">

@@ -45,7 +45,7 @@ export default function LoginPage() {
             priority
             className="mb-6 w-auto h-auto object-contain drop-shadow-2xl dark:brightness-0 dark:invert"
           />
-          <p className="text-[10px] tracking-[0.3em] text-slate-500 font-medium uppercase ml-2">Sistema de LogÃ­stica</p>
+          <p className="text-[10px] tracking-[0.3em] text-slate-500 font-medium uppercase ml-2">Sistema de Logística</p>
         </div>
       </div>
 

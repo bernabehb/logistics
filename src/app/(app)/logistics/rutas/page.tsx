@@ -605,7 +605,7 @@ export default function RutasPage() {
       setError(null);
     } catch (err) {
       console.error("Error fetching routes:", err);
-      setError("Error al cargar la informacion de rutas dinamica");
+      setError("Error al cargar la información de rutas dinámica");
     } finally {
       isFetchingRef.current = false;
       setIsRefreshing(false);
@@ -958,7 +958,7 @@ export default function RutasPage() {
                           <Truck className="size-8 text-slate-300 dark:text-slate-600" />
                         </div>
                         <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de busqueda, estatus o fecha</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
                       </div>
                     </td>
                   </tr>
@@ -1452,7 +1452,7 @@ export default function RutasPage() {
                   <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                     <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
                       <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                        Almacen: {group.almacen}
+                        Almacén: {group.almacen}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 capitalize">
                         {group.materiales.length} productos
