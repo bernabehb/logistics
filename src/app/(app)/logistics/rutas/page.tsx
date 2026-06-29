@@ -216,6 +216,30 @@ export default function RutasPage() {
     return getBlockScopeKey(blockName, currentLogisticsBranchId());
   };
 
+  const getRouteBlockForDisplay = (blockName: string) => {
+    return getActiveRouteBlock(apiBlocks, blockName, currentLogisticsBranchId());
+  };
+
+  const getAssignedUnitForDisplay = (blockName: string, apiBlock?: ApiBlockStatus) => {
+    const displayBranchId = branchFilter === 'all'
+      ? apiBlock?.iIdLogisticsBranch || 0
+      : currentLogisticsBranchId();
+
+    const scopedUnit = assignedUnits[getBlockScopeKey(blockName, displayBranchId)];
+    if (scopedUnit) return scopedUnit;
+
+    if (apiBlock?.iIdUnit && apiBlock.sUnidad) {
+      return {
+        id: `${apiBlock.sUnidad}-${apiBlock.iIdUnit}-${apiBlock.iTripNumber || 1}`,
+        name: apiBlock.sUnidad,
+        sucursal: apiBlock.sLogisticsBranch || "",
+        iId: apiBlock.iIdUnit
+      };
+    }
+
+    return undefined;
+  };
+
   useEffect(() => {
     cachedAssignedUnits = assignedUnits;
   }, [assignedUnits]);
@@ -227,7 +251,7 @@ export default function RutasPage() {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catalogos y asignaciones mas recientes de la BD
+      // para traer los catálogos y asignaciones más recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
@@ -264,7 +288,7 @@ export default function RutasPage() {
     const apiBlock = getActiveRouteBlock(apiBlocks, blockName, logisticsBranchId);
 
     if (!apiBlock) {
-      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catalogo.`);
+      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
       return;
     }
 
@@ -292,7 +316,7 @@ export default function RutasPage() {
         })
       });
 
-      if (!response.ok) throw new Error("Error en la asignacion");
+      if (!response.ok) throw new Error("Error en la asignación");
 
       fetchAllData(true, true);
     } catch (err) {
@@ -317,6 +341,14 @@ export default function RutasPage() {
   };
 
   const executeAuthorizeBlock = async (blockName: string, authorize: boolean) => {
+    if (branchFilter === 'all') {
+      await showError({
+        title: "Selecciona una sucursal",
+        text: "Para autorizar debes filtrar por una sucursal específica.",
+        timer: 2600
+      });
+      return;
+    }
     const logisticsBranchId = branchFilter !== 'all' ? getLogisticsBranchId(branchFilter) : 0;
     const blockScopeKey = currentBlockScopeKey(blockName);
     const apiBlock = getActiveRouteBlock(apiBlocks, blockName, logisticsBranchId);
@@ -324,7 +356,7 @@ export default function RutasPage() {
     if (!apiBlock) {
       await showError({
         title: "Bloque no encontrado",
-        text: `No se pudo encontrar el ID del bloque "${blockName}" en el catalogo.`
+        text: `No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`
       });
       return;
     }
@@ -353,7 +385,7 @@ export default function RutasPage() {
         closeSwal();
         await showError({
           title: "Selecciona una sucursal",
-          text: "Para autorizar debes filtrar por una sucursal especifica.",
+          text: "Para autorizar debes filtrar por una sucursal específica.",
           timer: 2600
         });
         return;
@@ -395,7 +427,7 @@ export default function RutasPage() {
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || errJson.message || "Error al cambiar la autorizacion del bloque");
+        throw new Error(errJson.error || errJson.message || "Error al cambiar la autorización del bloque");
       }
 
       await showSuccess({
@@ -412,7 +444,7 @@ export default function RutasPage() {
       closeSwal();
       await showError({
         title: authorize ? "No se pudo autorizar el bloque" : "No se pudo regresar el bloque",
-        text: err.message || "Hubo un error al cambiar la autorizacion del bloque."
+        text: err.message || "Hubo un error al cambiar la autorización del bloque."
       });
     } finally {
       setIsRefreshing(false);
@@ -439,7 +471,7 @@ export default function RutasPage() {
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
     if (isFetchingRef.current) {
-      console.log("Fetch en progreso, omitiendo peticion concurrente.");
+      console.log("Fetch en progreso, omitiendo petición concurrente.");
       return;
     }
     isFetchingRef.current = true;
@@ -1028,9 +1060,10 @@ export default function RutasPage() {
                   BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
                     const items = groupedData[blockName] || [];
                     const blockScopeKey = currentBlockScopeKey(blockName);
-                    const assignedUnit = assignedUnits[blockScopeKey];
-                    const apiBlock = getActiveRouteBlock(apiBlocks, blockName, currentLogisticsBranchId());
-                    const isAuthorized = isBlockAuthorizedForCurrentTrip(apiBlock);
+                    const apiBlock = getRouteBlockForDisplay(blockName);
+                    const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
+                    const isAllBranches = branchFilter === 'all';
+                    const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
                     const canAuthorize = !!assignedUnit && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
                     const isProcessing = authorizingBlockName === blockScopeKey;
                     return (
@@ -1082,7 +1115,7 @@ export default function RutasPage() {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      disabled={isAssigning === blockScopeKey}
+                                      disabled={isAssigning === blockScopeKey || isAllBranches}
                                       className={cn(
                                         "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
                                         assignedUnit
@@ -1117,7 +1150,7 @@ export default function RutasPage() {
                                               : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                           )}
                                         >
-                                          Sin Asignacion
+                                          Sin Asignación
                                         </button>
                                         <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
                                         {unidadesDisponibles.length > 0 ? (
@@ -1253,9 +1286,10 @@ export default function RutasPage() {
             BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
               const items = groupedData[blockName] || [];
               const blockScopeKey = currentBlockScopeKey(blockName);
-              const assignedUnit = assignedUnits[blockScopeKey];
-              const apiBlock = getActiveRouteBlock(apiBlocks, blockName, currentLogisticsBranchId());
-              const isAuthorized = isBlockAuthorizedForCurrentTrip(apiBlock);
+              const apiBlock = getRouteBlockForDisplay(blockName);
+              const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
+              const isAllBranches = branchFilter === 'all';
+              const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
               const canAuthorize = !!assignedUnit && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
               const isProcessing = authorizingBlockName === blockScopeKey;
 
@@ -1306,7 +1340,7 @@ export default function RutasPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={isAssigning === blockScopeKey}
+                              disabled={isAssigning === blockScopeKey || isAllBranches}
                               className={cn(
                                 "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
                                 assignedUnit
@@ -1340,7 +1374,7 @@ export default function RutasPage() {
                                       : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                   )}
                                 >
-                                  Sin Asignacion
+                                  Sin Asignación
                                 </button>
                                 <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
                                 {unidadesDisponibles.length > 0 ? (
