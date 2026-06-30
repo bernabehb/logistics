@@ -53,7 +53,7 @@ const BRANCH_GEOFENCES = [
   { name: "Santa Catarina", center: [25.6742, -100.4624] as [number, number] },
 ];
 
-const GEOFENCE_RADIUS_METERS = 200;
+const GEOFENCE_RADIUS_METERS = 40;
 export default function UnitMap({ lat, lng, unitName }: UnitMapProps) {
   const [mapType, setMapType] = useState<"roadmap" | "hybrid">("roadmap");
   const [recenterSignal, setRecenterSignal] = useState(0);

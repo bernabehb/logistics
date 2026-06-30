@@ -15,6 +15,7 @@ export interface Unit {
   latitud?: number;
   longitud?: number;
   apiDriverName?: string; // Nombre del chofer que viene del backend
+  capacityKg?: number | null;
 }
 
 export interface ApiUnit {
@@ -32,6 +33,7 @@ export interface ApiUnit {
   fLongitud: number;
   sEstatus: string; // "Disponible", "Asignado", "En Taller", etc.
   sChofer: string;
+  fCapacityKg?: number | null;
 }
 
 export function mapApiUnitToUnit(apiUnit: ApiUnit, index: number): Unit {
@@ -57,6 +59,7 @@ export function mapApiUnitToUnit(apiUnit: ApiUnit, index: number): Unit {
     latitud: apiUnit.fLatitud,
     longitud: apiUnit.fLongitud,
     apiDriverName: apiUnit.sChofer?.trim() || undefined,
+    capacityKg: apiUnit.fCapacityKg !== undefined && apiUnit.fCapacityKg !== null ? Number(apiUnit.fCapacityKg) : null,
   };
 }
 

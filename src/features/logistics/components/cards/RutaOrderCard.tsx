@@ -22,6 +22,7 @@ export interface RutaPedido {
   completedDeliveries?: number;
   block?: string;
   montoTotal?: number;
+  totalWeightKg?: number;
   orderNum?: number;
   sucursal?: string;
   logisticsBranchId?: number;

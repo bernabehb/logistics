@@ -287,6 +287,15 @@ export default function UnidadesPage() {
                         </span>
                       </div>
                     )}
+
+                    {unit.capacityKg !== undefined && unit.capacityKg !== null && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-400 uppercase tracking-wider">Capacidad de carga</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200 font-mono text-xs tracking-wide">
+                          {unit.capacityKg.toLocaleString("es-MX")} kg
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1">

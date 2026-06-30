@@ -88,6 +88,7 @@ interface AvailableUnit {
   name: string;
   sucursal: string;
   iId: number;
+  capacityKg?: number | null;
 }
 
 interface FetchedInvoiceDetails {
@@ -156,6 +157,7 @@ const getActiveRouteBlock = (blocks: ApiBlockStatus[], blockName: string, logist
 
 let cachedInvoices: RutaPedido[] | null = null;
 let cachedUnidades: AvailableUnit[] | null = null;
+let cachedUnitCatalog: AvailableUnit[] | null = null;
 let cachedAssignedUnits: Record<string, AvailableUnit> | null = null;
 let cachedDrivers: Driver[] | null = null;
 let cachedBlocks: ApiBlockStatus[] | null = null;
@@ -166,6 +168,7 @@ let lastBranchFilter: string = 'all';
 export default function RutasPage() {
   const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[lastDriverFilter] || []);
   const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
+  const [unitCatalog, setUnitCatalog] = useState<AvailableUnit[]>(cachedUnitCatalog || cachedUnidades || []);
   const [isLoading, setIsLoading] = useState(!cachedInvoices);
   const [error, setError] = useState<string | null>(null);
 
@@ -220,20 +223,42 @@ export default function RutasPage() {
     return getActiveRouteBlock(apiBlocks, blockName, currentLogisticsBranchId());
   };
 
+  const findUnitInCatalog = (unit?: Pick<AvailableUnit, 'iId' | 'name'> | null) => {
+    if (!unit) return undefined;
+
+    return unitCatalog.find(u => u.iId === Number(unit.iId))
+      || unitCatalog.find(u => u.name.trim().toUpperCase() === unit.name.trim().toUpperCase())
+      || unidadesDisponibles.find(u => u.iId === Number(unit.iId))
+      || unidadesDisponibles.find(u => u.name.trim().toUpperCase() === unit.name.trim().toUpperCase());
+  };
+
   const getAssignedUnitForDisplay = (blockName: string, apiBlock?: ApiBlockStatus) => {
     const displayBranchId = branchFilter === 'all'
       ? apiBlock?.iIdLogisticsBranch || 0
       : currentLogisticsBranchId();
 
     const scopedUnit = assignedUnits[getBlockScopeKey(blockName, displayBranchId)];
-    if (scopedUnit) return scopedUnit;
+    if (scopedUnit) {
+      const catalogUnit = findUnitInCatalog(scopedUnit);
+      return {
+        ...scopedUnit,
+        sucursal: scopedUnit.sucursal || catalogUnit?.sucursal || "",
+        capacityKg: scopedUnit.capacityKg ?? catalogUnit?.capacityKg ?? null
+      };
+    }
 
     if (apiBlock?.iIdUnit && apiBlock.sUnidad) {
+      const catalogUnit = findUnitInCatalog({
+        iId: Number(apiBlock.iIdUnit),
+        name: apiBlock.sUnidad
+      });
+
       return {
         id: `${apiBlock.sUnidad}-${apiBlock.iIdUnit}-${apiBlock.iTripNumber || 1}`,
         name: apiBlock.sUnidad,
-        sucursal: apiBlock.sLogisticsBranch || "",
-        iId: apiBlock.iIdUnit
+        sucursal: apiBlock.sLogisticsBranch || catalogUnit?.sucursal || "",
+        iId: Number(apiBlock.iIdUnit),
+        capacityKg: catalogUnit?.capacityKg ?? null
       };
     }
 
@@ -251,7 +276,7 @@ export default function RutasPage() {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catálogos y asignaciones más recientes de la BD
+      // para traer los catalogos y asignaciones más recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
@@ -334,6 +359,30 @@ export default function RutasPage() {
       .map(p => p.id.trim().toUpperCase())
       .filter(Boolean)
       .filter((value, index, array) => array.indexOf(value) === index);
+  };
+
+  const getVisibleBlockWeightKg = (blockName: string) => {
+    return (groupedData[blockName] || [])
+      .filter(p => !p.id.startsWith('ORDER-'))
+      .reduce((sum, p) => sum + (Number(p.totalWeightKg) || 0), 0);
+  };
+
+  const formatKg = (value: number) =>
+    `${value.toLocaleString("es-MX", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
+
+  const getSuggestedUnits = (requiredWeightKg: number, selectedUnit?: AvailableUnit) => {
+    const selectedBranch = branchFilter === 'all' ? "" : branchFilter.toUpperCase();
+
+    return unidadesDisponibles
+      .filter(unit => {
+        const capacityKg = Number(unit.capacityKg || 0);
+        if (capacityKg < requiredWeightKg) return false;
+        if (selectedUnit && unit.iId === selectedUnit.iId) return false;
+        if (selectedBranch && unit.sucursal?.toUpperCase() !== selectedBranch) return false;
+        return true;
+      })
+      .sort((a, b) => Number(a.capacityKg || 0) - Number(b.capacityKg || 0))
+      .slice(0, 5);
   };
 
   const isBlockAuthorizedForCurrentTrip = (apiBlock: ApiBlockStatus | undefined) => {
@@ -453,6 +502,38 @@ export default function RutasPage() {
   };
 
   const handleAuthorizeBlock = async (blockName: string, authorize: boolean) => {
+    if (authorize) {
+      if (branchFilter === 'all') {
+        await showError({
+          title: "Selecciona una sucursal",
+          text: "Para autorizar debes filtrar por una sucursal especifica. Asi solo se autoriza el material que sale de esa sucursal.",
+          timer: 2600
+        });
+        return;
+      }
+
+      const apiBlock = getRouteBlockForDisplay(blockName);
+      const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
+      const requiredWeightKg = getVisibleBlockWeightKg(blockName);
+      const capacityKg = Number(assignedUnit?.capacityKg || 0);
+
+      if (assignedUnit && requiredWeightKg > 0 && capacityKg > 0 && requiredWeightKg > capacityKg) {
+        const suggestions = getSuggestedUnits(requiredWeightKg, assignedUnit);
+        const suggestionsHtml = suggestions.length > 0
+          ? `<div style="margin-top:14px;text-align:left;border-top:1px solid rgba(148,163,184,.35);padding-top:12px;">
+              <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Unidades compatibles disponibles</div>
+              ${suggestions.map(unit => `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px;color:#16a34a;"><b>${unit.name}</b><span>${unit.sucursal || "SIN SUCURSAL"} - ${formatKg(Number(unit.capacityKg || 0))}</span></div>`).join("")}
+            </div>`
+          : `<div style="margin-top:14px;text-align:left;border-top:1px solid rgba(148,163,184,.35);padding-top:12px;font-size:13px;">No hay unidades disponibles con capacidad suficiente para la sucursal seleccionada.</div>`;
+
+        await showError({
+          title: "Capacidad insuficiente",
+          html: `La carga del bloque <b>${blockName}</b> pesa <b>${formatKg(requiredWeightKg)}</b> y la unidad <b>${assignedUnit.name}</b> soporta <b>${formatKg(capacityKg)}</b>.<br/>Selecciona una unidad con mayor capacidad.${suggestionsHtml}`
+        });
+        return;
+      }
+    }
+
     const confirmed = await showConfirm({
       icon: authorize ? "question" : "warning",
       iconColor: authorize ? "#60a5fa" : "#f59e0b",
@@ -489,7 +570,7 @@ export default function RutasPage() {
       if (!silent) setIsLoading(true);
       setError(null);
 
-      const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedDrivers || !cachedBlocks;
+      const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedUnitCatalog || !cachedDrivers || !cachedBlocks;
 
       let routesUrl = '/api/routes';
       if (driverFilter && driverFilter !== 'all') {
@@ -533,14 +614,24 @@ export default function RutasPage() {
 
         if (unitsRes.ok) {
           const unitsData = await unitsRes.json();
+          const allUnits = unitsData.map((u: any, i: number) => ({
+            id: `${u.sNombre_Unidad}-${u.sSucursal}-${i}`,
+            name: u.sNombre_Unidad,
+            sucursal: u.sSucursal,
+            iId: Number(u.iId || u.sId || 0),
+            capacityKg: u.fCapacityKg !== null && u.fCapacityKg !== undefined ? Number(u.fCapacityKg) : null
+          }));
           const availableUnits = unitsData
             .filter((u: any) => u.sEstatus !== "Asignado" && u.sEstatus !== "Mantenimiento")
             .map((u: any, i: number) => ({
               id: `${u.sNombre_Unidad}-${u.sSucursal}-${i}`,
               name: u.sNombre_Unidad,
               sucursal: u.sSucursal,
-              iId: Number(u.iId || u.sId || 0)
+              iId: Number(u.iId || u.sId || 0),
+              capacityKg: u.fCapacityKg !== null && u.fCapacityKg !== undefined ? Number(u.fCapacityKg) : null
             }));
+          setUnitCatalog(allUnits);
+          cachedUnitCatalog = allUnits;
           setUnidadesDisponibles(availableUnits);
           cachedUnidades = availableUnits;
         }
@@ -592,6 +683,7 @@ export default function RutasPage() {
             completedDeliveries: type === 'anticipada' ? (row.montoAnticipado > 0 ? 1 : 0) : undefined,
             hasGlassCut: false,
             montoTotal: row.monto_Factura,
+            totalWeightKg: 0,
             orderNum: row.orderNum,
             sucursal: mappedSucursal,
             logisticsBranchId
@@ -599,6 +691,10 @@ export default function RutasPage() {
         }
 
         const current = groupedMap.get(groupKey)!;
+        const rowWeightKg = Number(row.totalNetWeight || 0);
+        if (!Number.isNaN(rowWeightKg)) {
+          current.totalWeightKg = (current.totalWeightKg || 0) + rowWeightKg;
+        }
 
         let warehouseName = (row.almacen || "").trim().toUpperCase();
         let warehouseId: string | null = null;
@@ -990,7 +1086,7 @@ export default function RutasPage() {
                           <Truck className="size-8 text-slate-300 dark:text-slate-600" />
                         </div>
                         <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de bÃƒÂºsqueda, estatus o fecha</p>
                       </div>
                     </td>
                   </tr>
@@ -1066,16 +1162,22 @@ export default function RutasPage() {
                     const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
                     const canAuthorize = !!assignedUnit && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
                     const isProcessing = authorizingBlockName === blockScopeKey;
+                    const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
                     return (
                       <Fragment key={blockName}>
                         <tr className="bg-slate-100/90 dark:bg-slate-800/70 border-y border-slate-300/80 dark:border-slate-700/80">
                           <td colSpan={6} className="px-6 py-3.5">
                             <div className="flex items-center gap-4">
                               <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">{blockName}</span>
-                                <div className="size-5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
+                                <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest whitespace-nowrap">{blockName}</span>
+                                <div className="size-5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900 shrink-0">
                                   {items.length}
                                 </div>
+                                {totalBlockWeightKg > 0 && (
+                                  <span className="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">
+                                    {formatKg(totalBlockWeightKg)}
+                                  </span>
+                                )}
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
@@ -1095,10 +1197,8 @@ export default function RutasPage() {
                                   size="sm"
                                   className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
                                 >
-                                  {isProcessing ? (
+                                  {isProcessing && (
                                     <RefreshCw className="size-3.5 animate-spin" />
-                                  ) : (
-                                    <Check className="size-3.5 transition-colors" />
                                   )}
                                   {isProcessing
                                     ? "Procesando..."
@@ -1172,7 +1272,7 @@ export default function RutasPage() {
                                                   ? "bg-white/20 text-white"
                                                   : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
                                               )}>
-                                                {unid.sucursal}
+                                                {unid.capacityKg ? `${unid.sucursal} - ${Math.round(unid.capacityKg)} kg` : unid.sucursal}
                                               </span>
                                             </button>
                                           ))
@@ -1292,128 +1392,138 @@ export default function RutasPage() {
               const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
               const canAuthorize = !!assignedUnit && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
               const isProcessing = authorizingBlockName === blockScopeKey;
-
+              const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
               return (
                 <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
-                  <CardHeader className="p-4 pb-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider leading-none">
-                          {blockName}
-                        </CardTitle>
-                        <div className="flex items-center justify-center size-5 rounded-full bg-blue-600 dark:bg-blue-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900">
-                          {items.length}
+                  <CardHeader className="p-4 pb-0">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CardTitle className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider leading-tight break-words">
+                            {blockName}
+                          </CardTitle>
+                          <div className="flex items-center justify-center size-5 rounded-full bg-blue-600 dark:bg-blue-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900 shrink-0">
+                            {items.length}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            variant={
+                              isAuthorized && canAuthorize
+                                ? "logistics-warning"
+                                : canAuthorize
+                                  ? "logistics-success"
+                                  : "logistics-action"
+                            }
+                            onClick={() => handleAuthorizeBlock(blockName, !isAuthorized)}
+                            disabled={!canAuthorize || isProcessing}
+                            size="sm"
+                            className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
+                          >
+                            {isProcessing && (
+                              <RefreshCw className="size-3.5 animate-spin" />
+                            )}
+                            {isProcessing
+                              ? "Procesando..."
+                              : isAuthorized && canAuthorize
+                                ? "Regresar"
+                                : "Autorizar"}
+                          </Button>
+
+                          <Popover
+                            open={openPopoverId === blockScopeKey}
+                            onOpenChange={(open) => setOpenPopoverId(open ? blockScopeKey : null)}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isAssigning === blockScopeKey || isAllBranches}
+                                className={cn(
+                                  "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
+                                  assignedUnit
+                                    ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
+                                    : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
+                                )}
+                              >
+                                {isAssigning === blockScopeKey ? (
+                                  <RefreshCw className="size-3.5 animate-spin" />
+                                ) : (
+                                  <Truck className="size-3.5" />
+                                )}
+                                <span className="uppercase tracking-widest truncate max-w-[100px]">
+                                  {assignedUnit ? assignedUnit.name : "Unidad"}
+                                </span>
+                                <ChevronDown className="size-3 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
+                              <div className="flex flex-col gap-1">
+                                <p className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
+                                  Seleccionar Unidad
+                                </p>
+                                <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
+                                  <button
+                                    onClick={() => handleAssignUnit(blockName, null)}
+                                    className={cn(
+                                      "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
+                                      !assignedUnit
+                                        ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
+                                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                    )}
+                                  >
+                                    Sin Asignación
+                                  </button>
+                                  <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
+                                  {unidadesDisponibles.length > 0 ? (
+                                    unidadesDisponibles.map((unid) => (
+                                      <button
+                                        key={unid.id}
+                                        onClick={() => handleAssignUnit(blockName, unid)}
+                                        className={cn(
+                                          "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
+                                          assignedUnit?.id === unid.id
+                                            ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                                        )}
+                                      >
+                                        <span>{unid.name}</span>
+                                        <span className={cn(
+                                          "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
+                                          assignedUnit?.id === unid.id
+                                            ? "bg-white/20 text-white"
+                                            : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                                        )}>
+                                          {unid.capacityKg ? `${unid.sucursal} - ${Math.round(unid.capacityKg)} kg` : unid.sucursal}
+                                        </span>
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <div className="px-3 py-4 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest">
+                                      No hay unidades disponibles
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant={
-                            isAuthorized && canAuthorize
-                              ? "logistics-warning"
-                              : canAuthorize
-                                ? "logistics-success"
-                                : "logistics-action"
-                          }
-                          onClick={() => handleAuthorizeBlock(blockName, !isAuthorized)}
-                          disabled={!canAuthorize || isProcessing}
-                          size="sm"
-                          className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
-                        >
-                          {isProcessing ? (
-                            <RefreshCw className="size-3.5 animate-spin" />
-                          ) : (
-                            <Check className="size-3.5 transition-colors" />
-                          )}
-                          {isProcessing
-                            ? "Procesando..."
-                            : isAuthorized && canAuthorize
-                              ? "Regresar"
-                              : "Autorizar"}
-                        </Button>
-
-                        <Popover
-                          open={openPopoverId === blockScopeKey}
-                          onOpenChange={(open) => setOpenPopoverId(open ? blockScopeKey : null)}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={isAssigning === blockScopeKey || isAllBranches}
-                              className={cn(
-                                "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
-                                assignedUnit
-                                  ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
-                                  : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
-                              )}
-                            >
-                              {isAssigning === blockScopeKey ? (
-                                <RefreshCw className="size-3.5 animate-spin" />
-                              ) : (
-                                <Truck className="size-3.5" />
-                              )}
-                              <span className="uppercase tracking-widest truncate max-w-[100px]">
-                                {assignedUnit ? assignedUnit.name : "Unidad"}
-                              </span>
-                              <ChevronDown className="size-3 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
-                            <div className="flex flex-col gap-1">
-                              <p className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
-                                Seleccionar Unidad
-                              </p>
-                              <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
-                                <button
-                                  onClick={() => handleAssignUnit(blockName, null)}
-                                  className={cn(
-                                    "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
-                                    !assignedUnit
-                                      ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
-                                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                                  )}
-                                >
-                                  Sin Asignación
-                                </button>
-                                <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
-                                {unidadesDisponibles.length > 0 ? (
-                                  unidadesDisponibles.map((unid) => (
-                                    <button
-                                      key={unid.id}
-                                      onClick={() => handleAssignUnit(blockName, unid)}
-                                      className={cn(
-                                        "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
-                                        assignedUnit?.id === unid.id
-                                          ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                                      )}
-                                    >
-                                      <span>{unid.name}</span>
-                                      <span className={cn(
-                                        "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
-                                        assignedUnit?.id === unid.id
-                                          ? "bg-white/20 text-white"
-                                          : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-                                      )}>
-                                        {unid.sucursal}
-                                      </span>
-                                    </button>
-                                  ))
-                                ) : (
-                                  <div className="px-3 py-4 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest">
-                                    No hay unidades disponibles
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+                      {totalBlockWeightKg > 0 ? (
+                        <div className="flex items-center gap-1.5 h-5">
+                          <span className="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">
+                            {formatKg(totalBlockWeightKg)}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="h-5" />
+                      )}
                     </div>
                   </CardHeader>
 
-                  <CardContent className="px-2 py-4 flex-1">
+                  <CardContent className="px-2 pt-1 pb-4 flex-1">
                     {items.length > 0 ? (
                       <div className={cn(
                         "flex flex-col gap-3",
@@ -1529,3 +1639,6 @@ export default function RutasPage() {
     </div>
   );
 }
+
+
+
