@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
+import { API_ENDPOINTS } from '@/lib/apiConfig';
+import { getServerApiHeaders } from '@/lib/serverApiHeaders';
 
 export async function GET() {
   try {
     const response = await fetch(API_ENDPOINTS.drivers, {
-      headers: API_HEADERS,
+      headers: await getServerApiHeaders(),
       next: { revalidate: 0 } // Disable caching to get fresh data
     });
 
@@ -25,3 +26,4 @@ export async function GET() {
     );
   }
 }
+

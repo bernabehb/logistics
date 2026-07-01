@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
+import { API_ENDPOINTS } from '@/lib/apiConfig';
+import { getServerApiHeaders } from '@/lib/serverApiHeaders';
 
 export async function POST() {
   try {
     const response = await fetch(API_ENDPOINTS.syncStartedSamsaraRoutes, {
       method: 'POST',
-      headers: API_HEADERS,
+      headers: await getServerApiHeaders(),
     });
 
     if (!response.ok) {
@@ -27,3 +28,4 @@ export async function POST() {
     );
   }
 }
+

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -416,7 +416,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     if (invoiceNums.length === 0) return;
 
     const confirmed = window.confirm(
-      `Â¿Deseas marcar como entregadas las facturas ${invoiceNums.join(", ")}?`
+      `¿Deseas marcar como entregadas las facturas ${invoiceNums.join(", ")}?`
     );
     if (!confirmed) return;
 
@@ -999,7 +999,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           </div>
 
                           <div className="mt-12 text-center animate-in slide-in-from-bottom-4 duration-700 delay-200">
-                            <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">Â¡CARGA ESCANEADA!</h2>
+                            <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">¡CARGA ESCANEADA!</h2>
                           </div>
                         </div>
                       )}

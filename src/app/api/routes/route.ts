@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
+import { API_ENDPOINTS } from '@/lib/apiConfig';
+import { getServerApiHeaders } from '@/lib/serverApiHeaders';
 
 export async function GET(request: Request) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
     }
 
     const response = await fetch(url, {
-      headers: API_HEADERS,
+      headers: await getServerApiHeaders(),
       next: { revalidate: 0 }
     });
 
@@ -33,3 +34,4 @@ export async function GET(request: Request) {
     );
   }
 }
+

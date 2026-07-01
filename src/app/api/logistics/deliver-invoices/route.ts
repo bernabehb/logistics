@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
-import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
+import { API_ENDPOINTS } from '@/lib/apiConfig';
+import { getServerApiHeaders } from '@/lib/serverApiHeaders';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const response = await fetch(API_ENDPOINTS.deliverInvoices, {
       method: 'POST',
-      headers: {
-        ...API_HEADERS,
-        'Content-Type': 'application/json',
-      },
+      headers: await getServerApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     });
 
@@ -30,3 +28,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+

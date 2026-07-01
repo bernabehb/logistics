@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
+import { API_ENDPOINTS } from '@/lib/apiConfig';
+import { getServerApiHeaders } from '@/lib/serverApiHeaders';
 
 export async function GET(
   request: Request,
@@ -9,7 +10,7 @@ export async function GET(
     const resolvedParams = await params;
     const invoiceNum = resolvedParams.invoiceNum;
     const response = await fetch(API_ENDPOINTS.invoiceDetails(invoiceNum), {
-      headers: API_HEADERS,
+      headers: await getServerApiHeaders(),
       next: { revalidate: 0 }
     });
 
@@ -30,3 +31,4 @@ export async function GET(
     );
   }
 }
+

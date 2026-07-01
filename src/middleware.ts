@@ -17,6 +17,13 @@ export function middleware(request: NextRequest) {
   if (authToken) {
     try {
       const session = JSON.parse(authToken);
+      const isLegacyLogisticsSession = session.role === 'Logistica' && !session.backendToken;
+
+      if (isLegacyLogisticsSession) {
+        const response = NextResponse.redirect(new URL('/login', request.url));
+        response.cookies.delete('auth_token');
+        return response;
+      }
       
       if (path === '/login' || path === '/') {
         if (session.role === 'Chofer') {

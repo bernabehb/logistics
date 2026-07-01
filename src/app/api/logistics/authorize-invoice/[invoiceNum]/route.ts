@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
+import { API_ENDPOINTS } from '@/lib/apiConfig';
+import { getServerApiHeaders } from '@/lib/serverApiHeaders';
 
 export async function POST(
   request: Request,
@@ -10,7 +11,7 @@ export async function POST(
     const invoiceNum = resolvedParams.invoiceNum;
     const response = await fetch(API_ENDPOINTS.authorizeInvoice(invoiceNum), {
       method: 'POST',
-      headers: API_HEADERS,
+      headers: await getServerApiHeaders(),
     });
 
     if (!response.ok) {
@@ -30,3 +31,4 @@ export async function POST(
     );
   }
 }
+

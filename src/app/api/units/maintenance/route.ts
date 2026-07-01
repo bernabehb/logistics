@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { API_ENDPOINTS, API_HEADERS } from '@/lib/apiConfig';
+import { API_ENDPOINTS } from '@/lib/apiConfig';
+import { getServerApiHeaders } from '@/lib/serverApiHeaders';
 
 export async function POST(request: Request) {
   try {
@@ -8,10 +9,7 @@ export async function POST(request: Request) {
 
     const response = await fetch(API_ENDPOINTS.toggleUnitMaintenance, {
       method: 'POST',
-      headers: {
-        ...API_HEADERS,
-        'Content-Type': 'application/json',
-      },
+      headers: await getServerApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ iIdUnit, bMaintenance }),
     });
 
@@ -33,3 +31,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+
