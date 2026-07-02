@@ -45,6 +45,48 @@ const getLogisticsBranchId = (branch?: string) => {
   if (normalized.includes("SANTA CATARINA")) return 4;
   return 0;
 };
+const readApiErrorMessage = async (response: Response, fallback: string) => {
+  try {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      const errJson = await response.json();
+      const possibleMessages = [
+        errJson?.error,
+        errJson?.message,
+        errJson?.detail,
+        errJson?.title
+      ].filter(Boolean);
+
+      if (possibleMessages.length > 0) {
+        return String(possibleMessages[0]);
+      }
+
+      if (errJson && typeof errJson === "object") {
+        return JSON.stringify(errJson);
+      }
+    }
+
+    const text = await response.text();
+    if (text) return text;
+  } catch {
+    // Keep the original fallback if the response body cannot be parsed.
+  }
+
+  return fallback;
+};
+
+const isAddressValidationError = (message: string) => {
+  const normalized = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  return normalized.includes("google maps")
+    || normalized.includes("validar una direccion")
+    || normalized.includes("direccion incorrecta")
+    || normalized.includes("no se pudo validar una direccion");
+};
 
 interface ApiRutaInvoice {
   tipoFactura: string;
@@ -475,8 +517,11 @@ export default function RutasPage() {
       );
 
       if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || errJson.message || "Error al cambiar la autorización del bloque");
+        const errorMessage = await readApiErrorMessage(
+          response,
+          "Error al cambiar la autorizacion del bloque"
+        );
+        throw new Error(errorMessage);
       }
 
       await showSuccess({
@@ -488,12 +533,20 @@ export default function RutasPage() {
       });
 
       await fetchAllData(true, true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error authorizing block:", err);
       closeSwal();
+
+      const errorMessage = err instanceof Error ? err.message : "Hubo un error al cambiar la autorizacion del bloque.";
+      const addressError = isAddressValidationError(errorMessage);
+
       await showError({
-        title: authorize ? "No se pudo autorizar el bloque" : "No se pudo regresar el bloque",
-        text: err.message || "Hubo un error al cambiar la autorización del bloque."
+        title: addressError
+          ? "No se pudo validar la direccion"
+          : authorize ? "No se pudo autorizar el bloque" : "No se pudo regresar el bloque",
+        text: addressError
+          ? `${errorMessage} Si el problema continua, verifica la direccion o crea la ruta directamente en Samsara.`
+          : errorMessage
       });
     } finally {
       setIsRefreshing(false);
