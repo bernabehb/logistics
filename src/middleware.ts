@@ -1,6 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+function isJwtExpired(token?: string) {
+  if (!token) return false;
+
+  const [, payload] = token.split('.');
+  if (!payload) return false;
+
+  try {
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+    const decoded = JSON.parse(atob(padded));
+    const expiresAt = typeof decoded?.exp === 'number' ? decoded.exp * 1000 : null;
+    return Boolean(expiresAt && Date.now() >= expiresAt);
+  } catch {
+    return false;
+  }
+}
+
 export function middleware(request: NextRequest) {
   const authToken = request.cookies.get('auth_token')?.value;
   const path = request.nextUrl.pathname;
@@ -19,7 +36,7 @@ export function middleware(request: NextRequest) {
       const session = JSON.parse(authToken);
       const isLegacyLogisticsSession = session.role === 'Logistica' && !session.backendToken;
 
-      if (isLegacyLogisticsSession) {
+      if (isLegacyLogisticsSession || isJwtExpired(session.backendToken)) {
         const response = NextResponse.redirect(new URL('/login', request.url));
         response.cookies.delete('auth_token');
         return response;
@@ -64,7 +81,7 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/login', request.url));
       }
 
-    } catch (e) {
+    } catch {
       // In case of invalid token format, clear and send to login
       const response = NextResponse.redirect(new URL('/login', request.url));
       response.cookies.delete('auth_token');

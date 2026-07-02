@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import Image from "next/image";
 import { Menu, X } from "lucide-react";
+import { SessionExpiredHandler } from "@/components/SessionExpiredHandler";
 
 export default function AppLayout({
   children,
@@ -14,6 +15,8 @@ export default function AppLayout({
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#F8FAFC] dark:bg-[#0F172A]">
+      <SessionExpiredHandler />
+
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] z-40 relative">
         <Image 
