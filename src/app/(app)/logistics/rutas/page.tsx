@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
-import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check } from "lucide-react";
+import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check, MapPin } from "lucide-react";
 import { API_ENDPOINTS, API_HEADERS } from "@/lib/apiConfig";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -206,6 +206,7 @@ let cachedBlocks: ApiBlockStatus[] | null = null;
 let cachedInvoicesByDriver: Record<string, RutaPedido[]> = {};
 let lastDriverFilter: string = 'all';
 let lastBranchFilter: string = 'all';
+let lastViewMode: 'cards' | 'table' = 'cards';
 
 export default function RutasPage() {
   const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[lastDriverFilter] || []);
@@ -221,7 +222,7 @@ export default function RutasPage() {
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<RutaInvoiceType>('normal');
   const [assignedUnits, setAssignedUnits] = useState<Record<string, AvailableUnit>>(cachedAssignedUnits || {});
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(lastViewMode);
   const [driverFilter, setDriverFilter] = useState<string>(lastDriverFilter);
   const [branchFilter, setBranchFilter] = useState<string>(lastBranchFilter);
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
@@ -310,6 +311,24 @@ export default function RutasPage() {
   useEffect(() => {
     cachedAssignedUnits = assignedUnits;
   }, [assignedUnits]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("rutas_view_mode") as 'cards' | 'table';
+      if (saved === 'cards' || saved === 'table') {
+        setViewMode(saved);
+        lastViewMode = saved;
+      }
+    }
+  }, []);
+
+  const handleViewModeChange = (mode: 'cards' | 'table') => {
+    setViewMode(mode);
+    lastViewMode = mode;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("rutas_view_mode", mode);
+    }
+  };
 
   const isInitialMount = useRef(true);
 
@@ -739,7 +758,8 @@ export default function RutasPage() {
             totalWeightKg: 0,
             orderNum: row.orderNum,
             sucursal: mappedSucursal,
-            logisticsBranchId
+            logisticsBranchId,
+            direccionEnvio: row.direccionEnvio
           });
         }
 
@@ -1017,7 +1037,7 @@ export default function RutasPage() {
           <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1 hidden md:block"></div>
           <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9">
             <button
-              onClick={() => setViewMode('cards')}
+              onClick={() => handleViewModeChange('cards')}
               title="Vista de Tarjetas"
               className={cn(
                 "p-1.5 rounded-lg transition-all",
@@ -1029,7 +1049,7 @@ export default function RutasPage() {
               <LayoutGrid className="size-4" />
             </button>
             <button
-              onClick={() => setViewMode('table')}
+              onClick={() => handleViewModeChange('table')}
               title="Vista de Tablero"
               className={cn(
                 "p-1.5 rounded-lg transition-all",
@@ -1171,14 +1191,17 @@ export default function RutasPage() {
                             </div>
                           </td>
                           <td className="px-6 py-5">
-                            <div className="flex items-center gap-3">
-                              <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
-                                {p.clientName.substring(0, 2).toUpperCase()}
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
-                              </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
+                              {p.direccionEnvio && (
+                                <div className="flex items-start gap-1 mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium hover:text-slate-700 dark:hover:text-slate-200 transition-colors" title={p.direccionEnvio}>
+                                  <MapPin className="size-3.5 text-red-500 shrink-0 mt-0.5" />
+                                  <span className="break-words max-w-[600px] leading-relaxed">
+                                    {p.direccionEnvio}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-5">
@@ -1358,14 +1381,17 @@ export default function RutasPage() {
                                 </div>
                               </td>
                               <td className="px-6 py-5">
-                                <div className="flex items-center gap-3">
-                                  <div className="size-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
-                                    {p.clientName.substring(0, 2).toUpperCase()}
-                                  </div>
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
-                                  </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
+                                  {p.direccionEnvio && (
+                                    <div className="flex items-start gap-1 mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium hover:text-slate-700 dark:hover:text-slate-200 transition-colors" title={p.direccionEnvio}>
+                                      <MapPin className="size-3.5 text-red-500 shrink-0 mt-0.5" />
+                                      <span className="break-words max-w-[600px] leading-relaxed">
+                                        {p.direccionEnvio}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               <td className="px-6 py-5">
