@@ -225,6 +225,8 @@ export default function RutasPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(lastViewMode);
   const [driverFilter, setDriverFilter] = useState<string>(lastDriverFilter);
   const [branchFilter, setBranchFilter] = useState<string>(lastBranchFilter);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
   const [apiBlocks, setApiBlocks] = useState<ApiBlockStatus[]>(cachedBlocks || []);
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
@@ -311,6 +313,16 @@ export default function RutasPage() {
   useEffect(() => {
     cachedAssignedUnits = assignedUnits;
   }, [assignedUnits]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [deliveryTypeFilter, searchQuery, fromDate, statusFilters, invoiceTypeFilter, branchFilter, driverFilter, viewMode]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [currentPage]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -881,12 +893,27 @@ export default function RutasPage() {
       return true;
     });
 
-    if (deliveryTypeFilter === "sucursal") {
-      return filtered.slice(0, 15);
-    }
-
     return filtered;
   }, [invoices, deliveryTypeFilter, searchQuery, fromDate, statusFilters, invoiceTypeFilter, branchFilter]);
+
+  const paginatedPedidos = useMemo(() => {
+    if (viewMode !== 'table') {
+      return filteredPedidos;
+    }
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredPedidos.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredPedidos, currentPage, viewMode]);
+
+  const paginatedGroupedData = useMemo(() => {
+    const groups: Record<string, RutaPedido[]> = {};
+    BLOCKS_LIST.forEach(b => groups[b] = []);
+    paginatedPedidos.forEach(p => {
+      if (p.block && groups[p.block]) {
+        groups[p.block].push(p);
+      }
+    });
+    return groups;
+  }, [paginatedPedidos, BLOCKS_LIST]);
 
   const groupedData = useMemo(() => {
     const groups: Record<string, RutaPedido[]> = {};
@@ -898,6 +925,10 @@ export default function RutasPage() {
     });
     return groups;
   }, [filteredPedidos, BLOCKS_LIST]);
+
+  const totalPages = Math.ceil(filteredPedidos.length / ITEMS_PER_PAGE);
+  const startItem = Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredPedidos.length);
+  const endItem = Math.min(currentPage * ITEMS_PER_PAGE, filteredPedidos.length);
 
   return (
     <div className="w-full flex flex-col gap-4 h-full pb-12 -mt-2 md:-mt-4">
@@ -1175,7 +1206,7 @@ export default function RutasPage() {
                         </div>
                       </td>
                     </tr>
-                    {filteredPedidos.map(p => {
+                    {paginatedPedidos.map(p => {
                       const aluminio = p.warehouses.find(w => w.id === 'Aluminio')?.status || 'none';
                       const vidrio = p.warehouses.find(w => w.id === 'Vidrio')?.status || 'none';
                       const herrajes = p.warehouses.find(w => w.id === 'Herrajes')?.status || 'none';
@@ -1184,7 +1215,7 @@ export default function RutasPage() {
                         <tr key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                           <td className="px-6 py-5">
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              <span className="text-sm font-black text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                 {p.id.startsWith('ORDER-') ? `Orden: ${p.id.split('-')[1]}` : `Factura: ${p.id}`}
                               </span>
                               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
@@ -1192,7 +1223,7 @@ export default function RutasPage() {
                           </td>
                           <td className="px-6 py-5">
                             <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                              <span className="text-sm font-black text-slate-500 dark:text-slate-400 truncate max-w-[240px] leading-tight">{p.clientName}</span>
                               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
                               {p.direccionEnvio && (
                                 <div className="flex items-start gap-1 mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium hover:text-slate-700 dark:hover:text-slate-200 transition-colors" title={p.direccionEnvio}>
@@ -1229,8 +1260,8 @@ export default function RutasPage() {
                     })}
                   </>
                 ) : (
-                  BLOCKS_LIST.filter(blockName => (groupedData[blockName] || []).length > 0).map((blockName) => {
-                    const items = groupedData[blockName] || [];
+                  BLOCKS_LIST.filter(blockName => (paginatedGroupedData[blockName] || []).length > 0).map((blockName) => {
+                    const items = paginatedGroupedData[blockName] || [];
                     const blockScopeKey = currentBlockScopeKey(blockName);
                     const apiBlock = getRouteBlockForDisplay(blockName);
                     const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
@@ -1374,7 +1405,7 @@ export default function RutasPage() {
                             <tr key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                               <td className="px-6 py-5">
                                 <div className="flex flex-col">
-                                  <span className="text-sm font-black text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                  <span className="text-sm font-black text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                     {p.id.startsWith('ORDER-') ? `Orden: ${p.id.split('-')[1]}` : `Factura: ${p.id}`}
                                   </span>
                                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
@@ -1382,7 +1413,7 @@ export default function RutasPage() {
                               </td>
                               <td className="px-6 py-5">
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-black text-slate-700 dark:text-slate-200 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                                  <span className="text-sm font-black text-slate-500 dark:text-slate-400 truncate max-w-[240px] leading-tight">{p.clientName}</span>
                                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
                                   {p.direccionEnvio && (
                                     <div className="flex items-start gap-1 mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium hover:text-slate-700 dark:hover:text-slate-200 transition-colors" title={p.direccionEnvio}>
@@ -1431,13 +1462,48 @@ export default function RutasPage() {
           </div>
           <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 flex items-center justify-between">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              Mostrando {filteredPedidos.length} de {filteredPedidos.length} pedidos
+              {filteredPedidos.length > 0
+                ? `Mostrando ${startItem}-${endItem} de ${filteredPedidos.length} pedidos`
+                : "Sin pedidos para mostrar"}
             </p>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled><ChevronDown className="size-4 rotate-90" /></Button>
-              <Button variant="ghost" size="sm" className="h-8 px-3 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 hover:text-white">1</Button>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-lg" disabled><ChevronDown className="size-4 -rotate-90" /></Button>
-            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 rounded-lg cursor-pointer"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                >
+                  <ChevronDown className="size-4 rotate-90" />
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "ghost" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                    className={cn(
+                      "h-8 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      currentPage === page
+                        ? "bg-blue-600 text-white hover:bg-blue-700 hover:text-white"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100"
+                    )}
+                  >
+                    {page}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 rounded-lg cursor-pointer"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                >
+                  <ChevronDown className="size-4 -rotate-90" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : deliveryTypeFilter === 'domicilio' ? (
