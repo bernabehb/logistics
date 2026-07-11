@@ -257,3 +257,161 @@
 .dark .leaflet-tile-pane {
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
+/* Route authorization thermal tickets */
+.route-ticket-preview-root,
+.route-ticket-print-root {
+  color: #000 !important;
+  background: #fff !important;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.route-ticket-print-root {
+  display: none;
+}
+
+.route-ticket-preview-root,
+.route-ticket-preview-root *,
+.route-ticket-print-root,
+.route-ticket-print-root * {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  text-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+.route-ticket-page {
+  width: 8cm;
+  padding: 3mm 4mm 3mm;
+  background: #fff !important;
+  color: #000 !important;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.18;
+}
+
+.ticket-header {
+  padding: 0 3mm 5mm;
+  text-align: center;
+}
+
+.ticket-company {
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.ticket-route-title {
+  margin-top: 1mm;
+  font-weight: 900;
+  text-decoration: underline;
+}
+
+.ticket-warehouse {
+  margin-top: 2mm;
+}
+
+.ticket-warehouse-title {
+  margin: 0 3mm 5mm;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ticket-table-header,
+.ticket-row,
+.ticket-total {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 23mm;
+  column-gap: 2mm;
+  align-items: start;
+  padding: 1.4mm 2mm;
+  border-bottom: 1px dotted #000;
+}
+
+.ticket-table-header {
+  padding-top: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ticket-row span {
+  text-align: center;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.ticket-row strong,
+.ticket-total strong {
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 900;
+}
+
+.ticket-total {
+  margin-top: 1mm;
+  border-top: 1px solid #000;
+  border-bottom: none;
+  font-weight: 900;
+}
+
+.ticket-barcode-wrap {
+  margin-top: 6mm;
+  padding-top: 4mm;
+  border-top: 1px dotted #000;
+  text-align: center;
+}
+
+.ticket-barcode {
+  width: 44mm;
+  height: 18mm;
+  color: #000 !important;
+  display: block;
+  margin: 0 auto;
+}
+
+@media print {
+  @page {
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 80mm !important;
+    height: max-content !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  body > * {
+    display: none !important;
+  }
+
+  body > .route-ticket-print-root {
+    display: block !important;
+  }
+
+  .route-ticket-print-root,
+  .route-ticket-print-root * {
+    visibility: visible !important;
+  }
+
+  .route-ticket-print-root {
+    position: static !important;
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .route-ticket-page {
+    width: 80mm !important;
+    height: max-content !important;
+    box-shadow: none !important;
+  }
+}
+
+

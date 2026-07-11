@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
-import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check, MapPin } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check, MapPin, Printer } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RutaOrderCard, RutaPedido, RutaStatus, RutaInvoiceType } from "@/features/logistics/components/cards/RutaOrderCard";
@@ -36,6 +37,245 @@ const BLOCKS_LIST_FALLBACK = [
 
 const BRANCHES = ["APODACA", "GUADALUPE", "MONTERREY", "SANTA CATARINA"];
 
+interface RouteTicketLine {
+  description: string;
+  quantity: number;
+  unit: string;
+}
+
+interface RouteTicketWarehouse {
+  warehouse: string;
+  lines: RouteTicketLine[];
+}
+
+interface RouteTicket {
+  orderNum: number;
+  clientName: string;
+  vendor: string;
+  dateLabel: string;
+  warehouses: RouteTicketWarehouse[];
+  totalPieces: number;
+}
+
+const CODE39_PATTERNS: Record<string, string> = {
+  "0": "nnnwwnwnn",
+  "1": "wnnwnnnnw",
+  "2": "nnwwnnnnw",
+  "3": "wnwwnnnnn",
+  "4": "nnnwwnnnw",
+  "5": "wnnwwnnnn",
+  "6": "nnwwwnnnn",
+  "7": "nnnwnnwnw",
+  "8": "wnnwnnwnn",
+  "9": "nnwwnnwnn",
+  "*": "nwnnwnwnn"
+};
+
+const formatTicketDate = (date = new Date()) => {
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = date.toLocaleString("es-MX", { month: "short" }).replace(".", "").toUpperCase();
+  const year = date.getFullYear().toString().slice(-2);
+  const time = date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true }).toLowerCase();
+  return `${day}/${month}/${year} - ${time}`;
+};
+
+const formatTicketQuantity = (value: number) =>
+  value.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function Code39Barcode({ value }: { value: string }) {
+  const normalizedValue = value.replace(/[^0-9]/g, "");
+  const encodedValue = `*${normalizedValue}*`;
+  const narrow = 1;
+  const wide = 3;
+  const height = 40;
+  const bars: { x: number; width: number }[] = [];
+  let x = 0;
+
+  for (const char of encodedValue) {
+    const pattern = CODE39_PATTERNS[char] || CODE39_PATTERNS["0"];
+
+    pattern.split("").forEach((part, index) => {
+      const width = part === "w" ? wide : narrow;
+      if (index % 2 === 0) {
+        bars.push({ x, width });
+      }
+      x += width;
+    });
+
+    x += narrow;
+  }
+
+  return (
+    <svg className="ticket-barcode" viewBox={`0 0 ${x} 56`} role="img" aria-label={`Codigo de barras ${normalizedValue}`}>
+      {bars.map((bar, index) => (
+        <rect key={index} x={bar.x} y="0" width={bar.width} height={height} fill="currentColor" />
+      ))}
+      <text x={x / 2} y="53" textAnchor="middle" fontSize="8" fontFamily="Arial, sans-serif" fill="currentColor">
+        {normalizedValue}
+      </text>
+    </svg>
+  );
+}
+
+function TicketPages({ tickets }: { tickets: RouteTicket[] }) {
+  return (
+    <>
+      {tickets.map((ticket) => (
+        <section key={ticket.orderNum} className="route-ticket-page">
+          <div className="ticket-header">
+            <div className="ticket-company">COMPERS</div>
+            <div>Fecha: {ticket.dateLabel}</div>
+            <div>OV #{ticket.orderNum}</div>
+            <div>Cliente: {ticket.clientName}</div>
+            <div>Vendedor: {ticket.vendor}</div>
+            <div className="ticket-route-title">RUTA</div>
+          </div>
+
+          {ticket.warehouses.map((warehouse) => (
+            <div key={`${ticket.orderNum}-${warehouse.warehouse}`} className="ticket-warehouse">
+              <div className="ticket-warehouse-title">**ALMACEN {warehouse.warehouse}**</div>
+              <div className="ticket-table-header">
+                <span>Descripcion</span>
+                <span>Cant</span>
+              </div>
+              {warehouse.lines.map((line, index) => (
+                <div key={`${line.description}-${line.unit}-${index}`} className="ticket-row">
+                  <span>{line.description}</span>
+                  <strong>{formatTicketQuantity(line.quantity)} {line.unit}</strong>
+                </div>
+              ))}
+            </div>
+          ))}
+
+          <div className="ticket-total">
+            <span>TOTAL DE PIEZAS</span>
+            <strong>{formatTicketQuantity(ticket.totalPieces)} PZ</strong>
+          </div>
+
+          <div className="ticket-barcode-wrap">
+            <Code39Barcode value={String(ticket.orderNum)} />
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+
+function RouteTicketsDialog({
+  tickets,
+  open,
+  onOpenChange
+}: {
+  tickets: RouteTicket[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [currentTicketIndex, setCurrentTicketIndex] = useState(0);
+  const [printedTickets, setPrintedTickets] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (open) {
+      setCurrentTicketIndex(0);
+      setPrintedTickets(new Set());
+    }
+  }, [open, tickets.length]);
+
+  const currentTicket = tickets[currentTicketIndex];
+  const currentTicketList = currentTicket ? [currentTicket] : [];
+  const hasPrevious = currentTicketIndex > 0;
+  const hasNext = currentTicketIndex < tickets.length - 1;
+
+  const handlePrevious = () => {
+    setCurrentTicketIndex((current) => Math.max(current - 1, 0));
+  };
+
+  const handleNext = () => {
+    setCurrentTicketIndex((current) => Math.min(current + 1, tickets.length - 1));
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent 
+          onInteractOutside={(e) => e.preventDefault()}
+          className="max-w-[420px] max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-2xl"
+        >
+          <DialogHeader className="route-ticket-screen-controls">
+            <DialogTitle className="text-base font-black uppercase tracking-widest text-slate-900 dark:text-slate-100">
+              Tickets de salida
+            </DialogTitle>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {tickets.map((_, idx) => {
+                const isPrinted = printedTickets.has(idx);
+                const isCurrent = idx === currentTicketIndex;
+                let circleClass = "";
+                if (isCurrent && isPrinted) {
+                  circleClass = "border-slate-900 bg-green-500 text-white dark:border-slate-100";
+                } else if (isPrinted) {
+                  circleClass = "border-green-500 bg-green-500 text-white";
+                } else if (isCurrent) {
+                  circleClass = "border-slate-800 text-slate-800 dark:border-slate-200 dark:text-slate-200";
+                } else {
+                  circleClass = "border-slate-300 text-slate-400 dark:border-slate-700 dark:text-slate-500";
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-colors",
+                      circleClass
+                    )}
+                  >
+                    {isPrinted ? <Check className="size-3.5 stroke-[3]" /> : idx + 1}
+                  </div>
+                );
+              })}
+            </div>
+            <DialogDescription className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+              Ticket {tickets.length > 0 ? currentTicketIndex + 1 : 0} de {tickets.length}. Imprime uno por uno.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="route-ticket-preview-root mx-auto flex flex-col items-center gap-4 py-2">
+            <TicketPages tickets={currentTicketList} />
+          </div>
+
+          <DialogFooter className="route-ticket-screen-controls flex-col gap-2 sm:flex-col sm:gap-2">
+            <div className="grid w-full grid-cols-2 gap-2">
+              <Button variant="outline" onClick={handlePrevious} disabled={!hasPrevious} className="h-10 rounded-xl text-xs font-black uppercase tracking-widest">
+                Anterior
+              </Button>
+              <Button variant="outline" onClick={handleNext} disabled={!hasNext} className="h-10 rounded-xl text-xs font-black uppercase tracking-widest">
+                Siguiente
+              </Button>
+            </div>
+            <Button onClick={() => {
+              window.print();
+              setPrintedTickets((prev) => {
+                const next = new Set(prev);
+                next.add(currentTicketIndex);
+                return next;
+              });
+            }} disabled={!currentTicket} className="w-full h-10 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+              <Printer className="size-4 mr-2" />
+              Imprimir ticket
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {open && currentTicket && typeof document !== "undefined"
+        ? createPortal(
+          <div className="route-ticket-print-root" aria-hidden="true">
+            <TicketPages tickets={currentTicketList} />
+          </div>,
+          document.body
+        )
+        : null}
+    </>
+  );
+}
 const getLogisticsBranchId = (branch?: string) => {
   const normalized = branch?.trim().toUpperCase() || "";
   if (normalized.includes("MONTERREY")) return 1;
@@ -202,13 +442,15 @@ let cachedUnitCatalog: AvailableUnit[] | null = null;
 let cachedAssignedUnits: Record<string, AvailableUnit> | null = null;
 let cachedDrivers: Driver[] | null = null;
 let cachedBlocks: ApiBlockStatus[] | null = null;
-let cachedInvoicesByDriver: Record<string, RutaPedido[]> = {};
+const cachedInvoicesByDriver: Record<string, RutaPedido[]> = {};
+const cachedRouteRowsByDriver: Record<string, ApiRutaInvoice[]> = {};
 let lastDriverFilter: string = 'all';
 let lastBranchFilter: string = 'all';
 let lastViewMode: 'cards' | 'table' = 'cards';
 
 export default function RutasPage() {
   const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[lastDriverFilter] || []);
+  const [routeTicketRows, setRouteTicketRows] = useState<ApiRutaInvoice[]>(cachedRouteRowsByDriver[lastDriverFilter] || []);
   const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
   const [unitCatalog, setUnitCatalog] = useState<AvailableUnit[]>(cachedUnitCatalog || cachedUnidades || []);
   const [isLoading, setIsLoading] = useState(!cachedInvoices);
@@ -233,6 +475,8 @@ export default function RutasPage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [authorizingBlockName, setAuthorizingBlockName] = useState<string | null>(null);
   const [selectedInvoicesByBlock, setSelectedInvoicesByBlock] = useState<Record<string, string[]>>({});
+  const [routeTickets, setRouteTickets] = useState<RouteTicket[]>([]);
+  const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
   const handleOpenDetails = async (invoiceId: string) => {
     const invoiceNum = invoiceId;
     setSelectedInvoiceId(invoiceId);
@@ -347,7 +591,7 @@ export default function RutasPage() {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catalogos y asignaciones más recientes de la BD
+      // para traer los catalogos y asignaciones mÃ¡s recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
@@ -496,6 +740,89 @@ export default function RutasPage() {
 
   const formatKg = (value: number) =>
     `${value.toLocaleString("es-MX", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
+  const buildRouteTickets = (blockName: string, invoiceNums: string[]) => {
+    const invoiceSet = new Set(invoiceNums.map(invoice => invoice.trim().toUpperCase()).filter(Boolean));
+    const selectedBranchId = currentLogisticsBranchId();
+    const dateLabel = formatTicketDate();
+
+    const rows = routeTicketRows.filter(row => {
+      const rowInvoice = (row.factura || "").trim().toUpperCase();
+      if (!rowInvoice || !invoiceSet.has(rowInvoice)) return false;
+      if (normalizeBlockName(row.bloque || "") !== normalizeBlockName(blockName)) return false;
+
+      const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
+      const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
+      const rowBranchId = row.iIdLogisticsBranch ?? getLogisticsBranchId(mappedSucursal);
+      return !selectedBranchId || selectedBranchId <= 0 || rowBranchId === selectedBranchId;
+    });
+
+    const ticketsByOrder = new Map<number, RouteTicket & { warehouseMap: Map<string, Map<string, RouteTicketLine>> }>();
+
+    rows.forEach(row => {
+      if (!row.orderNum) return;
+
+      if (!ticketsByOrder.has(row.orderNum)) {
+        ticketsByOrder.set(row.orderNum, {
+          orderNum: row.orderNum,
+          clientName: row.cliente || "SIN CLIENTE",
+          vendor: row.vendedor || "SIN VENDEDOR",
+          dateLabel,
+          warehouses: [],
+          totalPieces: 0,
+          warehouseMap: new Map()
+        });
+      }
+
+      const ticket = ticketsByOrder.get(row.orderNum)!;
+      const warehouse = (row.almacen || row.almacenDescripcionEpicor || "GENERAL").trim().toUpperCase();
+      const description = (row.material || row.partNum || "SIN DESCRIPCION").trim().toUpperCase();
+      const unit = (row.unidadEmbarque || row.salesUM || "PZ").trim().toUpperCase();
+      const quantity = Number(row.cantidad ?? row.orderQty ?? 0) || 0;
+      const lineKey = `${description}|${unit}`;
+
+      if (!ticket.warehouseMap.has(warehouse)) {
+        ticket.warehouseMap.set(warehouse, new Map());
+      }
+
+      const warehouseLines = ticket.warehouseMap.get(warehouse)!;
+      const existingLine = warehouseLines.get(lineKey);
+      if (existingLine) {
+        existingLine.quantity += quantity;
+      } else {
+        warehouseLines.set(lineKey, { description, quantity, unit });
+      }
+
+      if (unit === "PZ") {
+        ticket.totalPieces += quantity;
+      }
+    });
+
+    return Array.from(ticketsByOrder.values())
+      .sort((a, b) => a.orderNum - b.orderNum)
+      .map(ticket => {
+        const warehouses = Array.from(ticket.warehouseMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([warehouse, lines]) => ({
+            warehouse,
+            lines: Array.from(lines.values()).sort((a, b) => a.description.localeCompare(b.description))
+          }));
+
+        const totalPieces = ticket.totalPieces > 0
+          ? ticket.totalPieces
+          : warehouses.flatMap(warehouse => warehouse.lines).reduce((sum, line) => sum + line.quantity, 0);
+
+        return {
+          orderNum: ticket.orderNum,
+          clientName: ticket.clientName,
+          vendor: ticket.vendor,
+          dateLabel: ticket.dateLabel,
+          warehouses,
+          totalPieces
+        };
+      })
+      .filter(ticket => ticket.warehouses.length > 0);
+  };
+
   const getSuggestedUnits = (requiredWeightKg: number, selectedUnit?: AvailableUnit) => {
     const selectedBranch = branchFilter === 'all' ? "" : branchFilter.toUpperCase();
 
@@ -519,7 +846,7 @@ export default function RutasPage() {
     if (branchFilter === 'all') {
       await showError({
         title: "Selecciona una sucursal",
-        text: "Para autorizar debes filtrar por una sucursal específica.",
+        text: "Para autorizar debes filtrar por una sucursal especÃ­fica.",
         timer: 2600
       });
       return;
@@ -531,7 +858,7 @@ export default function RutasPage() {
     if (!apiBlock) {
       await showError({
         title: "Bloque no encontrado",
-        text: `No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`
+        text: `No se pudo encontrar el ID del bloque "${blockName}" en el catÃ¡logo.`
       });
       return;
     }
@@ -561,7 +888,7 @@ export default function RutasPage() {
         closeSwal();
         await showError({
           title: "Selecciona una sucursal",
-          text: "Para autorizar debes filtrar por una sucursal específica.",
+          text: "Para autorizar debes filtrar por una sucursal especÃ­fica.",
           timer: 2600
         });
         return;
@@ -575,6 +902,8 @@ export default function RutasPage() {
         });
         return;
       }
+
+      const ticketsToPrint = authorize ? buildRouteTickets(blockName, invoiceNums) : [];
 
       const response = await fetch(
         useInvoiceAuthorization
@@ -616,6 +945,11 @@ export default function RutasPage() {
           : `Las facturas del bloque <b>${blockName}</b> regresaron correctamente.`,
         timer: 1800
       });
+
+      if (authorize && ticketsToPrint.length > 0) {
+        setRouteTickets(ticketsToPrint);
+        setIsTicketDialogOpen(true);
+      }
 
       clearBlockInvoiceSelection(blockScopeKey);
       await fetchAllData(true, true);
@@ -680,7 +1014,7 @@ export default function RutasPage() {
     const confirmed = await showConfirm({
       icon: authorize ? "question" : "warning",
       iconColor: authorize ? "#60a5fa" : "#f59e0b",
-      title: authorize ? "¿Autorizar bloque?" : "¿Regresar bloque?",
+      title: authorize ? "Â¿Autorizar bloque?" : "Â¿Regresar bloque?",
       html: authorize
         ? selectedCount > 0
           ? `Se creara la ruta en Samsara y se autorizaran <b>${selectedCount}</b> facturas seleccionadas del bloque <b>${blockName}</b>.`
@@ -697,13 +1031,13 @@ export default function RutasPage() {
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
     if (isFetchingRef.current) {
-      console.log("Fetch en progreso, omitiendo petición concurrente.");
+      console.log("Fetch en progreso, omitiendo peticiÃ³n concurrente.");
       return;
     }
     isFetchingRef.current = true;
     const requestId = ++lastRequestRef.current;
 
-    if (!forceRefresh && !silent && cachedInvoicesByDriver[driverFilter]) {
+    if (!forceRefresh && !silent && cachedInvoicesByDriver[driverFilter] && cachedRouteRowsByDriver[driverFilter]) {
       setInvoices(cachedInvoicesByDriver[driverFilter]);
       setIsLoading(false);
       isFetchingRef.current = false;
@@ -793,6 +1127,8 @@ export default function RutasPage() {
 
       if (!routesResponse.ok) throw new Error('No se pudo conectar con el servidor de rutas');
       const data: ApiRutaInvoice[] = await routesResponse.json();
+      cachedRouteRowsByDriver[driverFilter] = data;
+      setRouteTicketRows(data);
 
       const groupedMap = new Map<string, RutaPedido & { block: string }>();
 
@@ -879,7 +1215,7 @@ export default function RutasPage() {
       setError(null);
     } catch (err) {
       console.error("Error fetching routes:", err);
-      setError("Error al cargar la información de rutas dinámica");
+      setError("Error al cargar la informaciÃ³n de rutas dinÃ¡mica");
     } finally {
       isFetchingRef.current = false;
       setIsRefreshing(false);
@@ -1251,7 +1587,7 @@ export default function RutasPage() {
                           <Truck className="size-8 text-slate-300 dark:text-slate-600" />
                         </div>
                         <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de bÃºsqueda, estatus o fecha</p>
                       </div>
                     </td>
                   </tr>
@@ -1689,6 +2025,12 @@ export default function RutasPage() {
         </div>
       )}
 
+      <RouteTicketsDialog
+        tickets={routeTickets}
+        open={isTicketDialogOpen}
+        onOpenChange={setIsTicketDialogOpen}
+      />
+
       <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
         <DialogContent className="w-full h-full sm:h-auto sm:max-w-[500px] p-0 overflow-y-auto sm:overflow-hidden bg-white dark:bg-slate-900 border-none shadow-2xl rounded-none sm:rounded-3xl">
           <div className="p-4 sm:p-6 space-y-6">
@@ -1712,7 +2054,7 @@ export default function RutasPage() {
                   <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                     <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
                       <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                        Almacén: {group.almacen}
+                        AlmacÃ©n: {group.almacen}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 capitalize">
                         {group.materiales.length} productos
@@ -1755,8 +2097,6 @@ export default function RutasPage() {
     </div>
   );
 }
-
-
 
 
 
