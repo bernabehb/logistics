@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check, MapPin } from "lucide-react";
-import { API_ENDPOINTS, API_HEADERS } from "@/lib/apiConfig";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RutaOrderCard, RutaPedido, RutaStatus, RutaInvoiceType } from "@/features/logistics/components/cards/RutaOrderCard";
@@ -221,7 +220,6 @@ export default function RutasPage() {
   const [statusFilters, setStatusFilters] = useState<RutaStatus[]>([]);
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<RutaInvoiceType>('normal');
   const [assignedUnits, setAssignedUnits] = useState<Record<string, AvailableUnit>>(cachedAssignedUnits || {});
-  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(lastViewMode);
   const [driverFilter, setDriverFilter] = useState<string>(lastDriverFilter);
   const [branchFilter, setBranchFilter] = useState<string>(lastBranchFilter);
@@ -229,12 +227,12 @@ export default function RutasPage() {
   const ITEMS_PER_PAGE = 15;
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
   const [apiBlocks, setApiBlocks] = useState<ApiBlockStatus[]>(cachedBlocks || []);
-  const [isAssigning, setIsAssigning] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [invoiceDetails, setInvoiceDetails] = useState<FetchedInvoiceDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [authorizingBlockName, setAuthorizingBlockName] = useState<string | null>(null);
+  const [selectedInvoicesByBlock, setSelectedInvoicesByBlock] = useState<Record<string, string[]>>({});
   const handleOpenDetails = async (invoiceId: string) => {
     const invoiceNum = invoiceId;
     setSelectedInvoiceId(invoiceId);
@@ -380,69 +378,124 @@ export default function RutasPage() {
     };
   }, [driverFilter]);
 
-  const handleAssignUnit = async (blockName: string, unit: AvailableUnit | null) => {
-    const logisticsBranchId = currentLogisticsBranchId();
-    const blockScopeKey = currentBlockScopeKey(blockName);
-    const apiBlock = getActiveRouteBlock(apiBlocks, blockName, logisticsBranchId);
-
-    if (!apiBlock) {
-      alert(`No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`);
-      return;
-    }
-
-    const originalAssignments = { ...assignedUnits };
-
-    setAssignedUnits(prev => {
-      const next = { ...prev };
-      if (unit) {
-        next[blockScopeKey] = unit;
-      } else {
-        delete next[blockScopeKey];
-      }
-      return next;
-    });
-
-    try {
-      setIsAssigning(blockScopeKey);
-      const response = await fetch('/api/logistics/assign-unit-to-block', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
-          iIdUnit: unit ? Number(unit.iId) : 0,
-          iIdLogisticsBranch: logisticsBranchId || null
-        })
-      });
-
-      if (!response.ok) throw new Error("Error en la asignación");
-
-      fetchAllData(true, true);
-    } catch (err) {
-      console.error("Error assigning unit to block:", err);
-      setAssignedUnits(originalAssignments); // Rollback
-      alert("Hubo un error al asignar la unidad al bloque.");
-    } finally {
-      setIsAssigning(null);
-      setOpenPopoverId(null);
-    }
-  };
-  const getVisibleBlockInvoiceNums = (blockName: string) => {
+  const getVisibleBlockInvoiceItems = (blockName: string) => {
     return (groupedData[blockName] || [])
-      .filter(p => !p.id.startsWith('ORDER-'))
+      .filter(p => !p.id.startsWith('ORDER-'));
+  };
+
+  const getVisibleBlockInvoiceNums = (blockName: string) => {
+    return getVisibleBlockInvoiceItems(blockName)
       .map(p => p.id.trim().toUpperCase())
       .filter(Boolean)
       .filter((value, index, array) => array.indexOf(value) === index);
   };
 
   const getVisibleBlockWeightKg = (blockName: string) => {
-    return (groupedData[blockName] || [])
-      .filter(p => !p.id.startsWith('ORDER-'))
+    return getVisibleBlockInvoiceItems(blockName)
       .reduce((sum, p) => sum + (Number(p.totalWeightKg) || 0), 0);
+  };
+
+  const isInvoiceSelectableForPartialRoute = (pedido: RutaPedido) => {
+    return !pedido.id.startsWith('ORDER-') && pedido.estadoGeneral === 'ready';
+  };
+
+  const getSelectableBlockInvoiceNums = (blockName: string) => {
+    return getVisibleBlockInvoiceItems(blockName)
+      .filter(isInvoiceSelectableForPartialRoute)
+      .map(p => p.id.trim().toUpperCase())
+      .filter(Boolean)
+      .filter((value, index, array) => array.indexOf(value) === index);
+  };
+
+  const getSelectedBlockInvoiceNums = (blockName: string) => {
+    const selected = selectedInvoicesByBlock[currentBlockScopeKey(blockName)] || [];
+    const selectable = new Set(getSelectableBlockInvoiceNums(blockName));
+
+    return selected
+      .map(x => x.trim().toUpperCase())
+      .filter(invoice => selectable.has(invoice))
+      .filter((value, index, array) => array.indexOf(value) === index);
+  };
+
+  const getSelectedBlockWeightKg = (blockName: string) => {
+    const selected = new Set(getSelectedBlockInvoiceNums(blockName));
+    if (selected.size === 0) return 0;
+
+    return getVisibleBlockInvoiceItems(blockName)
+      .filter(p => selected.has(p.id.trim().toUpperCase()))
+      .reduce((sum, p) => sum + (Number(p.totalWeightKg) || 0), 0);
+  };
+
+  const isBlockInvoiceSelected = (blockName: string, invoiceId: string) => {
+    return getSelectedBlockInvoiceNums(blockName).includes(invoiceId.trim().toUpperCase());
+  };
+
+  const toggleBlockInvoiceSelection = (blockName: string, pedido: RutaPedido) => {
+    if (!isInvoiceSelectableForPartialRoute(pedido)) return;
+
+    const invoiceNum = pedido.id.trim().toUpperCase();
+    const blockScopeKey = currentBlockScopeKey(blockName);
+
+    setSelectedInvoicesByBlock(prev => {
+      const current = prev[blockScopeKey] || [];
+      const exists = current.includes(invoiceNum);
+      const nextInvoices = exists
+        ? current.filter(x => x !== invoiceNum)
+        : [...current, invoiceNum];
+      const next = { ...prev };
+
+      if (nextInvoices.length > 0) {
+        next[blockScopeKey] = nextInvoices;
+      } else {
+        delete next[blockScopeKey];
+      }
+
+      return next;
+    });
+  };
+
+  const clearBlockInvoiceSelection = (blockScopeKey: string) => {
+    setSelectedInvoicesByBlock(prev => {
+      if (!prev[blockScopeKey]) return prev;
+      const next = { ...prev };
+      delete next[blockScopeKey];
+      return next;
+    });
+  };
+
+  const renderInvoiceSelectionButton = (blockName: string, pedido: RutaPedido, className?: string) => {
+    if (pedido.id.startsWith('ORDER-')) return null;
+
+    const isSelectable = isInvoiceSelectableForPartialRoute(pedido);
+    const isSelected = isBlockInvoiceSelected(blockName, pedido.id);
+
+    return (
+      <button
+        type="button"
+        title={isSelectable ? "Seleccionar factura" : "Factura no lista para salida"}
+        aria-label={isSelectable ? `Seleccionar factura ${pedido.id}` : `Factura ${pedido.id} no lista para salida`}
+        aria-pressed={isSelected}
+        disabled={!isSelectable}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleBlockInvoiceSelection(blockName, pedido);
+        }}
+        className={cn(
+          "size-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all",
+          isSelected
+            ? "bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/30"
+            : "bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-transparent hover:border-blue-400 dark:hover:border-blue-500",
+          !isSelectable && "opacity-30 cursor-not-allowed hover:border-slate-300 dark:hover:border-slate-700",
+          className
+        )}
+      >
+        <Check className="size-3.5 stroke-[4]" />
+      </button>
+    );
   };
 
   const formatKg = (value: number) =>
     `${value.toLocaleString("es-MX", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
-
   const getSuggestedUnits = (requiredWeightKg: number, selectedUnit?: AvailableUnit) => {
     const selectedBranch = branchFilter === 'all' ? "" : branchFilter.toUpperCase();
 
@@ -497,9 +550,10 @@ export default function RutasPage() {
       const useInvoiceAuthorization = branchFilter !== 'all';
       const authorizedInvoiceNums = parseInvoiceCsv(apiBlock.sAuthorizedInvoices);
       const visibleInvoiceNums = getVisibleBlockInvoiceNums(blockName);
+      const selectedInvoiceNums = getSelectedBlockInvoiceNums(blockName);
       const invoiceNums = useInvoiceAuthorization
         ? authorize
-          ? visibleInvoiceNums
+          ? (selectedInvoiceNums.length > 0 ? selectedInvoiceNums : visibleInvoiceNums)
           : (authorizedInvoiceNums.length > 0 ? authorizedInvoiceNums : visibleInvoiceNums)
         : [];
 
@@ -563,6 +617,7 @@ export default function RutasPage() {
         timer: 1800
       });
 
+      clearBlockInvoiceSelection(blockScopeKey);
       await fetchAllData(true, true);
     } catch (err: unknown) {
       console.error("Error authorizing block:", err);
@@ -586,6 +641,9 @@ export default function RutasPage() {
   };
 
   const handleAuthorizeBlock = async (blockName: string, authorize: boolean) => {
+    const selectedInvoiceNums = getSelectedBlockInvoiceNums(blockName);
+    const selectedCount = selectedInvoiceNums.length;
+
     if (authorize) {
       if (branchFilter === 'all') {
         await showError({
@@ -598,7 +656,8 @@ export default function RutasPage() {
 
       const apiBlock = getRouteBlockForDisplay(blockName);
       const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
-      const requiredWeightKg = getVisibleBlockWeightKg(blockName);
+      const selectedWeightKg = getSelectedBlockWeightKg(blockName);
+      const requiredWeightKg = selectedCount > 0 ? selectedWeightKg : getVisibleBlockWeightKg(blockName);
       const capacityKg = Number(assignedUnit?.capacityKg || 0);
 
       if (assignedUnit && requiredWeightKg > 0 && capacityKg > 0 && requiredWeightKg > capacityKg) {
@@ -623,7 +682,9 @@ export default function RutasPage() {
       iconColor: authorize ? "#60a5fa" : "#f59e0b",
       title: authorize ? "¿Autorizar bloque?" : "¿Regresar bloque?",
       html: authorize
-        ? `Se creara la ruta en Samsara y se autorizaran solo las facturas visibles de la sucursal seleccionada para el bloque <b>${blockName}</b>.`
+        ? selectedCount > 0
+          ? `Se creara la ruta en Samsara y se autorizaran <b>${selectedCount}</b> facturas seleccionadas del bloque <b>${blockName}</b>.`
+          : `Se creara la ruta en Samsara y se autorizaran solo las facturas visibles de la sucursal seleccionada para el bloque <b>${blockName}</b>.`
         : `Se regresaran las facturas del bloque <b>${blockName}</b> para incluir nuevas facturas y volver a autorizar.`,
       confirmButtonText: authorize ? "Si, autorizar" : "Si, regresar",
       confirmButtonColor: authorize ? "#2563eb" : "#f59e0b"
@@ -1267,9 +1328,13 @@ export default function RutasPage() {
                     const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
                     const isAllBranches = branchFilter === 'all';
                     const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
-                    const canAuthorize = !!assignedUnit && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
+                    const selectedInvoiceNums = getSelectedBlockInvoiceNums(blockName);
+                    const selectedCount = selectedInvoiceNums.length;
+                    const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-')));
                     const isProcessing = authorizingBlockName === blockScopeKey;
                     const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
+                    const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
+                    const displayBlockWeightKg = selectedCount > 0 ? selectedBlockWeightKg : totalBlockWeightKg;
                     return (
                       <Fragment key={blockName}>
                         <tr className="bg-slate-100/90 dark:bg-slate-800/70 border-y border-slate-300/80 dark:border-slate-700/80">
@@ -1280,9 +1345,14 @@ export default function RutasPage() {
                                 <div className="size-5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white dark:ring-slate-900 shrink-0">
                                   {items.length}
                                 </div>
-                                {totalBlockWeightKg > 0 && (
+                                {displayBlockWeightKg > 0 && (
                                   <span className="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">
-                                    {formatKg(totalBlockWeightKg)}
+                                    {formatKg(displayBlockWeightKg)}
+                                  </span>
+                                )}
+                                {selectedCount > 0 && (
+                                  <span className="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-blue-700 dark:text-blue-300 whitespace-nowrap shrink-0">
+                                    {selectedCount} sel.
                                   </span>
                                 )}
                               </div>
@@ -1313,85 +1383,23 @@ export default function RutasPage() {
                                       ? "Regresar"
                                       : "Autorizar"}
                                 </Button>
-
-                                <Popover
-                                  open={openPopoverId === `${blockScopeKey}-table`}
-                                  onOpenChange={(open) => setOpenPopoverId(open ? `${blockScopeKey}-table` : null)}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className={cn(
+                                    "h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-2 transition-all cursor-default",
+                                    assignedUnit
+                                      ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
+                                      : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
+                                  )}
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label="Unidad asignada desde Samsara"
                                 >
-                                  <PopoverTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={isAssigning === blockScopeKey || isAllBranches}
-                                      className={cn(
-                                        "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
-                                        assignedUnit
-                                          ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
-                                          : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
-                                      )}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {isAssigning === blockScopeKey ? (
-                                        <RefreshCw className="size-3.5 animate-spin" />
-                                      ) : (
-                                        <Truck className="size-3.5" />
-                                      )}
-                                      <span className="uppercase tracking-widest truncate max-w-[100px]">
-                                        {assignedUnit ? assignedUnit.name : "Unidad"}
-                                      </span>
-                                      <ChevronDown className="size-3 opacity-50" />
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-48 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex flex-col gap-1">
-                                      <p className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
-                                        Seleccionar Unidad
-                                      </p>
-                                      <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
-                                        <button
-                                          onClick={() => handleAssignUnit(blockName, null)}
-                                          className={cn(
-                                            "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
-                                            !assignedUnit
-                                              ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
-                                              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                                          )}
-                                        >
-                                          Sin Asignación
-                                        </button>
-                                        <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
-                                        {unidadesDisponibles.length > 0 ? (
-                                          unidadesDisponibles.map((unid) => (
-                                            <button
-                                              key={unid.id}
-                                              onClick={() => handleAssignUnit(blockName, unid)}
-                                              className={cn(
-                                                "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
-                                                assignedUnit?.id === unid.id
-                                                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                                                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                                              )}
-                                            >
-                                              <span>{unid.name}</span>
-                                              <span className={cn(
-                                                "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
-                                                assignedUnit?.id === unid.id
-                                                  ? "bg-white/20 text-white"
-                                                  : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-                                              )}>
-                                                {unid.capacityKg ? `${unid.sucursal} - ${Math.round(unid.capacityKg)} kg` : unid.sucursal}
-                                              </span>
-                                            </button>
-                                          ))
-                                        ) : (
-                                          <div className="px-3 py-4 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest">
-                                            No hay unidades disponibles
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
+                                  <Truck className="size-3.5" />
+                                  <span className="uppercase tracking-widest truncate max-w-[100px]">
+                                    {assignedUnit ? assignedUnit.name : "Sin unidad"}
+                                  </span>
+                                </Button>
                               </div>
                             </div>
                           </td>
@@ -1404,11 +1412,14 @@ export default function RutasPage() {
                           return (
                             <tr key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                               <td className="px-6 py-5">
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-black text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                    {p.id.startsWith('ORDER-') ? `Orden: ${p.id.split('-')[1]}` : `Factura: ${p.id}`}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
+                                <div className="flex items-start gap-3">
+                                  {renderInvoiceSelectionButton(blockName, p, "mt-0.5")}
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-black text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                      {p.id.startsWith('ORDER-') ? `Orden: ${p.id.split('-')[1]}` : `Factura: ${p.id}`}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
+                                  </div>
                                 </div>
                               </td>
                               <td className="px-6 py-5">
@@ -1535,9 +1546,13 @@ export default function RutasPage() {
               const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
               const isAllBranches = branchFilter === 'all';
               const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
-              const canAuthorize = !!assignedUnit && items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-'));
+              const selectedInvoiceNums = getSelectedBlockInvoiceNums(blockName);
+              const selectedCount = selectedInvoiceNums.length;
+              const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-')));
               const isProcessing = authorizingBlockName === blockScopeKey;
               const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
+              const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
+              const displayBlockWeightKg = selectedCount > 0 ? selectedBlockWeightKg : totalBlockWeightKg;
               return (
                 <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
                   <CardHeader className="p-4 pb-0">
@@ -1575,92 +1590,35 @@ export default function RutasPage() {
                                 ? "Regresar"
                                 : "Autorizar"}
                           </Button>
-
-                          <Popover
-                            open={openPopoverId === blockScopeKey}
-                            onOpenChange={(open) => setOpenPopoverId(open ? blockScopeKey : null)}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-2 transition-all cursor-default",
+                              assignedUnit
+                                ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
+                                : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
+                            )}
+                            aria-label="Unidad asignada desde Samsara"
                           >
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={isAssigning === blockScopeKey || isAllBranches}
-                                className={cn(
-                                  "h-8 px-3 text-[10px] font-black border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2 transition-all hover:bg-slate-50",
-                                  assignedUnit
-                                    ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-none ring-0 opacity-100"
-                                    : "bg-white dark:bg-slate-800 shadow-sm opacity-80"
-                                )}
-                              >
-                                {isAssigning === blockScopeKey ? (
-                                  <RefreshCw className="size-3.5 animate-spin" />
-                                ) : (
-                                  <Truck className="size-3.5" />
-                                )}
-                                <span className="uppercase tracking-widest truncate max-w-[100px]">
-                                  {assignedUnit ? assignedUnit.name : "Unidad"}
-                                </span>
-                                <ChevronDown className="size-3 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
-                              <div className="flex flex-col gap-1">
-                                <p className="px-2 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
-                                  Seleccionar Unidad
-                                </p>
-                                <div className="grid grid-cols-1 gap-0.5 max-h-[240px] overflow-y-auto pr-1 select-none no-scrollbar">
-                                  <button
-                                    onClick={() => handleAssignUnit(blockName, null)}
-                                    className={cn(
-                                      "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all",
-                                      !assignedUnit
-                                        ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm"
-                                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                                    )}
-                                  >
-                                    Sin Asignación
-                                  </button>
-                                  <div className="h-px bg-slate-100 dark:bg-slate-800 my-0.5 mx-2"></div>
-                                  {unidadesDisponibles.length > 0 ? (
-                                    unidadesDisponibles.map((unid) => (
-                                      <button
-                                        key={unid.id}
-                                        onClick={() => handleAssignUnit(blockName, unid)}
-                                        className={cn(
-                                          "w-full text-left px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex justify-between items-center",
-                                          assignedUnit?.id === unid.id
-                                            ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                                            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                                        )}
-                                      >
-                                        <span>{unid.name}</span>
-                                        <span className={cn(
-                                          "text-[8px] px-1.5 py-0.5 rounded-md truncate max-w-[80px]",
-                                          assignedUnit?.id === unid.id
-                                            ? "bg-white/20 text-white"
-                                            : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-                                        )}>
-                                          {unid.capacityKg ? `${unid.sucursal} - ${Math.round(unid.capacityKg)} kg` : unid.sucursal}
-                                        </span>
-                                      </button>
-                                    ))
-                                  ) : (
-                                    <div className="px-3 py-4 text-center text-slate-400 text-[9px] font-black uppercase tracking-widest">
-                                      No hay unidades disponibles
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                            <Truck className="size-3.5" />
+                            <span className="uppercase tracking-widest truncate max-w-[100px]">
+                              {assignedUnit ? assignedUnit.name : "Sin unidad"}
+                            </span>
+                          </Button>
                         </div>
                       </div>
 
-                      {totalBlockWeightKg > 0 ? (
+                      {displayBlockWeightKg > 0 ? (
                         <div className="flex items-center gap-1.5 h-5">
                           <span className="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">
-                            {formatKg(totalBlockWeightKg)}
+                            {formatKg(displayBlockWeightKg)}
                           </span>
+                          {selectedCount > 0 && (
+                            <span className="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-blue-700 dark:text-blue-300 whitespace-nowrap shrink-0">
+                              {selectedCount} sel.
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <div className="h-5" />
@@ -1676,11 +1634,24 @@ export default function RutasPage() {
                           ? "max-h-[510px] overflow-y-auto pr-2 custom-scrollbar"
                           : "h-auto overflow-visible pr-0"
                       )}>
-                        {items.map(p => (
-                          <div key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} className="shrink-0">
-                            <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
-                          </div>
-                        ))}
+                        {items.map(p => {
+                          const isSelected = isBlockInvoiceSelected(blockName, p.id);
+
+                          return (
+                            <div
+                              key={`${p.id}-${p.logisticsBranchId || p.sucursal}`}
+                              className={cn(
+                                "shrink-0 relative rounded-2xl transition-all",
+                                isSelected && "outline outline-2 outline-blue-500/80 outline-offset-[-2px] shadow-[inset_4px_0_0_rgba(37,99,235,0.95)]"
+                              )}
+                            >
+                              <div className="absolute top-3 right-3 z-10">
+                                {renderInvoiceSelectionButton(blockName, p)}
+                              </div>
+                              <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800/50 rounded-3xl opacity-40">
@@ -1784,6 +1755,8 @@ export default function RutasPage() {
     </div>
   );
 }
+
+
 
 
 

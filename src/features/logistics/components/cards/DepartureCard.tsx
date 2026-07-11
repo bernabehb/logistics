@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw } from "lucide-react";
+import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw, Pencil, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { showConfirm, showError, showSuccess } from "@/lib/mySwal";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
@@ -93,6 +93,16 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isDelivering, setIsDelivering] = useState(false);
   const [isSendingManualRoute, setIsSendingManualRoute] = useState(false);
+  const [locationOverrides, setLocationOverrides] = useState<string[]>(departure.locations || []);
+  const [editingLocationIndex, setEditingLocationIndex] = useState<number | null>(null);
+  const [editingAddress, setEditingAddress] = useState("");
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+
+  useEffect(() => {
+    setLocationOverrides(departure.locations || []);
+  }, [departure.locations]);
+
+  const displayedLocations = locationOverrides.length > 0 ? locationOverrides : departure.locations;
 
   // Detección de facturas agregadas posteriormente (desde el backend)
   const addedInvoicesCount = React.useMemo(() =>
@@ -470,12 +480,102 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       });
     } catch (err) {
       console.error(err);
+      setEditingLocationIndex(null);
+      await new Promise(resolve => setTimeout(resolve, 50));
       await showError({
         title: "No se pudo mandar en ruta",
         text: err instanceof Error ? err.message : "Ocurrio un error al mandar la carga escaneada en ruta."
       });
     } finally {
       setIsSendingManualRoute(false);
+    }
+  };
+
+  const openAddressEditor = (index: number, address: string) => {
+    setEditingLocationIndex(index);
+    setEditingAddress(address);
+  };
+
+  const closeAddressEditor = () => {
+    if (isSavingAddress) return;
+    setEditingLocationIndex(null);
+    setEditingAddress("");
+  };
+
+  const handleSaveShippingAddress = async () => {
+    if (editingLocationIndex === null) return;
+
+    const requestedAddress = editingAddress.trim();
+    if (!requestedAddress) {
+      setEditingLocationIndex(null);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await showError({
+        title: "Direccion requerida",
+        text: "Escribe la nueva direccion de envio antes de guardar."
+      });
+      return;
+    }
+
+    const invoiceNums = displayedLocations.length <= 1
+      ? departure.invoices.map(inv => inv.id).filter(Boolean)
+      : [departure.invoices[editingLocationIndex]?.id].filter(Boolean);
+
+    if (invoiceNums.length === 0) {
+      setEditingLocationIndex(null);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await showError({
+        title: "Sin factura",
+        text: "No se encontro una factura para actualizar esta direccion."
+      });
+      return;
+    }
+
+    setIsSavingAddress(true);
+    try {
+      let normalizedAddress = requestedAddress;
+
+      for (const invoiceNum of invoiceNums) {
+        const response = await fetch('/api/logistics/update-shipping-address', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceNum, requestedAddress }),
+        });
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok || data?.success === false) {
+          throw new Error(data?.message || data?.error || `No se pudo actualizar la factura ${invoiceNum}.`);
+        }
+
+        normalizedAddress = data?.googleFormattedAddress || data?.GoogleFormattedAddress || data?.requestedAddress || data?.RequestedAddress || normalizedAddress;
+      }
+
+      setLocationOverrides(prev => {
+        const next = [...(prev.length > 0 ? prev : departure.locations)];
+        next[editingLocationIndex] = normalizedAddress;
+        return next;
+      });
+
+      setEditingLocationIndex(null);
+      setEditingAddress("");
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      await showSuccess({
+        title: "Direccion actualizada",
+        text: invoiceNums.length > 1
+          ? `Se actualizo la direccion para ${invoiceNums.length} facturas.`
+          : `Se actualizo la direccion de la factura ${invoiceNums[0]}.`,
+        timer: 1700
+      });
+    } catch (err) {
+      console.error(err);
+      setEditingLocationIndex(null);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await showError({
+        title: "No se pudo actualizar",
+        text: err instanceof Error ? err.message : "Ocurrio un error al actualizar la direccion de envio."
+      });
+    } finally {
+      setIsSavingAddress(false);
     }
   };
 
@@ -611,17 +711,30 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                 {/* Vertical Connecting Line */}
                 <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-blue-200 to-slate-200 dark:from-blue-500/30 dark:to-slate-700/30 rounded-full" />
 
-                {departure.locations.map((loc, i) => (
+                {displayedLocations.map((loc, i) => (
                   <div key={i} className="relative flex items-start gap-4 group/stop">
                     {/* Stop Number Indicator */}
                     <div className="relative z-10 flex items-center justify-center size-3.5 bg-white dark:bg-slate-900 border-2 border-blue-400 dark:border-blue-500 rounded-full shrink-0 mt-0.5 group-hover/stop:scale-110 group-hover/stop:bg-blue-50 dark:group-hover/stop:bg-blue-900/40 transition-all">
                       <span className="text-[7.5px] font-black text-blue-600 dark:text-blue-400 leading-none">{i + 1}</span>
                     </div>
 
-                    <div className="flex flex-col min-w-0">
+                    <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
                       <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-snug group-hover/stop:text-blue-600 dark:group-hover/stop:text-blue-400 transition-colors">
                         {loc}
                       </span>
+
+                      {departure.status === "En ruta" && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => openAddressEditor(i, loc)}
+                          className="-mt-1 text-blue-500 hover:bg-blue-50 hover:text-blue-600 dark:text-blue-400 dark:hover:bg-blue-500/10 shrink-0"
+                          title="Editar direccion de envio"
+                        >
+                          <Pencil className="size-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -630,6 +743,75 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
           )}
         </div>
       </CardContent>
+
+      <Dialog open={editingLocationIndex !== null} onOpenChange={(open) => {
+        if (!open) closeAddressEditor();
+      }}>
+        <DialogContent className="sm:max-w-[460px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+              Editar direccion de envio
+            </DialogTitle>
+            <DialogDescription className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Se normalizara con Google y se actualizara el stop pendiente en Samsara.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                Facturas
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {(displayedLocations.length <= 1
+                  ? departure.invoices
+                  : departure.invoices[editingLocationIndex ?? 0]
+                    ? [departure.invoices[editingLocationIndex ?? 0]]
+                    : []
+                ).map((inv) => (
+                  <span key={inv.id} className="text-[10px] font-bold px-2 py-0.5 border rounded-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                    {inv.id}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Nueva direccion
+              </label>
+              <Input
+                value={editingAddress}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingAddress(e.target.value)}
+                disabled={isSavingAddress}
+                className="h-11 rounded-xl text-xs font-bold"
+                placeholder="Escribe la direccion de envio"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="bg-transparent border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeAddressEditor}
+              disabled={isSavingAddress}
+              className="rounded-xl"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveShippingAddress}
+              disabled={isSavingAddress || !editingAddress.trim()}
+              className="rounded-xl bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              {isSavingAddress ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <Save className="size-4 mr-2" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CardFooter className="px-5 pb-4">
         <div className="w-full shrink-0">
@@ -1036,6 +1218,12 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     </Card>
   );
 }
+
+
+
+
+
+
 
 
 
