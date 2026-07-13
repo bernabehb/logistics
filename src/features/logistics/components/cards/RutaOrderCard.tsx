@@ -128,7 +128,7 @@ export function RutaOrderCard({ pedido, activeStatusFilters, onClick }: RutaOrde
                     {label}
                   </span>
                   {id === "Vidrio" && pedido.hasGlassCut && (
-                    <div className="mt-0.5 bg-blue-600 dark:bg-blue-500 text-white dark:text-white px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow-sm">
+                    <div className="mt-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-red-700 dark:bg-red-500/15 dark:text-red-300">
                       Corte
                     </div>
                   )}

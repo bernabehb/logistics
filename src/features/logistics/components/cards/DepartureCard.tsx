@@ -43,6 +43,7 @@ export interface FetchedInvoiceDetails {
       material: string;
       cantidad: number;
       unidadVenta: string;
+      corte?: number;
     }[];
   }[];
 }
@@ -1105,7 +1106,16 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                   {group.materiales.map((mat, mIdx) => (
                                     <tr key={mIdx}>
-                                      <td className="px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200">{mat.material}</td>
+                                      <td className="px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span>{mat.material}</span>
+                                          {Number(mat.corte) === 1 && (
+                                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                                              Corte
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
                                       <td className="px-4 py-3 text-sm font-black text-slate-900 dark:text-slate-100 text-right">{mat.cantidad} {mat.unidadVenta}</td>
                                     </tr>
                                   ))}
