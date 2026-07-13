@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ConfiguraciÃ³n centralizada para la API externa.
  * Evita inconsistencias de URLs entre diferentes archivos.
  */
@@ -23,7 +23,9 @@ export const API_ENDPOINTS = {
   authorizationsHome: `${EXTERNAL_API_BASE_URL}/Logistics/GetDepartureAuthorizationsHome`,
   authorizationsBranch: `${EXTERNAL_API_BASE_URL}/Logistics/GetDepartureAuthorizationsBranch`,
   invoiceDetails: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/GetInvoiceDetails/${invoiceNum}`,
+  orderDetails: (orderNum: string | number) => `${EXTERNAL_API_BASE_URL}/Logistics/GetOrderDetails/${orderNum}`,
   scanInvoiceForDeparture: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/ScanInvoiceForDeparture/${invoiceNum}`,
+  scanOrderForDeparture: (orderNum: string | number) => `${EXTERNAL_API_BASE_URL}/Logistics/ScanOrderForDeparture/${orderNum}`,
   authorizeInvoice: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeInvoice/${invoiceNum}`,
   deliverInvoices: `${EXTERNAL_API_BASE_URL}/Logistics/DeliverInvoices`,
   markScannedInvoicesInRouteManual: `${EXTERNAL_API_BASE_URL}/Logistics/MarkScannedInvoicesInRouteManual`,

@@ -11,6 +11,8 @@ import { RefreshCw } from "lucide-react";
 interface FacturaObj {
   factura?: string;
   Factura?: string;
+  orderNum?: number;
+  OrderNum?: number;
   autorizada?: boolean;
   Autorizada?: boolean;
   escaneada?: boolean;
@@ -58,6 +60,10 @@ const getInvoiceId = (invoice: FacturaObj | string) => (
   typeof invoice === 'string' ? invoice : (invoice.factura || invoice.Factura || "")
 );
 
+const getOrderNum = (invoice: FacturaObj | string) => (
+  typeof invoice === 'string' ? undefined : (invoice.orderNum || invoice.OrderNum || undefined)
+);
+
 export default function AutorizarSalidaPage() {
   const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || []);
   const [isRefreshing, setIsRefreshing] = useState(!cachedDepartures);
@@ -88,6 +94,7 @@ export default function AutorizarSalidaPage() {
           const invoicesToMap = computedStatus === "En ruta" ? allInvoices : computedStatus === "Escaneada" ? scannedInvoices : pendingInvoices;
           const mappedInvoices = invoicesToMap.map(f => ({
             id: getInvoiceId(f),
+            orderNum: getOrderNum(f),
             groups: [],
             isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva),
             isScanned: isScannedInvoice(f)
@@ -129,6 +136,7 @@ export default function AutorizarSalidaPage() {
           const invoicesToMap = computedStatus === "En ruta" ? allInvoices : computedStatus === "Escaneada" ? scannedInvoices : pendingInvoices;
           const mappedInvoices = invoicesToMap.map(f => ({
             id: getInvoiceId(f),
+            orderNum: getOrderNum(f),
             groups: [],
             isScanned: isScannedInvoice(f)
           }));

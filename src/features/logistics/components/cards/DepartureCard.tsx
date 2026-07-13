@@ -29,6 +29,7 @@ interface WarehouseGroup {
 
 export interface Invoice {
   id: string;
+  orderNum?: number;
   groups: WarehouseGroup[];
   isNew?: boolean;
   isScanned?: boolean;
@@ -123,19 +124,23 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     [departure.invoices, verifiedInvoiceIds]
   );
 
-  const handleVerificationSuccess = React.useCallback(async (code: string) => {
-    setCurrentInvoiceId(code);
+  const handleVerificationSuccess = React.useCallback(async (invoice: Invoice) => {
+    setCurrentInvoiceId(invoice.id);
     setIsError(false);
     setIsLoadingDetails(true);
     setAuthStep("invoice_review");
 
     try {
-      const res = await fetch(`/api/logistics/invoice-details/${code}`);
+      const detailsUrl = invoice.orderNum
+        ? `/api/logistics/order-details/${invoice.orderNum}`
+        : `/api/logistics/invoice-details/${invoice.id}`;
+
+      const res = await fetch(detailsUrl);
       if (res.ok) {
         const data = await res.json();
         setFetchedInvoiceDetails(data);
       } else {
-        console.error("Failed to fetch invoice details");
+        console.error("Failed to fetch order/invoice details");
         setFetchedInvoiceDetails(null);
       }
     } catch (err) {
@@ -179,28 +184,30 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     }
   }, [authStep, selectedMethod, scanMode]);
 
-  // Helper to match a scanned or typed invoice number against remaining invoices in a fuzzy, robust way
+  // Helper to match a scanned or typed sales order against remaining invoices in a fuzzy, robust way
   const matchInvoice = React.useCallback((scannedText: string): Invoice | undefined => {
     const trimmed = scannedText.trim();
-    const normalizedText = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
-
-    // Split by hyphen to get the first part (e.g. "233252-3163.01" -> "233252")
-    const hyphenPrefix = trimmed.split("-")[0].trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const normalize = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const normalizedText = normalize(trimmed);
+    const hyphenPrefix = normalize(trimmed.split("-")[0].trim());
 
     return remainingInvoices.find(inv => {
-      const cleanedId = inv.id.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const candidates = [inv.orderNum?.toString(), inv.id]
+        .filter((value): value is string => Boolean(value))
+        .map(normalize);
 
-      // Match if equal, starts with, ends with, or contains (fuzzy matching)
-      return cleanedId === normalizedText ||
-        cleanedId === hyphenPrefix ||
-        normalizedText.startsWith(cleanedId) ||
-        hyphenPrefix.startsWith(cleanedId) ||
-        cleanedId.startsWith(normalizedText) ||
-        cleanedId.startsWith(hyphenPrefix) ||
-        normalizedText.endsWith(cleanedId) ||
-        cleanedId.endsWith(normalizedText) ||
-        hyphenPrefix.endsWith(cleanedId) ||
-        cleanedId.endsWith(hyphenPrefix);
+      return candidates.some(candidate =>
+        candidate === normalizedText ||
+        candidate === hyphenPrefix ||
+        normalizedText.startsWith(candidate) ||
+        hyphenPrefix.startsWith(candidate) ||
+        candidate.startsWith(normalizedText) ||
+        candidate.startsWith(hyphenPrefix) ||
+        normalizedText.endsWith(candidate) ||
+        candidate.endsWith(normalizedText) ||
+        hyphenPrefix.endsWith(candidate) ||
+        candidate.endsWith(hyphenPrefix)
+      );
     });
   }, [remainingInvoices]);
 
@@ -251,7 +258,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
               }
               setScannedCode(null);
               setIsError(false);
-              handleVerificationSuccess(targetInvoice.id);
+              handleVerificationSuccess(targetInvoice);
             } else {
               setScannedCode(decodedText.trim());
               setIsError(true);
@@ -313,11 +320,11 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         if (targetInvoice) {
           setScannedCode(null);
           setIsError(false);
-          handleVerificationSuccess(targetInvoice.id);
+          handleVerificationSuccess(targetInvoice);
         } else {
           setScannedCode(inputVal);
           setIsError(true);
-          alert(`La factura "${inputVal}" no pertenece a este viaje.`);
+          alert(`La orden de venta "${inputVal}" no pertenece a este viaje.`);
         }
       }
       if (scannerInputRef.current) {
@@ -340,7 +347,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         if (navigator.vibrate) navigator.vibrate(200);
         setScannedCode(null);
         setIsError(false);
-        handleVerificationSuccess(targetInvoice.id);
+        handleVerificationSuccess(targetInvoice);
       } else {
         setScannedCode(decodedText.trim());
         setIsError(true);
@@ -355,16 +362,25 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   };
 
   const confirmInvoiceVerification = async () => {
-    if (currentInvoiceId && !verifiedInvoiceIds.includes(currentInvoiceId)) {
+    if (currentInvoice && !verifiedInvoiceIds.includes(currentInvoice.id)) {
       setIsAuthorizing(true);
       try {
-        const res = await fetch(`/api/logistics/scan-invoice-for-departure/${currentInvoiceId}`, {
+        const relatedInvoiceIds = currentInvoice.orderNum
+          ? departure.invoices
+              .filter(inv => inv.orderNum === currentInvoice.orderNum)
+              .map(inv => inv.id)
+          : [currentInvoice.id];
+
+        const scanUrl = currentInvoice.orderNum
+          ? `/api/logistics/scan-order-for-departure/${currentInvoice.orderNum}`
+          : `/api/logistics/scan-invoice-for-departure/${currentInvoice.id}`;
+
+        const res = await fetch(scanUrl, {
           method: 'POST'
         });
-        if (!res.ok) throw new Error("Failed to scan invoice");
+        if (!res.ok) throw new Error("Failed to scan order/invoice");
 
-        // Scan successful, proceed
-        const newVerified = [...verifiedInvoiceIds, currentInvoiceId];
+        const newVerified = Array.from(new Set([...verifiedInvoiceIds, ...relatedInvoiceIds]));
         setVerifiedInvoiceIds(newVerified);
 
         if (newVerified.length === departure.invoices.length) {
@@ -377,7 +393,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         setFetchedInvoiceDetails(null);
       } catch (err) {
         console.error(err);
-        alert("Hubo un error al marcar la factura como escaneada.");
+        alert("Hubo un error al marcar la orden de venta como escaneada.");
       } finally {
         setIsAuthorizing(false);
       }
@@ -390,7 +406,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     if (targetInvoice) {
       setScannedCode(null);
       setIsError(false);
-      handleVerificationSuccess(targetInvoice.id);
+      handleVerificationSuccess(targetInvoice);
     } else {
       setScannedCode(invoiceInput.trim());
       setIsError(true);
@@ -942,7 +958,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           <ArrowLeft className="size-5" />
                         </Button>
                         <DialogTitle className="text-lg font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                          {scanMode === "camera" ? "Escaneando Factura..." : "Escanear con Lector"}
+                          {scanMode === "camera" ? "Escaneando OV..." : "Escanear con Lector"}
                         </DialogTitle>
                       </div>
 
@@ -1038,7 +1054,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                                 <QrCode className="size-10 text-emerald-500" />
                               </div>
                               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
-                                Apunta al código de barras de la factura y presiona el gatillo para escanear de forma automática.
+                                Apunta al código de barras de la orden de venta y presiona el gatillo para escanear de forma automática.
                               </p>
                             </div>
                           ) : (
@@ -1070,7 +1086,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                     <div className="space-y-6 animate-in zoom-in-95 duration-300">
                       <div className="text-center space-y-2 px-2">
                         <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Revisar Carga</DialogTitle>
-                        <p className="text-xs sm:text-sm font-bold text-emerald-500 uppercase tracking-widest">{currentInvoiceId}</p>
+                        <p className="text-xs sm:text-sm font-bold text-emerald-500 uppercase tracking-widest">{currentInvoice?.orderNum ? `OV ${currentInvoice.orderNum}` : currentInvoiceId}</p>
                       </div>
 
                       <div className="space-y-4 max-h-[60vh] sm:max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
