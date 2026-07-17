@@ -264,6 +264,34 @@ export default function AutorizarSalidaPage() {
     }, 600);
   };
 
+
+  const handleReturnBranchPickupToRoutes = async (id: string) => {
+    const departure = departures.find(dep => dep.id === id);
+    const invoiceNums = departure?.invoices.map(inv => inv.id).filter(Boolean) || [];
+
+    if (!departure || departure.deliveryType !== "sucursal" || invoiceNums.length === 0) {
+      throw new Error("No hay facturas de sucursal para regresar a Rutas.");
+    }
+
+    const response = await fetch("/api/logistics/return-branch-pickup-to-routes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invoiceNums }),
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || data?.error || "No se pudo regresar la factura a Rutas.");
+    }
+
+    const updated = departures.filter(dep => dep.id !== id);
+    setDepartures(updated);
+    cachedDepartures = updated;
+    window.setTimeout(() => {
+      fetchDepartures(true);
+    }, 600);
+  };
   const branchFilteredDepartures = departures.filter(dep => {
     if (branchFilter === "all") return true;
     return (dep.logisticsBranch || "").trim().toUpperCase() === branchFilter;
@@ -404,6 +432,7 @@ export default function AutorizarSalidaPage() {
                 onAuthorize={handleAuthorize}
                 onDelivered={handleDelivered}
                 onSendScannedInRouteManual={handleSendScannedInRouteManual}
+                onReturnToRoutes={handleReturnBranchPickupToRoutes}
               />
             ))}
           </div>

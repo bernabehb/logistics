@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw, Pencil, Save } from "lucide-react";
+import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw, Pencil, Save, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { showConfirm, showError, showSuccess } from "@/lib/mySwal";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
@@ -69,9 +69,10 @@ interface DepartureCardProps {
   onAuthorize: (id: string) => void;
   onDelivered?: (id: string) => void;
   onSendScannedInRouteManual?: (id: string) => Promise<void>;
+  onReturnToRoutes?: (id: string) => Promise<void>;
 }
 
-export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScannedInRouteManual }: DepartureCardProps) {
+export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScannedInRouteManual, onReturnToRoutes }: DepartureCardProps) {
   const [authStep, setAuthStep] = useState<"method_select" | "active_verification" | "invoice_review" | "trip_verified">("method_select");
   const [selectedMethod, setSelectedMethod] = useState<"manual" | "scanning" | null>(null);
   const [verifiedInvoiceIds, setVerifiedInvoiceIds] = useState<string[]>([]);
@@ -95,6 +96,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isDelivering, setIsDelivering] = useState(false);
   const [isSendingManualRoute, setIsSendingManualRoute] = useState(false);
+  const [isReturningToRoutes, setIsReturningToRoutes] = useState(false);
   const [locationOverrides, setLocationOverrides] = useState<string[]>(departure.locations || []);
   const [editingLocationIndex, setEditingLocationIndex] = useState<number | null>(null);
   const [editingAddress, setEditingAddress] = useState("");
@@ -290,7 +292,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
             qrCodeSuccessCallback,
             qrCodeErrorCallback
           );
-        } catch (err: any) {
+        } catch (err) {
           console.error("Failed to start html5-qrcode scanner:", err);
           if (isMounted) {
             setCameraError("No se pudo conectar a la cámara");
@@ -372,14 +374,16 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
               .map(inv => inv.id)
           : [currentInvoice.id];
 
-        const scanUrl = currentInvoice.orderNum
-          ? `/api/logistics/scan-order-for-departure/${currentInvoice.orderNum}`
-          : `/api/logistics/scan-invoice-for-departure/${currentInvoice.id}`;
+        if (departure.deliveryType === "domicilio") {
+          const scanUrl = currentInvoice.orderNum
+            ? `/api/logistics/scan-order-for-departure/${currentInvoice.orderNum}`
+            : `/api/logistics/scan-invoice-for-departure/${currentInvoice.id}`;
 
-        const res = await fetch(scanUrl, {
-          method: 'POST'
-        });
-        if (!res.ok) throw new Error("Failed to scan order/invoice");
+          const res = await fetch(scanUrl, {
+            method: 'POST'
+          });
+          if (!res.ok) throw new Error("Failed to scan order/invoice");
+        }
 
         const newVerified = Array.from(new Set([...verifiedInvoiceIds, ...relatedInvoiceIds]));
         setVerifiedInvoiceIds(newVerified);
@@ -427,6 +431,48 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   };
 
   const handleFinalAuthorization = async () => {
+    if (departure.deliveryType === "sucursal") {
+      const invoiceNums = verifiedInvoiceIds.length > 0
+        ? verifiedInvoiceIds
+        : departure.invoices.map(inv => inv.id).filter(Boolean);
+      if (invoiceNums.length === 0) return;
+
+      setIsAuthorizing(true);
+      try {
+        const res = await fetch('/api/logistics/confirm-branch-pickup-delivery', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scannedCode: "",
+            invoiceNums
+          })
+        });
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok || data?.success === false) {
+          throw new Error(data?.message || data?.error || "No se pudo confirmar la entrega en sucursal.");
+        }
+
+        setIsAuthDialogOpen(false);
+        onDelivered?.(departure.id);
+        resetAuth();
+        await showSuccess({
+          title: "Entrega confirmada",
+          html: data?.message || "La recoleccion en sucursal fue marcada como entregada.",
+          timer: 1600
+        });
+      } catch (err) {
+        console.error(err);
+        await showError({
+          title: "No se pudo entregar",
+          text: err instanceof Error ? err.message : "Hubo un error al confirmar la entrega en sucursal."
+        });
+      } finally {
+        setIsAuthorizing(false);
+      }
+      return;
+    }
+
     setIsAuthDialogOpen(false);
     onAuthorize(departure.id);
     await new Promise(resolve => setTimeout(resolve, 120));
@@ -508,6 +554,41 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     }
   };
 
+  const handleReturnToRoutes = async () => {
+    if (!onReturnToRoutes || departure.invoices.length === 0) return;
+
+    const invoiceNums = departure.invoices.map(inv => inv.id).filter(Boolean);
+    const confirmed = await showConfirm({
+      title: "Regresar a Rutas",
+      html: `La factura <b>${invoiceNums.join(", ")}</b> volvera a estar disponible en la interfaz de Rutas.`,
+      icon: "question",
+      iconColor: "#f59e0b",
+      confirmButtonText: "Si, regresar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#d97706"
+    });
+
+    if (!confirmed) return;
+
+    setIsReturningToRoutes(true);
+    try {
+      await onReturnToRoutes(departure.id);
+
+      await showSuccess({
+        title: "Regresada a Rutas",
+        html: `La factura <b>${invoiceNums.join(", ")}</b> volvio a Rutas correctamente.`,
+        timer: 1600
+      });
+    } catch (err) {
+      console.error(err);
+      await showError({
+        title: "No se pudo regresar",
+        text: err instanceof Error ? err.message : "Ocurrio un error al regresar la factura a Rutas."
+      });
+    } finally {
+      setIsReturningToRoutes(false);
+    }
+  };
   const openAddressEditor = (index: number, address: string) => {
     setEditingLocationIndex(index);
     setEditingAddress(address);
@@ -598,7 +679,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
   return (
     <Card className="hover:shadow-md transition-all duration-300 group flex flex-col h-full overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] shadow-sm">
-      <CardHeader className="flex flex-col justify-start p-4 pt-3 pb-2">
+      <CardHeader className={cn("flex flex-col justify-start p-4 pt-3 pb-2", departure.deliveryType === "sucursal" && "hidden")}>
         {/* Header: Unit/Invoice Name */}
         <div className="flex justify-between items-start shrink-0 w-full">
           <div className="flex flex-col min-w-0 flex-1">
@@ -635,8 +716,8 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         {/* Details Section */}
         <div className="bg-white dark:bg-[#1E293B] rounded-xl p-4 flex-1 flex flex-col gap-2.5 border border-slate-200 dark:border-slate-800/50">
           {/* Driver/Client Info */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className={cn("flex justify-between gap-3", departure.deliveryType === "sucursal" ? "items-start" : "items-center")}>
+            <div className="flex items-center gap-3 shrink-0">
               <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0">
                 <User className="size-4 text-slate-500 dark:text-slate-400" />
               </div>
@@ -644,15 +725,18 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                 {departure.deliveryType === 'sucursal' ? "Cliente" : "Chofer"}
               </span>
             </div>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase truncate ml-2 text-right flex-1 min-w-0">
+            <span className={cn(
+              "text-xs font-bold text-slate-700 dark:text-slate-200 uppercase ml-2 text-right flex-1 min-w-0",
+              departure.deliveryType === "sucursal" ? "whitespace-normal break-words leading-snug" : "truncate"
+            )}>
               {departure.deliveryType === 'sucursal' ? (departure.clientName || 'Cliente General') : departure.driverName}
             </span>
           </div>
 
           {/* Facturas */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className={cn("flex justify-between gap-3", departure.deliveryType === "sucursal" ? "items-start" : "items-center")}>
+              <div className="flex items-center gap-3 shrink-0">
                 <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0">
                   <FileText className="size-4 text-slate-500 dark:text-slate-400" />
                 </div>
@@ -831,9 +915,23 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       </Dialog>
 
       <CardFooter className="px-5 pb-4">
-        <div className="w-full shrink-0">
+        <div className="w-full shrink-0 space-y-3">
           {departure.status === "Pendiente" ? (
-            <Dialog open={isAuthDialogOpen} onOpenChange={(open) => {
+            <>
+              {departure.deliveryType === "sucursal" && onReturnToRoutes && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="logistics-card"
+                  onClick={handleReturnToRoutes}
+                  disabled={isReturningToRoutes}
+                  className="border-amber-400/60 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+                >
+                  {isReturningToRoutes ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <Undo2 className="size-4 mr-2" />}
+                  Regresar a Rutas
+                </Button>
+              )}
+              <Dialog open={isAuthDialogOpen} onOpenChange={(open) => {
               setIsAuthDialogOpen(open);
               if (!open) resetAuth();
             }}>
@@ -912,7 +1010,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
                   {authStep === "active_verification" && selectedMethod === "manual" && (
                     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         <Button variant="ghost" size="icon" onClick={() => setAuthStep("method_select")} className="rounded-full">
                           <ArrowLeft className="size-5" />
                         </Button>
@@ -954,7 +1052,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
                   {authStep === "active_verification" && selectedMethod === "scanning" && (
                     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         <Button variant="ghost" size="icon" onClick={() => setAuthStep("method_select")} className="rounded-full">
                           <ArrowLeft className="size-5" />
                         </Button>
@@ -1197,7 +1295,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] transition-all active:scale-[0.98] hover:translate-y-[-2px]"
                             onClick={handleFinalAuthorization}
                           >
-                            Finalizar Escaneo
+                            {departure.deliveryType === "sucursal" ? "Marcar Entregado" : "Finalizar Escaneo"}
                           </Button>
                         </div>
                       ) : (
@@ -1216,6 +1314,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                 </div>
               </DialogContent>
             </Dialog>
+            </>
           ) : departure.status === "Escaneada" ? (
             <Button
               variant="logistics-action"
@@ -1244,6 +1343,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     </Card>
   );
 }
+
 
 
 

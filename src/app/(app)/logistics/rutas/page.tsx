@@ -27,7 +27,7 @@ import {
 import { LogisticsFilters, LogisticsDateFilters, LogisticsStatusFilters, LogisticsTypeFilters, StatusCircle, StatusPill } from "@/features/logistics/components";
 import { isAfter, isBefore, startOfDay, endOfDay, parse } from "date-fns";
 import { es } from "date-fns/locale";
-import { closeSwal, showConfirm, showError, showLoading, showSuccess } from "@/lib/mySwal";
+import { closeSwal, getSwalTheme, MySwal, showConfirm, showError, showLoading, showSuccess } from "@/lib/mySwal";
 
 const BLOCKS_LIST_FALLBACK = [
   "AZTLAN 1", "AZTLAN 2", "AZTLAN 3", "AZTLAN 4",
@@ -196,7 +196,7 @@ function RouteTicketsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent 
+        <DialogContent
           onInteractOutside={(e) => e.preventDefault()}
           className="max-w-[420px] max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-2xl"
         >
@@ -362,6 +362,7 @@ interface ApiRutaInvoice {
   bloque: string;
   estatusEmbarque: string;
   iIdLogisticsBranch?: number;
+  dDateRouteAuthorized?: string | null;
 }
 
 interface AvailableUnit {
@@ -380,7 +381,7 @@ interface FetchedInvoiceDetails {
       material: string;
       cantidad: number;
       unidadVenta: string;
-          corte?: number;
+      corte?: number;
     }[];
   }[];
 }
@@ -478,6 +479,8 @@ export default function RutasPage() {
   const [selectedInvoicesByBlock, setSelectedInvoicesByBlock] = useState<Record<string, string[]>>({});
   const [routeTickets, setRouteTickets] = useState<RouteTicket[]>([]);
   const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
+  const [authorizingBranchPickupKey, setAuthorizingBranchPickupKey] = useState<string | null>(null);
+  const authorizingBranchPickupRef = useRef(false);
   const handleOpenDetails = async (invoiceId: string) => {
     const invoiceNum = invoiceId;
     setSelectedInvoiceId(invoiceId);
@@ -706,6 +709,132 @@ export default function RutasPage() {
       delete next[blockScopeKey];
       return next;
     });
+  };
+  const getDistinctInvoiceNums = (items: RutaPedido[]) => {
+    return items
+      .filter(item => !item.id.startsWith('ORDER-'))
+      .map(item => item.id.trim().toUpperCase())
+      .filter(Boolean)
+      .filter((value, index, array) => array.indexOf(value) === index);
+  };
+
+  const getBranchPickupAuthorizeKey = (items: RutaPedido[]) => {
+    return items
+      .filter(Boolean)
+      .map(item => `${item.id.trim().toUpperCase()}|${item.logisticsBranchId || item.sucursal || ""}`)
+      .join("||");
+  };
+
+  const removeAuthorizedBranchPickupFromRoutes = (invoiceNums: string[], logisticsBranchId: number) => {
+    const authorizedInvoices = new Set(invoiceNums.map(invoice => invoice.trim().toUpperCase()).filter(Boolean));
+
+    const shouldRemovePedido = (pedido: RutaPedido) => {
+      if (pedido.deliveryType !== 'sucursal') return false;
+      if (!authorizedInvoices.has(pedido.id.trim().toUpperCase())) return false;
+      return Number(pedido.logisticsBranchId || 0) === logisticsBranchId;
+    };
+
+    const shouldRemoveRow = (row: ApiRutaInvoice) => {
+      const invoiceNum = row.factura?.trim().toUpperCase();
+      if (!invoiceNum || !authorizedInvoices.has(invoiceNum)) return false;
+
+      const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
+      const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
+      const rowBranchId = row.iIdLogisticsBranch ?? getLogisticsBranchId(mappedSucursal);
+
+      return Number(rowBranchId || 0) === logisticsBranchId;
+    };
+
+    setInvoices(prev => prev.filter(pedido => !shouldRemovePedido(pedido)));
+    setRouteTicketRows(prev => prev.filter(row => !shouldRemoveRow(row)));
+
+    cachedInvoices = cachedInvoices ? cachedInvoices.filter(pedido => !shouldRemovePedido(pedido)) : cachedInvoices;
+    Object.keys(cachedInvoicesByDriver).forEach(key => {
+      cachedInvoicesByDriver[key] = cachedInvoicesByDriver[key].filter(pedido => !shouldRemovePedido(pedido));
+    });
+
+    Object.keys(cachedRouteRowsByDriver).forEach(key => {
+      cachedRouteRowsByDriver[key] = cachedRouteRowsByDriver[key].filter(row => !shouldRemoveRow(row));
+    });
+  };
+
+  const handleAuthorizeBranchPickup = async (items: RutaPedido[], blockName?: string) => {
+    const targetItems = items.filter(Boolean);
+    if (targetItems.length === 0 || authorizingBranchPickupRef.current) return;
+
+    const authorizeKey = getBranchPickupAuthorizeKey(targetItems);
+    authorizingBranchPickupRef.current = true;
+    setAuthorizingBranchPickupKey(authorizeKey);
+
+    try {
+      const itemBranchIds = targetItems
+        .map(item => Number(item.logisticsBranchId || 0))
+        .filter(branchId => branchId > 0)
+        .filter((branchId, index, array) => array.indexOf(branchId) === index);
+      const logisticsBranchId = currentLogisticsBranchId() || (itemBranchIds.length === 1 ? itemBranchIds[0] : 0);
+      if (!logisticsBranchId) {
+        await showError({
+          title: "Selecciona una sucursal",
+          text: "Para autorizar una recoleccion en sucursal debes filtrar por una sucursal especifica.",
+          timer: 2600
+        });
+        return;
+      }
+
+      const invoiceNums = getDistinctInvoiceNums(targetItems);
+      if (invoiceNums.length === 0) {
+        await showError({
+          title: "Sin facturas para ticket",
+          text: "No se encontraron facturas para generar el ticket de recoleccion en sucursal.",
+          timer: 2600
+        });
+        return;
+      }
+
+      const ticketBlockName = blockName || targetItems[0]?.block || "";
+      const ticketsToPrint = buildRouteTickets(ticketBlockName, invoiceNums);
+      if (ticketsToPrint.length === 0) {
+        await showError({
+          title: "No se pudo generar el ticket",
+          text: "No se encontraron detalles de la orden de venta para imprimir el ticket.",
+          timer: 2800
+        });
+        return;
+      }
+
+      const authorizeResponse = await fetch('/api/logistics/authorize-branch-pickup-delivery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          iIdLogisticsBranch: logisticsBranchId,
+          invoiceNums
+        })
+      });
+
+      if (!authorizeResponse.ok) {
+        const errorMessage = await readApiErrorMessage(
+          authorizeResponse,
+          "No se pudo autorizar la recoleccion en sucursal."
+        );
+        await showError({
+          title: "No se pudo autorizar",
+          text: errorMessage,
+          timer: 3200
+        });
+        return;
+      }
+
+      removeAuthorizedBranchPickupFromRoutes(invoiceNums, logisticsBranchId);
+      setRouteTickets(ticketsToPrint);
+      setIsTicketDialogOpen(true);
+
+      if (blockName) {
+        clearBlockInvoiceSelection(currentBlockScopeKey(blockName));
+      }
+    } finally {
+      authorizingBranchPickupRef.current = false;
+      setAuthorizingBranchPickupKey(null);
+    }
   };
 
   const renderInvoiceSelectionButton = (blockName: string, pedido: RutaPedido, className?: string) => {
@@ -1128,12 +1257,16 @@ export default function RutasPage() {
 
       if (!routesResponse.ok) throw new Error('No se pudo conectar con el servidor de rutas');
       const data: ApiRutaInvoice[] = await routesResponse.json();
-      cachedRouteRowsByDriver[driverFilter] = data;
-      setRouteTicketRows(data);
+      const activeRouteRows = data.filter(row => {
+        const isBranchPickup = row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'));
+        return !(isBranchPickup && row.dDateRouteAuthorized);
+      });
+      cachedRouteRowsByDriver[driverFilter] = activeRouteRows;
+      setRouteTicketRows(activeRouteRows);
 
       const groupedMap = new Map<string, RutaPedido & { block: string }>();
 
-      data.forEach((row) => {
+      activeRouteRows.forEach((row) => {
         const isFactura = row.factura && row.factura.trim() !== "";
         const displayId = isFactura ? row.factura : `ORDER-${row.orderNum}`;
         const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
@@ -1669,6 +1802,8 @@ export default function RutasPage() {
                     const selectedCount = selectedInvoiceNums.length;
                     const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-')));
                     const isProcessing = authorizingBlockName === blockScopeKey;
+                    const branchPickupAuthorizeKey = getBranchPickupAuthorizeKey(items);
+                    const isAuthorizingBranchPickup = authorizingBranchPickupKey === branchPickupAuthorizeKey;
                     const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
                     const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
                     const displayBlockWeightKg = selectedCount > 0 ? selectedBlockWeightKg : totalBlockWeightKg;
@@ -1695,6 +1830,21 @@ export default function RutasPage() {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                  variant="logistics-success"
+                                  disabled={!!authorizingBranchPickupKey}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAuthorizeBranchPickup(items, blockName);
+                                  }}
+                                  size="sm"
+                                  className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                  {isAuthorizingBranchPickup && (
+                                    <RefreshCw className="size-3.5 animate-spin" />
+                                  )}
+                                  {isAuthorizingBranchPickup ? "Autorizando..." : "Autorizar"}
+                                </Button>
                                 <Button
                                   variant={
                                     isAuthorized && canAuthorize
@@ -2015,7 +2165,26 @@ export default function RutasPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filteredPedidos.length > 0 ? (
               filteredPedidos.map(p => (
-                <RutaOrderCard key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
+                <div key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} className="relative">
+                  <div className="absolute right-3 top-3 z-10">
+                    <Button
+                      variant="logistics-success"
+                      size="sm"
+                      disabled={!!authorizingBranchPickupKey}
+                      className="h-8 px-3 text-[10px] font-black rounded-xl uppercase tracking-widest shadow-sm flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAuthorizeBranchPickup([p], p.block);
+                      }}
+                    >
+                      {authorizingBranchPickupKey === getBranchPickupAuthorizeKey([p]) && (
+                        <RefreshCw className="size-3.5 animate-spin" />
+                      )}
+                      {authorizingBranchPickupKey === getBranchPickupAuthorizeKey([p]) ? "Autorizando..." : "Autorizar"}
+                    </Button>
+                  </div>
+                  <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
+                </div>
               ))
             ) : (
               <div className="col-span-full py-20 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center opacity-50">
