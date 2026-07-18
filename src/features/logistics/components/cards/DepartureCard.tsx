@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw, Pencil, Save, Undo2 } from "lucide-react";
+import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw, Pencil, Save, Undo2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { showConfirm, showError, showSuccess } from "@/lib/mySwal";
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from "@/components/ui/card";
@@ -97,6 +97,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   const [isDelivering, setIsDelivering] = useState(false);
   const [isSendingManualRoute, setIsSendingManualRoute] = useState(false);
   const [isReturningToRoutes, setIsReturningToRoutes] = useState(false);
+  const [isOpeningSamsaraRoute, setIsOpeningSamsaraRoute] = useState(false);
   const [locationOverrides, setLocationOverrides] = useState<string[]>(departure.locations || []);
   const [editingLocationIndex, setEditingLocationIndex] = useState<number | null>(null);
   const [editingAddress, setEditingAddress] = useState("");
@@ -431,6 +432,8 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   };
 
   const handleFinalAuthorization = async () => {
+    if (isAuthorizing) return;
+
     if (departure.deliveryType === "sucursal") {
       const invoiceNums = verifiedInvoiceIds.length > 0
         ? verifiedInvoiceIds
@@ -589,6 +592,52 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       setIsReturningToRoutes(false);
     }
   };
+  const handleOpenSamsaraRoute = async () => {
+    const invoiceNums = departure.invoices.map(inv => inv.id).filter(Boolean);
+
+    if (invoiceNums.length === 0) {
+      await showError({
+        title: "Sin facturas",
+        text: "No se encontraron facturas para buscar la ruta en Samsara."
+      });
+      return;
+    }
+
+    const samsaraTab = window.open('about:blank', '_blank');
+    if (samsaraTab) {
+      samsaraTab.opener = null;
+      samsaraTab.document.title = 'Cargando ruta Samsara...';
+    }
+
+    setIsOpeningSamsaraRoute(true);
+    try {
+      const response = await fetch('/api/logistics/samsara-route-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceNums }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.success === false || !data?.url) {
+        throw new Error(data?.message || data?.error || "No se encontro una ruta de Samsara para esta salida.");
+      }
+
+      if (samsaraTab) {
+        samsaraTab.location.href = data.url;
+      } else {
+        window.open(data.url, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      samsaraTab?.close();
+      console.error(err);
+      await showError({
+        title: "No se pudo abrir Samsara",
+        text: err instanceof Error ? err.message : "Ocurrio un error al buscar la ruta en Samsara."
+      });
+    } finally {
+      setIsOpeningSamsaraRoute(false);
+    }
+  };
   const openAddressEditor = (index: number, address: string) => {
     setEditingLocationIndex(index);
     setEditingAddress(address);
@@ -712,31 +761,29 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col gap-4">
+      <CardContent className={cn("flex-1 flex flex-col gap-4", departure.deliveryType === "sucursal" && "pt-4")}>
         {/* Details Section */}
         <div className="bg-white dark:bg-[#1E293B] rounded-xl p-4 flex-1 flex flex-col gap-2.5 border border-slate-200 dark:border-slate-800/50">
           {/* Driver/Client Info */}
-          <div className={cn("flex justify-between gap-3", departure.deliveryType === "sucursal" ? "items-start" : "items-center")}>
-            <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-col items-start gap-2">
+            <div className="flex items-center gap-3 w-full">
               <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0">
                 <User className="size-4 text-slate-500 dark:text-slate-400" />
               </div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                {departure.deliveryType === 'sucursal' ? "Cliente" : "Chofer"}
+                {departure.deliveryType === "sucursal" ? "Cliente" : "Chofer"}
               </span>
             </div>
-            <span className={cn(
-              "text-xs font-bold text-slate-700 dark:text-slate-200 uppercase ml-2 text-right flex-1 min-w-0",
-              departure.deliveryType === "sucursal" ? "whitespace-normal break-words leading-snug" : "truncate"
-            )}>
-              {departure.deliveryType === 'sucursal' ? (departure.clientName || 'Cliente General') : departure.driverName}
+            <span className="w-full pl-11 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase min-w-0 whitespace-normal break-words leading-snug">
+              {departure.deliveryType === "sucursal" ? (departure.clientName || "Cliente General") : departure.driverName}
             </span>
           </div>
+
 
           {/* Facturas */}
           <div className="flex flex-col gap-2">
             <div className={cn("flex justify-between gap-3", departure.deliveryType === "sucursal" ? "items-start" : "items-center")}>
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-3 w-full">
                 <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shrink-0">
                   <FileText className="size-4 text-slate-500 dark:text-slate-400" />
                 </div>
@@ -745,7 +792,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                 </span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5 pl-1">
+            <div className="flex flex-wrap gap-1.5 pl-11">
               {departure.invoices.map((inv, idx) => {
                 const isNew = !!inv.isNew;
                 return (
@@ -937,9 +984,10 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
             }}>
               <DialogTrigger asChild>
                 <Button
-                  variant="logistics-action" size="logistics-card"
+                  variant="logistics-action" size="logistics-card" className="cursor-pointer gap-2"
                 >
-                  Autorizar Salida
+                  <ScanLine className="size-4" />
+                  ESCANEAR
                 </Button>
               </DialogTrigger>
               <DialogContent className="w-full h-full sm:h-auto sm:max-w-[500px] p-0 overflow-y-auto sm:overflow-hidden bg-white dark:bg-slate-900 border-none shadow-2xl rounded-none sm:rounded-3xl">
@@ -1073,7 +1121,6 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             ) : (
                               <div id="camera-reader" className="w-full h-full overflow-hidden" />
                             )}
-
                             {!cameraError && (
                               <>
                                 <style dangerouslySetInnerHTML={{
@@ -1292,10 +1339,14 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           </div>
 
                           <Button
-                            className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] transition-all active:scale-[0.98] hover:translate-y-[-2px]"
+                            className="w-full h-16 rounded-2xl text-lg font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] transition-all active:scale-[0.98] hover:translate-y-[-2px] disabled:opacity-75 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:scale-100 flex items-center justify-center gap-2"
                             onClick={handleFinalAuthorization}
+                            disabled={isAuthorizing}
                           >
-                            {departure.deliveryType === "sucursal" ? "Marcar Entregado" : "Finalizar Escaneo"}
+                            {isAuthorizing && <RefreshCw className="size-5 animate-spin" />}
+                            {isAuthorizing
+                              ? (departure.deliveryType === "sucursal" ? "Marcando..." : "Finalizando...")
+                              : (departure.deliveryType === "sucursal" ? "Marcar Entregado" : "Finalizar Escaneo")}
                           </Button>
                         </div>
                       ) : (
@@ -1326,6 +1377,29 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
               {isSendingManualRoute ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <Truck className="size-4 mr-2" />}
               Mandar en ruta manual
             </Button>
+          ) : departure.status === "En ruta" ? (
+            <>
+              <Button
+                variant="outline"
+                size="logistics-card"
+                onClick={handleOpenSamsaraRoute}
+                disabled={isOpeningSamsaraRoute}
+                className="cursor-pointer border-blue-400/60 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/40 dark:text-blue-300 dark:hover:bg-blue-500/10"
+              >
+                {isOpeningSamsaraRoute ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <ExternalLink className="size-4 mr-2" />}
+                Ver ruta Samsara
+              </Button>
+              <Button
+                variant="logistics-action"
+                size="logistics-card"
+                onClick={handleDeliverTrip}
+                disabled={isDelivering}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30 shadow-emerald-500/20"
+              >
+                {isDelivering ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <CheckCircle className="size-4 mr-2" />}
+                Marcar Entregado
+              </Button>
+            </>
           ) : (
             <Button
               variant="logistics-action"
@@ -1343,10 +1417,6 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     </Card>
   );
 }
-
-
-
-
 
 
 

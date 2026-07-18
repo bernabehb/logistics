@@ -725,24 +725,17 @@ export default function RutasPage() {
       .join("||");
   };
 
-  const removeAuthorizedBranchPickupFromRoutes = (invoiceNums: string[], logisticsBranchId: number) => {
+  const removeAuthorizedBranchPickupFromRoutes = (invoiceNums: string[]) => {
     const authorizedInvoices = new Set(invoiceNums.map(invoice => invoice.trim().toUpperCase()).filter(Boolean));
 
     const shouldRemovePedido = (pedido: RutaPedido) => {
       if (pedido.deliveryType !== 'sucursal') return false;
-      if (!authorizedInvoices.has(pedido.id.trim().toUpperCase())) return false;
-      return Number(pedido.logisticsBranchId || 0) === logisticsBranchId;
+      return authorizedInvoices.has(pedido.id.trim().toUpperCase());
     };
 
     const shouldRemoveRow = (row: ApiRutaInvoice) => {
       const invoiceNum = row.factura?.trim().toUpperCase();
-      if (!invoiceNum || !authorizedInvoices.has(invoiceNum)) return false;
-
-      const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
-      const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
-      const rowBranchId = row.iIdLogisticsBranch ?? getLogisticsBranchId(mappedSucursal);
-
-      return Number(rowBranchId || 0) === logisticsBranchId;
+      return !!invoiceNum && authorizedInvoices.has(invoiceNum);
     };
 
     setInvoices(prev => prev.filter(pedido => !shouldRemovePedido(pedido)));
@@ -824,7 +817,7 @@ export default function RutasPage() {
         return;
       }
 
-      removeAuthorizedBranchPickupFromRoutes(invoiceNums, logisticsBranchId);
+      removeAuthorizedBranchPickupFromRoutes(invoiceNums);
       setRouteTickets(ticketsToPrint);
       setIsTicketDialogOpen(true);
 
@@ -1804,6 +1797,7 @@ export default function RutasPage() {
                     const isProcessing = authorizingBlockName === blockScopeKey;
                     const branchPickupAuthorizeKey = getBranchPickupAuthorizeKey(items);
                     const isAuthorizingBranchPickup = authorizingBranchPickupKey === branchPickupAuthorizeKey;
+                    const hasBranchPickupInvoices = getDistinctInvoiceNums(items).length > 0;
                     const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
                     const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
                     const displayBlockWeightKg = selectedCount > 0 ? selectedBlockWeightKg : totalBlockWeightKg;
@@ -1832,18 +1826,18 @@ export default function RutasPage() {
                               <div className="flex items-center gap-2 shrink-0">
                                 <Button
                                   variant="logistics-success"
-                                  disabled={!!authorizingBranchPickupKey}
+                                  disabled={!!authorizingBranchPickupKey || !hasBranchPickupInvoices}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleAuthorizeBranchPickup(items, blockName);
                                   }}
                                   size="sm"
-                                  className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest disabled:opacity-70 disabled:cursor-not-allowed"
+                                  className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
                                   {isAuthorizingBranchPickup && (
                                     <RefreshCw className="size-3.5 animate-spin" />
                                   )}
-                                  {isAuthorizingBranchPickup ? "Autorizando..." : "Autorizar"}
+                                  {isAuthorizingBranchPickup ? "Autorizando..." : hasBranchPickupInvoices ? "Autorizar" : "Sin factura"}
                                 </Button>
                                 <Button
                                   variant={
@@ -2164,28 +2158,35 @@ export default function RutasPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filteredPedidos.length > 0 ? (
-              filteredPedidos.map(p => (
-                <div key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} className="relative">
-                  <div className="absolute right-3 top-3 z-10">
-                    <Button
-                      variant="logistics-success"
-                      size="sm"
-                      disabled={!!authorizingBranchPickupKey}
-                      className="h-8 px-3 text-[10px] font-black rounded-xl uppercase tracking-widest shadow-sm flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAuthorizeBranchPickup([p], p.block);
-                      }}
-                    >
-                      {authorizingBranchPickupKey === getBranchPickupAuthorizeKey([p]) && (
-                        <RefreshCw className="size-3.5 animate-spin" />
-                      )}
-                      {authorizingBranchPickupKey === getBranchPickupAuthorizeKey([p]) ? "Autorizando..." : "Autorizar"}
-                    </Button>
+              filteredPedidos.map(p => {
+                const hasInvoice = !p.id.startsWith('ORDER-');
+                const authorizeKey = getBranchPickupAuthorizeKey([p]);
+                const isAuthorizing = authorizingBranchPickupKey === authorizeKey;
+
+                return (
+                  <div key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} className="relative">
+                    <div className="absolute right-3 top-3 z-10">
+                      <Button
+                        variant={hasInvoice ? "logistics-success" : "logistics-action"}
+                        size="sm"
+                        disabled={!!authorizingBranchPickupKey || !hasInvoice}
+                        className="h-8 px-3 text-[10px] font-black rounded-xl uppercase tracking-widest shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!hasInvoice) return;
+                          handleAuthorizeBranchPickup([p], p.block);
+                        }}
+                      >
+                        {isAuthorizing && (
+                          <RefreshCw className="size-3.5 animate-spin" />
+                        )}
+                        {isAuthorizing ? "Autorizando..." : hasInvoice ? "Autorizar" : "Sin factura"}
+                      </Button>
+                    </div>
+                    <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
                   </div>
-                  <RutaOrderCard pedido={p} activeStatusFilters={statusFilters} onClick={() => handleOpenDetails(p.id)} />
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="col-span-full py-20 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center opacity-50">
                 <p className="text-sm font-black uppercase tracking-widest text-slate-400">No hay pedidos pendientes en sucursal</p>
@@ -2274,6 +2275,5 @@ export default function RutasPage() {
     </div>
   );
 }
-
 
 

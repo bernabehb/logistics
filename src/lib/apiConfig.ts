@@ -38,5 +38,6 @@ export const API_ENDPOINTS = {
   authorizeBlockWithSamsaraRoute: `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeBlockWithSamsaraRoute`,
   authorizeBlockInvoicesWithSamsaraRoute: `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeBlockInvoicesWithSamsaraRoute`,
   updateShippingAddress: `${EXTERNAL_API_BASE_URL}/Logistics/UpdateShippingAddress`,
+  samsaraRouteLink: `${EXTERNAL_API_BASE_URL}/Logistics/GetSamsaraRouteLink`,
 };
 
