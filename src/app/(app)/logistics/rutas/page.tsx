@@ -1702,7 +1702,7 @@ export default function RutasPage() {
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aluminio</th>
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Vidrio</th>
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Herrajes</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado General</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{deliveryTypeFilter === 'sucursal' ? 'Acción' : 'Estado General'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1747,16 +1747,8 @@ export default function RutasPage() {
                           </td>
                           <td className="px-6 py-5">
                             <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-black text-slate-500 dark:text-slate-400 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                              <span className="text-sm font-black text-slate-500 dark:text-slate-400 leading-tight whitespace-normal break-words max-w-[420px]">{p.clientName}</span>
                               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
-                              {p.direccionEnvio && (
-                                <div className="flex items-start gap-1 mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium hover:text-slate-700 dark:hover:text-slate-200 transition-colors" title={p.direccionEnvio}>
-                                  <MapPin className="size-3.5 text-red-500 shrink-0 mt-0.5" />
-                                  <span className="break-words max-w-[600px] leading-relaxed">
-                                    {p.direccionEnvio}
-                                  </span>
-                                </div>
-                              )}
                             </div>
                           </td>
                           <td className="px-6 py-5">
@@ -1775,9 +1767,30 @@ export default function RutasPage() {
                             </div>
                           </td>
                           <td className="px-6 py-5">
-                            <div className="flex items-center">
-                              <StatusPill status={p.estadoGeneral} />
-                            </div>
+                            {(() => {
+                              const hasInvoice = !p.id.startsWith('ORDER-');
+                              const authorizeKey = getBranchPickupAuthorizeKey([p]);
+                              const isAuthorizing = authorizingBranchPickupKey === authorizeKey;
+
+                              return (
+                                <Button
+                                  variant={hasInvoice ? "logistics-success" : "logistics-action"}
+                                  size="sm"
+                                  disabled={!!authorizingBranchPickupKey || !hasInvoice}
+                                  className="h-9 px-4 text-[10px] font-black rounded-xl uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!hasInvoice) return;
+                                    handleAuthorizeBranchPickup([p], p.block);
+                                  }}
+                                >
+                                  {isAuthorizing && (
+                                    <RefreshCw className="size-3.5 animate-spin" />
+                                  )}
+                                  {isAuthorizing ? "Autorizando..." : hasInvoice ? "Autorizar" : "Sin factura"}
+                                </Button>
+                              );
+                            })()}
                           </td>
                         </tr>
                       );
@@ -1795,9 +1808,6 @@ export default function RutasPage() {
                     const selectedCount = selectedInvoiceNums.length;
                     const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-')));
                     const isProcessing = authorizingBlockName === blockScopeKey;
-                    const branchPickupAuthorizeKey = getBranchPickupAuthorizeKey(items);
-                    const isAuthorizingBranchPickup = authorizingBranchPickupKey === branchPickupAuthorizeKey;
-                    const hasBranchPickupInvoices = getDistinctInvoiceNums(items).length > 0;
                     const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
                     const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
                     const displayBlockWeightKg = selectedCount > 0 ? selectedBlockWeightKg : totalBlockWeightKg;
@@ -1824,21 +1834,6 @@ export default function RutasPage() {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
-                                <Button
-                                  variant="logistics-success"
-                                  disabled={!!authorizingBranchPickupKey || !hasBranchPickupInvoices}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAuthorizeBranchPickup(items, blockName);
-                                  }}
-                                  size="sm"
-                                  className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
-                                  {isAuthorizingBranchPickup && (
-                                    <RefreshCw className="size-3.5 animate-spin" />
-                                  )}
-                                  {isAuthorizingBranchPickup ? "Autorizando..." : hasBranchPickupInvoices ? "Autorizar" : "Sin factura"}
-                                </Button>
                                 <Button
                                   variant={
                                     isAuthorized && canAuthorize
@@ -1905,7 +1900,7 @@ export default function RutasPage() {
                               </td>
                               <td className="px-6 py-5">
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-sm font-black text-slate-500 dark:text-slate-400 truncate max-w-[240px] leading-tight">{p.clientName}</span>
+                                  <span className="text-sm font-black text-slate-500 dark:text-slate-400 leading-tight whitespace-normal break-words max-w-[420px]">{p.clientName}</span>
                                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 opacity-70 truncate">{p.vendedor}</span>
                                   {p.direccionEnvio && (
                                     <div className="flex items-start gap-1 mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium hover:text-slate-700 dark:hover:text-slate-200 transition-colors" title={p.direccionEnvio}>
