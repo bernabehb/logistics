@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
-import { Search, CheckCircle2, Home, Building2 } from "lucide-react";
+import { Search, CheckCircle2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,7 @@ const getOrderNum = (invoice: FacturaObj | string) => (
 export default function AutorizarSalidaPage() {
   const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || []);
   const [isRefreshing, setIsRefreshing] = useState(!cachedDepartures);
+  const [materialReviewAutoCreateEnabled, setMaterialReviewAutoCreateEnabled] = useState<boolean | null>(null);
 
   const fetchDepartures = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
@@ -171,8 +172,20 @@ export default function AutorizarSalidaPage() {
     }
   };
 
+  const fetchMaterialReviewDocumentStatus = async () => {
+    try {
+      const response = await fetch('/api/logistics/material-review-document-status');
+      const data = await response.json().catch(() => null);
+      setMaterialReviewAutoCreateEnabled(response.ok && data?.enabled === true);
+    } catch (err) {
+      console.warn("Error consultando estado de documento automatico:", err);
+      setMaterialReviewAutoCreateEnabled(false);
+    }
+  };
+
   useEffect(() => {
     fetchDepartures(!!cachedDepartures);
+    fetchMaterialReviewDocumentStatus();
   }, []);
 
   const handleRefresh = async () => {
@@ -188,7 +201,10 @@ export default function AutorizarSalidaPage() {
     } catch (err) {
       console.warn("Error sincronizando rutas iniciadas desde Samsara:", err);
     } finally {
-      await fetchDepartures(true);
+      await Promise.all([
+        fetchDepartures(true),
+        fetchMaterialReviewDocumentStatus(),
+      ]);
     }
   };
   const [searchQuery, setSearchQuery] = useState("");
@@ -314,9 +330,26 @@ export default function AutorizarSalidaPage() {
     <div className="w-full flex flex-col gap-4 min-h-full pb-12 -mt-2 md:-mt-4">
       {/* Title Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
-          Autorizar Salidas
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 transition-colors">
+            Autorizar Salidas
+          </h1>
+          <div
+            title={materialReviewAutoCreateEnabled ? "Documento automatico activo" : "Documento automatico inactivo"}
+            className="inline-flex h-8 items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 text-[10px] font-black uppercase tracking-widest text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
+          >
+            <FileText className="size-3.5 text-slate-400 dark:text-slate-500" />
+            <span>Documento</span>
+            <span
+              className={cn(
+                "size-2.5 rounded-full shadow-sm",
+                materialReviewAutoCreateEnabled
+                  ? "bg-emerald-500 shadow-emerald-500/40"
+                  : "bg-red-500 shadow-red-500/40"
+              )}
+            />
+          </div>
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -355,13 +388,13 @@ export default function AutorizarSalidaPage() {
 
           {/* Delivery Type (Domicilio/Sucursal) */}
           <div className="flex items-center justify-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
-            {[
+            {([
               { id: 'domicilio', label: 'Domicilio' },
               { id: 'sucursal', label: 'Sucursal' },
-            ].map((btn) => (
+            ] as const).map((btn) => (
               <button
                 key={btn.id}
-                onClick={() => setDeliveryTypeFilter(btn.id as any)}
+                onClick={() => setDeliveryTypeFilter(btn.id)}
                 className={cn(
                   "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap text-center flex items-center justify-center cursor-pointer",
                   deliveryTypeFilter === btn.id
@@ -378,14 +411,14 @@ export default function AutorizarSalidaPage() {
 
           {/* Status Filter (Pendientes/Escaneadas/En Ruta) */}
           <div className="flex items-center justify-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
-            {[
+            {([
               { id: "Pendiente", label: "Pendientes", count: pendingCount },
               { id: "Escaneada", label: "Escaneadas", count: scannedCount },
               { id: "En ruta", label: deliveryTypeFilter === "sucursal" ? "Autorizadas" : "En Ruta", count: enRutaCount }
-            ].map((status) => (
+            ] as const).map((status) => (
               <button
                 key={status.id}
-                onClick={() => setStatusFilter(status.id as any)}
+                onClick={() => setStatusFilter(status.id)}
                 className={cn(
                   "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer",
                   statusFilter === status.id

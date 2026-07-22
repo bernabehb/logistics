@@ -1,4 +1,4 @@
-export type BlockStatus = "Disponible" | "Asignado";
+﻿export type BlockStatus = "Disponible" | "Asignado";
 
 export interface Block {
   id: string;
@@ -8,5 +8,8 @@ export interface Block {
   name: string;
   status: BlockStatus;
   apiDriverName?: string;
-  iIdUnit?: number;
+  iIdHelper?: number | null;
+  helperNameSnapshot?: string | null;
+  helperUsesOther?: boolean;
 }
+

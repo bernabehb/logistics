@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type MouseEvent } from "react";
 import { Block, BlockStatus } from "@/features/logistics/models/blocks";
 import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
+import { Helper, AssignmentHelperPayload } from "@/features/logistics/models/helpers";
 import { BlockCard } from "@/features/logistics/components/cards/BlockCard";
 import { Search, Layers, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { closeSwal, showError, showLoading, showSuccess } from "@/lib/mySwal";
 import { LogisticsBranchFilter } from "@/features/logistics/components";
+
+type FetchAllDataArg = boolean | MouseEvent<HTMLButtonElement>;
 
 interface ApiBlockStatus {
   iIdDeliveryBlock: number;
@@ -22,11 +25,15 @@ interface ApiBlockStatus {
   iIdDriver: number | null;
   iIdUnit: number | null;
   iTripNumber?: number;
+  iIdHelper?: number | null;
+  sHelperNameSnapshot?: string | null;
+  bHelperUsesOther?: boolean;
 }
 
 // Cache persistente para navegación rápida
 let cachedBlocks: Block[] | null = null;
 let cachedDrivers: Driver[] | null = null;
+let cachedHelpers: Helper[] | null = null;
 let cachedBranchFilter: string = "all";
 
 const branchPriority: Record<string, number> = {
@@ -36,6 +43,11 @@ const branchPriority: Record<string, number> = {
   "SANTA CATARINA": 3,
 };
 
+
+const blockStatusOptions: { id: BlockStatus; label: string }[] = [
+  { id: "Disponible", label: "Disponibles" },
+  { id: "Asignado", label: "Asignados" },
+];
 const getBlockBranchPriority = (block: Block) => {
   return branchPriority[(block.logisticsBranch || "").trim().toUpperCase()] ?? 99;
 };
@@ -50,6 +62,8 @@ export default function BloquesPage() {
 
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(!cachedDrivers);
+  const [helpers, setHelpers] = useState<Helper[]>(cachedHelpers || []);
+  const [isLoadingHelpers, setIsLoadingHelpers] = useState(!cachedHelpers);
   const [driverError, setDriverError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -74,7 +88,7 @@ export default function BloquesPage() {
     };
   }, []);
 
-  const fetchAllData = async (silent: boolean | any = false) => {
+  const fetchAllData = async (silent: FetchAllDataArg = false) => {
     const isManualRefresh = typeof silent === 'object' && silent !== null;
     const isSilent = typeof silent === 'boolean' ? silent : false;
 
@@ -82,19 +96,26 @@ export default function BloquesPage() {
     if (isManualRefresh || (!isSilent && !cachedBlocks)) {
       setIsLoadingBlocks(true);
       setIsLoadingDrivers(true);
+      setIsLoadingHelpers(true);
     }
     setDriverError(null);
 
     try {
-      const [blocksRes, driversRes] = await Promise.all([
+      const [blocksRes, driversRes, helpersRes] = await Promise.all([
         fetch('/api/logistics/blocks-status'),
         fetch('/api/drivers'),
+        fetch('/api/logistics/helpers'),
       ]);
 
       if (!blocksRes.ok || !driversRes.ok) throw new Error('Error al conectar con los servidores');
 
       const blocksData: ApiBlockStatus[] = await blocksRes.json();
       const driversData: ApiDriver[] = await driversRes.json();
+      const helpersData: Helper[] = helpersRes.ok ? await helpersRes.json() : [];
+
+      if (!helpersRes.ok) {
+        console.warn('No se pudieron cargar los ayudantes. La asignación continuara con Ninguno/Otro.', helpersRes.status);
+      }
 
       // Map Blocks
       const mappedBlocksRaw: Block[] = blocksData.map(b => {
@@ -119,7 +140,10 @@ export default function BloquesPage() {
           logisticsBranch: b.sLogisticsBranch || undefined,
           name: b.sDeliveryBlock,
           status: (b.sEstatus === "Asignado" || b.sEstatus === "En Ruta") ? "Asignado" : "Disponible",
-          apiDriverName: b.sChofer || undefined
+          apiDriverName: b.sChofer || undefined,
+          iIdHelper: b.iIdHelper ?? null,
+          helperNameSnapshot: b.sHelperNameSnapshot || null,
+          helperUsesOther: b.bHelperUsesOther || false
         };
       });
       const mappedBlocksById = new Map<string, Block>();
@@ -158,6 +182,9 @@ export default function BloquesPage() {
 
       setDrivers(mappedDrivers);
       cachedDrivers = mappedDrivers;
+
+      setHelpers(helpersData);
+      cachedHelpers = helpersData;
     } catch (err) {
       console.error('Error fetching data:', err);
       setDriverError('No se pudieron cargar los datos del servidor');
@@ -165,6 +192,7 @@ export default function BloquesPage() {
       setIsRefreshing(false);
       setIsLoadingBlocks(false);
       setIsLoadingDrivers(false);
+      setIsLoadingHelpers(false);
     }
   };
 
@@ -199,7 +227,7 @@ export default function BloquesPage() {
     return block.apiDriverName;
   };
 
-  const handleAssignBlock = async (blockId: string, driverId: string) => {
+  const handleAssignBlock = async (blockId: string, driverId: string, helper?: AssignmentHelperPayload) => {
     const block = blocks.find(b => b.id === blockId);
     if (!block) return;
 
@@ -221,7 +249,10 @@ export default function BloquesPage() {
         return {
           ...b,
           status: driverId ? "Asignado" : "Disponible",
-          apiDriverName: driverId ? targetDriver?.name : undefined
+          apiDriverName: driverId ? targetDriver?.name : undefined,
+          iIdHelper: driverId ? helper?.iIdHelper ?? null : null,
+          helperNameSnapshot: driverId ? helper?.sHelperName ?? "Ninguno" : null,
+          helperUsesOther: driverId ? helper?.bHelperUsesOther ?? false : false
         };
       }
       return b;
@@ -259,15 +290,16 @@ export default function BloquesPage() {
 
         // Refresco silencioso en segundo plano con retraso para dar tiempo a la BD
         refreshTimeoutRef.current = setTimeout(() => fetchAllData(true), 2000);
-      } catch (err: any) {
-        console.warn("Validation/Error assigning block:", err?.message || err);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn("Validation/Error assigning block:", message);
         delete lastLocalUpdatesRef.current[baseBlockId];
         setBlocks(originalBlocks); // Revertir en caso de error
 
         closeSwal();
         await showError({
           title: "No se pudo liberar el bloque",
-          text: err?.message || "Hubo un error al intentar liberar el bloque. Intenta de nuevo más tarde."
+          text: message || "Hubo un error al intentar liberar el bloque. Intenta de nuevo más tarde."
         });
       }
       return;
@@ -290,7 +322,10 @@ export default function BloquesPage() {
         body: JSON.stringify({
           iIdDeliveryBlock: block.iId,
           iIdDriver: iIdDriver,
-          iIdLogisticsBranch: block.logisticsBranchId || null
+          iIdLogisticsBranch: block.logisticsBranchId || null,
+          iIdHelper: helper?.iIdHelper ?? null,
+          sHelperName: helper?.sHelperName ?? "Ninguno",
+          bHelperUsesOther: helper?.bHelperUsesOther ?? false
         })
       });
 
@@ -377,13 +412,10 @@ export default function BloquesPage() {
           />
 
           <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
-            {[
-              { id: "Disponible", label: "Disponibles" },
-              { id: "Asignado", label: "Asignados" },
-            ].map((status) => (
+            {blockStatusOptions.map((status) => (
               <button
                 key={status.id}
-                onClick={() => setStatusFilter(status.id as any)}
+                onClick={() => setStatusFilter(status.id)}
                 className={cn(
                   "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center justify-center cursor-pointer",
                   statusFilter === status.id
@@ -423,9 +455,11 @@ export default function BloquesPage() {
               key={block.id}
               block={block}
               assignedDriverName={getAssignedDriverName(block)}
-              onAssign={(driverId) => handleAssignBlock(block.id, driverId)}
+              onAssign={(driverId, helper) => handleAssignBlock(block.id, driverId, helper)}
               allDrivers={drivers}
               isLoadingDrivers={isLoadingDrivers}
+              helpers={helpers}
+              isLoadingHelpers={isLoadingHelpers}
               driverError={driverError}
             />
           ))
