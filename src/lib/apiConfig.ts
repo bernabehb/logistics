@@ -1,9 +1,9 @@
 ﻿/**
- * ConfiguraciÃƒÂ³n centralizada para la API externa.
+ * ConfiguraciÃ³n centralizada para la API externa.
  * Evita inconsistencias de URLs entre diferentes archivos.
  */
 
-// Usamos la URL del TÃƒÂºnel activa reportada en los logs de error
+// Usamos la URL del TÃºnel activa reportada en los logs de error
 export const EXTERNAL_API_BASE_URL = 'https://vjzmzlbx-5151.usw3.devtunnels.ms';
 
 export const API_HEADERS = {
@@ -28,8 +28,10 @@ export const API_ENDPOINTS = {
   scanOrderForDeparture: (orderNum: string | number) => `${EXTERNAL_API_BASE_URL}/Logistics/ScanOrderForDeparture/${orderNum}`,
   authorizeInvoice: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeInvoice/${invoiceNum}`,
   deliverInvoices: `${EXTERNAL_API_BASE_URL}/Logistics/DeliverInvoices`,
+  syncMaterialDeliveriesFromSamsara: `${EXTERNAL_API_BASE_URL}/Logistics/SyncMaterialDeliveriesFromSamsara`,
   authorizeBranchPickupDelivery: `${EXTERNAL_API_BASE_URL}/Logistics/AuthorizeBranchPickupDelivery`,
   returnBranchPickupToRoutes: `${EXTERNAL_API_BASE_URL}/Logistics/ReturnBranchPickupToRoutes`,
+  returnInvoiceToRoutes: (invoiceNum: string) => `${EXTERNAL_API_BASE_URL}/Logistics/ReturnInvoiceToRoutes/${invoiceNum}`,
   confirmBranchPickupDelivery: `${EXTERNAL_API_BASE_URL}/Logistics/ConfirmBranchPickupDelivery`,
   markScannedInvoicesInRouteManual: `${EXTERNAL_API_BASE_URL}/Logistics/MarkScannedInvoicesInRouteManual`,
   syncStartedSamsaraRoutes: `${EXTERNAL_API_BASE_URL}/Logistics/SamsaraRoutes/SyncStartedToLocal`,

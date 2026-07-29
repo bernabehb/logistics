@@ -8,15 +8,22 @@ import { Button } from "@/components/ui/button";
 import { DepartureCard, ReadyDeparture } from "@/features/logistics/components/cards/DepartureCard";
 import { LogisticsBranchFilter } from "@/features/logistics/components";
 import { RefreshCw } from "lucide-react";
+import { showError, showSuccess } from "@/lib/mySwal";
 interface FacturaObj {
   factura?: string;
   Factura?: string;
   orderNum?: number;
   OrderNum?: number;
+  monto?: number;
+  Monto?: number;
   autorizada?: boolean;
   Autorizada?: boolean;
   escaneada?: boolean;
   Escaneada?: boolean;
+  entregada?: boolean;
+  Entregada?: boolean;
+  delivered?: boolean;
+  Delivered?: boolean;
   esNueva?: boolean;
   EsNueva?: boolean;
 }
@@ -56,6 +63,14 @@ const isScannedInvoice = (invoice: FacturaObj | string) => {
   return typeof invoice.escaneada === 'boolean' ? invoice.escaneada : invoice.Escaneada === true;
 };
 
+const isDeliveredInvoice = (invoice: FacturaObj | string) => {
+  if (typeof invoice === 'string') return false;
+  if (typeof invoice.entregada === 'boolean') return invoice.entregada;
+  if (typeof invoice.Entregada === 'boolean') return invoice.Entregada;
+  if (typeof invoice.delivered === 'boolean') return invoice.delivered;
+  return invoice.Delivered === true;
+};
+
 const getInvoiceId = (invoice: FacturaObj | string) => (
   typeof invoice === 'string' ? invoice : (invoice.factura || invoice.Factura || "")
 );
@@ -64,9 +79,16 @@ const getOrderNum = (invoice: FacturaObj | string) => (
   typeof invoice === 'string' ? undefined : (invoice.orderNum || invoice.OrderNum || undefined)
 );
 
+const getInvoiceAmount = (invoice: FacturaObj | string) => {
+  if (typeof invoice === 'string') return undefined;
+  const amount = typeof invoice.monto === 'number' ? invoice.monto : invoice.Monto;
+  return typeof amount === 'number' ? amount : undefined;
+};
+
 export default function AutorizarSalidaPage() {
   const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || []);
   const [isRefreshing, setIsRefreshing] = useState(!cachedDepartures);
+  const [isSyncingDeliveries, setIsSyncingDeliveries] = useState(false);
   const [materialReviewAutoCreateEnabled, setMaterialReviewAutoCreateEnabled] = useState<boolean | null>(null);
 
   const fetchDepartures = async (silent = false) => {
@@ -83,11 +105,12 @@ export default function AutorizarSalidaPage() {
         const homeData: ApiDepartureHome[] = await homeRes.json();
         const mappedHome = homeData.map((d, i) => {
           const allInvoices = d.facturas || [];
-          const pendingInvoices = allInvoices.filter(f => !isAuthorizedInvoice(f) && !isScannedInvoice(f));
-          const scannedInvoices = allInvoices.filter(f => !isAuthorizedInvoice(f) && isScannedInvoice(f));
+          const activeInvoices = allInvoices.filter(f => !isDeliveredInvoice(f));
+          const pendingInvoices = activeInvoices.filter(f => !isAuthorizedInvoice(f) && !isScannedInvoice(f));
+          const scannedInvoices = activeInvoices.filter(f => !isAuthorizedInvoice(f) && isScannedInvoice(f));
 
-          const isFullyAuthorized = allInvoices.length > 0 && allInvoices.every(isAuthorizedInvoice);
-          const isFullyScanned = allInvoices.length > 0 && !isFullyAuthorized && pendingInvoices.length === 0 && scannedInvoices.length > 0;
+          const isFullyAuthorized = allInvoices.some(f => isAuthorizedInvoice(f) && !isDeliveredInvoice(f));
+          const isFullyScanned = activeInvoices.length > 0 && !isFullyAuthorized && pendingInvoices.length === 0 && scannedInvoices.length > 0;
           let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
           if (isFullyAuthorized) computedStatus = "En ruta";
           else if (isFullyScanned) computedStatus = "Escaneada";
@@ -96,9 +119,11 @@ export default function AutorizarSalidaPage() {
           const mappedInvoices = invoicesToMap.map(f => ({
             id: getInvoiceId(f),
             orderNum: getOrderNum(f),
+            amount: getInvoiceAmount(f),
             groups: [],
             isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva),
-            isScanned: isScannedInvoice(f)
+            isScanned: isScannedInvoice(f),
+            isDelivered: isDeliveredInvoice(f)
           }));
 
           const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
@@ -108,7 +133,7 @@ export default function AutorizarSalidaPage() {
             unitName: d.unidad,
             type: "Reparto",
             driverName: d.chofer,
-            destination: d.direccionesEntrega?.[0] || "Destinos múltiples",
+            destination: d.direccionesEntrega?.[0] || "Destinos mÃºltiples",
             invoices: mappedInvoices,
             totalWeightTons: d.pesoTotal,
             totalAmount: d.montoTotal,
@@ -117,7 +142,7 @@ export default function AutorizarSalidaPage() {
             status: computedStatus as ReadyDeparture["status"],
             logisticsBranch,
           };
-        }).filter(d => d.invoices.length > 0 || d.status === "En ruta");
+        }).filter(d => d.invoices.length > 0 && d.invoices.some(inv => !inv.isDelivered));
         newDepartures = [...newDepartures, ...mappedHome];
       }
 
@@ -125,11 +150,12 @@ export default function AutorizarSalidaPage() {
         const branchData: ApiDepartureBranch[] = await branchRes.json();
         const mappedBranch = branchData.map((d, i) => {
           const allInvoices = d.facturas || [];
-          const pendingInvoices = allInvoices.filter(f => !isAuthorizedInvoice(f) && !isScannedInvoice(f));
-          const scannedInvoices = allInvoices.filter(f => !isAuthorizedInvoice(f) && isScannedInvoice(f));
+          const activeInvoices = allInvoices.filter(f => !isDeliveredInvoice(f));
+          const pendingInvoices = activeInvoices.filter(f => !isAuthorizedInvoice(f) && !isScannedInvoice(f));
+          const scannedInvoices = activeInvoices.filter(f => !isAuthorizedInvoice(f) && isScannedInvoice(f));
 
-          const isFullyAuthorized = allInvoices.length > 0 && allInvoices.every(isAuthorizedInvoice);
-          const isFullyScanned = allInvoices.length > 0 && !isFullyAuthorized && pendingInvoices.length === 0 && scannedInvoices.length > 0;
+          const isFullyAuthorized = allInvoices.some(f => isAuthorizedInvoice(f) && !isDeliveredInvoice(f));
+          const isFullyScanned = activeInvoices.length > 0 && !isFullyAuthorized && pendingInvoices.length === 0 && scannedInvoices.length > 0;
           let computedStatus = (d.estatus?.toUpperCase() === "PENDIENTE" || d.estatus?.toUpperCase() === "LISTO") ? "Pendiente" : "En ruta";
           if (isFullyAuthorized) computedStatus = "En ruta";
           else if (isFullyScanned) computedStatus = "Escaneada";
@@ -138,8 +164,10 @@ export default function AutorizarSalidaPage() {
           const mappedInvoices = invoicesToMap.map(f => ({
             id: getInvoiceId(f),
             orderNum: getOrderNum(f),
+            amount: getInvoiceAmount(f),
             groups: [],
-            isScanned: isScannedInvoice(f)
+            isScanned: isScannedInvoice(f),
+            isDelivered: isDeliveredInvoice(f)
           }));
 
           const invoiceIds = mappedInvoices.map(inv => inv.id).join("_");
@@ -147,7 +175,7 @@ export default function AutorizarSalidaPage() {
           return {
             id: `branch-${d.cliente.trim()}-${computedStatus}-${invoiceIds}-${i}`,
             unitName: "SUCURSAL",
-            type: "Recolección",
+            type: "RecolecciÃ³n",
             driverName: "Cliente",
             clientName: d.cliente,
             destination: "Sucursal",
@@ -159,7 +187,7 @@ export default function AutorizarSalidaPage() {
             status: computedStatus as ReadyDeparture["status"],
             logisticsBranch,
           };
-        }).filter(d => d.invoices.length > 0 || d.status === "En ruta");
+        }).filter(d => d.invoices.length > 0 && d.invoices.some(inv => !inv.isDelivered));
         newDepartures = [...newDepartures, ...mappedBranch];
       }
 
@@ -178,7 +206,7 @@ export default function AutorizarSalidaPage() {
       const data = await response.json().catch(() => null);
       setMaterialReviewAutoCreateEnabled(response.ok && data?.enabled === true);
     } catch (err) {
-      console.warn("Error consultando estado de documento automatico:", err);
+      console.warn("Error consultando estado de documento automÃ¡tico:", err);
       setMaterialReviewAutoCreateEnabled(false);
     }
   };
@@ -188,6 +216,24 @@ export default function AutorizarSalidaPage() {
     fetchMaterialReviewDocumentStatus();
   }, []);
 
+  const markDeliveredInvoicesInState = (invoiceNums: string[]) => {
+    const deliveredSet = new Set(invoiceNums.map(inv => inv.trim()).filter(Boolean));
+    if (deliveredSet.size === 0) return;
+
+    setDepartures(prev => {
+      const updated = prev
+        .map(dep => ({
+          ...dep,
+          invoices: dep.invoices.map(inv =>
+            deliveredSet.has(inv.id.trim()) ? { ...inv, isDelivered: true } : inv
+          ),
+        }))
+        .filter(dep => dep.invoices.some(inv => !inv.isDelivered));
+
+      cachedDepartures = updated;
+      return updated;
+    });
+  };
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -205,6 +251,46 @@ export default function AutorizarSalidaPage() {
         fetchDepartures(true),
         fetchMaterialReviewDocumentStatus(),
       ]);
+    }
+  };
+  const handleSyncMaterialDeliveries = async () => {
+    setIsSyncingDeliveries(true);
+    try {
+      const response = await fetch("/api/logistics/sync-material-deliveries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ daysBack: 1, invoiceNums: [] }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.message || data?.error || "No se pudieron sincronizar las entregas desde Samsara.");
+      }
+
+      const deliveredInvoiceNums = Array.isArray(data?.deliveredInvoiceNums) ? data.deliveredInvoiceNums : [];
+      markDeliveredInvoicesInState(deliveredInvoiceNums);
+
+      const deliveredCount = data?.deliveredInvoices ?? deliveredInvoiceNums.length;
+      if (deliveredCount > 0) {
+        await showSuccess({
+          title: "Entregas sincronizadas",
+          text: `Se sincronizaron ${deliveredCount} facturas entregadas desde Samsara.`,
+        });
+      } else {
+        await showSuccess({
+          title: "Sin entregas nuevas",
+          text: "No se encontraron facturas en ruta pendientes de marcar como entregadas.",
+        });
+      }
+    } catch (err) {
+      console.warn("Error sincronizando entregas desde Samsara:", err);
+      await showError({
+        title: "No se pudo sincronizar",
+        text: err instanceof Error ? err.message : "No se pudieron sincronizar las entregas desde Samsara.",
+      });
+    } finally {
+      setIsSyncingDeliveries(false);
     }
   };
   const [searchQuery, setSearchQuery] = useState("");
@@ -308,6 +394,51 @@ export default function AutorizarSalidaPage() {
       fetchDepartures(true);
     }, 600);
   };
+
+  const handleReturnInvoiceToRoutes = async (invoiceNum: string) => {
+    const response = await fetch(`/api/logistics/return-invoice-to-routes/${encodeURIComponent(invoiceNum)}`, {
+      method: "POST",
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || data?.error || "No se pudo regresar la factura a Rutas.");
+    }
+
+    const invoiceKey = invoiceNum.trim();
+    setDepartures(prev => {
+      const updated = prev
+        .map(dep => {
+          const removedIndex = dep.invoices.findIndex(inv => inv.id.trim() === invoiceKey);
+          if (removedIndex < 0) return dep;
+
+          const remainingInvoices = dep.invoices.filter(inv => inv.id.trim() !== invoiceKey);
+          const allRemainingHaveAmount = remainingInvoices.every(inv => typeof inv.amount === "number");
+          const nextLocations = dep.locations.length === dep.invoices.length
+            ? dep.locations.filter((_, index) => index !== removedIndex)
+            : dep.locations;
+
+          return {
+            ...dep,
+            invoices: remainingInvoices,
+            locations: nextLocations,
+            totalAmount: allRemainingHaveAmount
+              ? remainingInvoices.reduce((total, inv) => total + (inv.amount || 0), 0)
+              : dep.totalAmount,
+          };
+        })
+        .filter(dep => dep.invoices.length > 0);
+
+      cachedDepartures = updated;
+      return updated;
+    });
+
+    await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
+    window.setTimeout(() => {
+      fetchDepartures(true);
+    }, 600);
+  };
   const branchFilteredDepartures = departures.filter(dep => {
     if (branchFilter === "all") return true;
     return (dep.logisticsBranch || "").trim().toUpperCase() === branchFilter;
@@ -350,16 +481,28 @@ export default function AutorizarSalidaPage() {
             />
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
-        >
-          <RefreshCw className={cn("size-3.5 mr-2", isRefreshing && "animate-spin text-blue-500")} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncMaterialDeliveries}
+            disabled={isSyncingDeliveries || isRefreshing}
+            className="h-9 rounded-xl font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/70 dark:text-emerald-300 dark:hover:bg-emerald-950/30 transition-all shadow-sm"
+          >
+            <CheckCircle2 className={cn("size-3.5 mr-2", isSyncingDeliveries && "animate-pulse")} />
+            Sincronizar entregas
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isSyncingDeliveries}
+            className="h-9 rounded-xl font-bold border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-sm"
+          >
+            <RefreshCw className={cn("size-3.5 mr-2", isRefreshing && "animate-spin text-blue-500")} />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
       {/* Unified Filter Row */}
@@ -466,6 +609,7 @@ export default function AutorizarSalidaPage() {
                 onDelivered={handleDelivered}
                 onSendScannedInRouteManual={handleSendScannedInRouteManual}
                 onReturnToRoutes={handleReturnBranchPickupToRoutes}
+                onReturnInvoiceToRoutes={handleReturnInvoiceToRoutes}
               />
             ))}
           </div>
@@ -474,3 +618,7 @@ export default function AutorizarSalidaPage() {
     </div>
   );
 }
+
+
+
+

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check, MapPin, Printer } from "lucide-react";
+import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check, MapPin, Printer, History, Clock3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RutaOrderCard, RutaPedido, RutaStatus, RutaInvoiceType } from "@/features/logistics/components/cards/RutaOrderCard";
@@ -363,6 +363,8 @@ interface ApiRutaInvoice {
   estatusEmbarque: string;
   iIdLogisticsBranch?: number;
   dDateRouteAuthorized?: string | null;
+  isPreviousPending?: boolean | number | string;
+  IsPreviousPending?: boolean | number | string;
 }
 
 interface AvailableUnit {
@@ -438,6 +440,31 @@ const getActiveRouteBlock = (blocks: ApiBlockStatus[], blockName: string, logist
     })[0];
 };
 
+const DEFAULT_PREVIOUS_PENDING_DAYS = 7;
+const getRoutesCacheKey = (driverFilter: string, includePreviousPending: boolean) =>
+  `${driverFilter || 'all'}|previous:${includePreviousPending ? '1' : '0'}`;
+
+const isTruthyPreviousPending = (value: unknown) => {
+  if (value === true || value === 1) return true;
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true';
+};
+
+const getTodayDateKey = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const isBeforeToday = (dateValue?: string | null) => {
+  if (!dateValue) return false;
+  const dateKey = dateValue.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateKey) && dateKey < getTodayDateKey();
+};
+
 let cachedInvoices: RutaPedido[] | null = null;
 let cachedUnidades: AvailableUnit[] | null = null;
 let cachedUnitCatalog: AvailableUnit[] | null = null;
@@ -448,14 +475,16 @@ const cachedInvoicesByDriver: Record<string, RutaPedido[]> = {};
 const cachedRouteRowsByDriver: Record<string, ApiRutaInvoice[]> = {};
 let lastDriverFilter: string = 'all';
 let lastBranchFilter: string = 'all';
+let lastIncludePreviousPending = false;
 let lastViewMode: 'cards' | 'table' = 'cards';
 
 export default function RutasPage() {
-  const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[lastDriverFilter] || []);
-  const [routeTicketRows, setRouteTicketRows] = useState<ApiRutaInvoice[]>(cachedRouteRowsByDriver[lastDriverFilter] || []);
+  const initialRoutesCacheKey = getRoutesCacheKey(lastDriverFilter, lastIncludePreviousPending);
+  const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[initialRoutesCacheKey] || []);
+  const [routeTicketRows, setRouteTicketRows] = useState<ApiRutaInvoice[]>(cachedRouteRowsByDriver[initialRoutesCacheKey] || []);
   const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
   const [unitCatalog, setUnitCatalog] = useState<AvailableUnit[]>(cachedUnitCatalog || cachedUnidades || []);
-  const [isLoading, setIsLoading] = useState(!cachedInvoices);
+  const [isLoading, setIsLoading] = useState(!cachedInvoicesByDriver[initialRoutesCacheKey]);
   const [error, setError] = useState<string | null>(null);
 
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<'sucursal' | 'domicilio'>('domicilio');
@@ -467,6 +496,7 @@ export default function RutasPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(lastViewMode);
   const [driverFilter, setDriverFilter] = useState<string>(lastDriverFilter);
   const [branchFilter, setBranchFilter] = useState<string>(lastBranchFilter);
+  const [includePreviousPending, setIncludePreviousPending] = useState(lastIncludePreviousPending);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
@@ -592,15 +622,17 @@ export default function RutasPage() {
 
   useEffect(() => {
     lastDriverFilter = driverFilter;
+    lastIncludePreviousPending = includePreviousPending;
+    const routesCacheKey = getRoutesCacheKey(driverFilter, includePreviousPending);
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
       // para traer los catalogos y asignaciones más recientes de la BD
       fetchAllData(true, true);
     } else {
-      fetchAllData(false, !!cachedInvoicesByDriver[driverFilter]);
+      fetchAllData(false, !!cachedInvoicesByDriver[routesCacheKey] && !!cachedRouteRowsByDriver[routesCacheKey]);
     }
-  }, [driverFilter]);
+  }, [driverFilter, includePreviousPending]);
 
   useEffect(() => {
     lastBranchFilter = branchFilter;
@@ -624,7 +656,7 @@ export default function RutasPage() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [driverFilter]);
+  }, [driverFilter, includePreviousPending]);
 
   const getVisibleBlockInvoiceItems = (blockName: string) => {
     return (groupedData[blockName] || [])
@@ -1159,9 +1191,11 @@ export default function RutasPage() {
     }
     isFetchingRef.current = true;
     const requestId = ++lastRequestRef.current;
+    const routesCacheKey = getRoutesCacheKey(driverFilter, includePreviousPending);
 
-    if (!forceRefresh && !silent && cachedInvoicesByDriver[driverFilter] && cachedRouteRowsByDriver[driverFilter]) {
-      setInvoices(cachedInvoicesByDriver[driverFilter]);
+    if (!forceRefresh && !silent && cachedInvoicesByDriver[routesCacheKey] && cachedRouteRowsByDriver[routesCacheKey]) {
+      setInvoices(cachedInvoicesByDriver[routesCacheKey]);
+      setRouteTicketRows(cachedRouteRowsByDriver[routesCacheKey]);
       setIsLoading(false);
       isFetchingRef.current = false;
       return;
@@ -1174,10 +1208,16 @@ export default function RutasPage() {
 
       const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedUnitCatalog || !cachedDrivers || !cachedBlocks;
 
-      let routesUrl = '/api/routes';
+      const routesParams = new URLSearchParams();
       if (driverFilter && driverFilter !== 'all') {
-        routesUrl += `?iIdDriver=${driverFilter}`;
+        routesParams.set('iIdDriver', driverFilter);
       }
+      if (includePreviousPending) {
+        routesParams.set('includePreviousPending', 'true');
+        routesParams.set('previousPendingDays', DEFAULT_PREVIOUS_PENDING_DAYS.toString());
+      }
+      const routesQuery = routesParams.toString();
+      const routesUrl = routesQuery ? `/api/routes?${routesQuery}` : '/api/routes';
 
       const [catalogsResults, routesResponse] = await Promise.all([
         catalogsNeeded
@@ -1254,7 +1294,7 @@ export default function RutasPage() {
         const isBranchPickup = row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'));
         return !(isBranchPickup && row.dDateRouteAuthorized);
       });
-      cachedRouteRowsByDriver[driverFilter] = activeRouteRows;
+      cachedRouteRowsByDriver[routesCacheKey] = activeRouteRows;
       setRouteTicketRows(activeRouteRows);
 
       const groupedMap = new Map<string, RutaPedido & { block: string }>();
@@ -1271,6 +1311,11 @@ export default function RutasPage() {
 
         if (!groupedMap.has(groupKey)) {
           const type: RutaInvoiceType = row.tipoFactura === "ANTICIPADA" ? "anticipada" : "normal";
+          const displayDate = isFactura ? row.fecha : row.orderDate;
+          const isPreviousPendingRow =
+            isTruthyPreviousPending(row.isPreviousPending) ||
+            isTruthyPreviousPending(row.IsPreviousPending) ||
+            (includePreviousPending && isBeforeToday(displayDate));
 
           let status: RutaStatus = 'pending';
           const rawStatus = (row.estatusEmbarque || "").toLowerCase();
@@ -1281,7 +1326,7 @@ export default function RutasPage() {
           groupedMap.set(groupKey, {
             id: displayId,
             clientName: row.cliente,
-            date: isFactura ? row.fecha : row.orderDate,
+            date: displayDate,
             warehouses: [],
             vendedor: row.vendedor,
             deliveryType: (row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'))) ? 'sucursal' : 'domicilio',
@@ -1295,7 +1340,8 @@ export default function RutasPage() {
             orderNum: row.orderNum,
             sucursal: mappedSucursal,
             logisticsBranchId,
-            direccionEnvio: row.direccionEnvio
+            direccionEnvio: row.direccionEnvio,
+            isPreviousPending: isPreviousPendingRow
           });
         }
 
@@ -1336,7 +1382,7 @@ export default function RutasPage() {
 
       const allData = Array.from(groupedMap.values());
 
-      cachedInvoicesByDriver[driverFilter] = allData;
+      cachedInvoicesByDriver[routesCacheKey] = allData;
       cachedInvoices = allData;
       setInvoices(allData);
       setError(null);
@@ -1649,6 +1695,24 @@ export default function RutasPage() {
           onToggleStatusFilter={toggleStatusFilter as any}
           compact={true}
         />
+        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
+        <button
+          type="button"
+          onClick={() => {
+            setIncludePreviousPending((prev) => !prev);
+            setCurrentPage(1);
+          }}
+          title={includePreviousPending ? "Ocultar pendientes anteriores" : "Mostrar pendientes anteriores"}
+          className={cn(
+            "inline-flex h-9 items-center justify-center gap-2 rounded-xl border px-3 text-[10px] font-black uppercase tracking-widest transition-all shrink-0 cursor-pointer",
+            includePreviousPending
+              ? "border-amber-300 bg-amber-50 text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+              : "border-slate-200 bg-white/70 text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-slate-200"
+          )}
+        >
+          <History className="size-3.5" />
+          Anteriores
+        </button>
 
         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
         <LogisticsTypeFilters
@@ -1739,8 +1803,13 @@ export default function RutasPage() {
                         <tr key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} onClick={() => handleOpenDetails(p.id)} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer">
                           <td className="px-6 py-5">
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              <span className="inline-flex items-center gap-1.5 text-sm font-black text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                 {p.id.startsWith('ORDER-') ? `Orden: ${p.id.split('-')[1]}` : `Factura: ${p.id}`}
+                                {p.isPreviousPending && (
+                                  <span className="inline-flex items-center justify-center size-6 rounded-full bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 shrink-0 shadow-sm">
+                                    <Clock3 className="size-4 stroke-[2.5]" />
+                                  </span>
+                                )}
                               </span>
                               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
                             </div>
@@ -1774,10 +1843,15 @@ export default function RutasPage() {
 
                               return (
                                 <Button
-                                  variant={hasInvoice ? "logistics-success" : "logistics-action"}
+                                  variant="outline"
                                   size="sm"
                                   disabled={!!authorizingBranchPickupKey || !hasInvoice}
-                                  className="h-9 px-4 text-[10px] font-black rounded-xl uppercase tracking-widest shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                                  className={cn(
+                                    "h-9 px-4 text-[10px] font-black rounded-xl uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-none ring-0",
+                                    hasInvoice
+                                      ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 opacity-60"
+                                  )}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (!hasInvoice) return;
@@ -1835,20 +1909,21 @@ export default function RutasPage() {
 
                               <div className="flex items-center gap-2 shrink-0">
                                 <Button
-                                  variant={
-                                    isAuthorized && canAuthorize
-                                      ? "logistics-warning"
-                                      : canAuthorize
-                                        ? "logistics-success"
-                                        : "logistics-action"
-                                  }
+                                  variant="outline"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleAuthorizeBlock(blockName, !isAuthorized);
                                   }}
                                   disabled={!canAuthorize || isProcessing}
                                   size="sm"
-                                  className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
+                                  className={cn(
+                                    "h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest transition-all shadow-none ring-0",
+                                    isAuthorized && canAuthorize
+                                      ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                                      : canAuthorize
+                                        ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 opacity-60"
+                                  )}
                                 >
                                   {isProcessing && (
                                     <RefreshCw className="size-3.5 animate-spin" />
@@ -1891,8 +1966,13 @@ export default function RutasPage() {
                                 <div className="flex items-start gap-3">
                                   {renderInvoiceSelectionButton(blockName, p, "mt-0.5")}
                                   <div className="flex flex-col">
-                                    <span className="text-sm font-black text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                    <span className="inline-flex items-center gap-1.5 text-sm font-black text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                       {p.id.startsWith('ORDER-') ? `Orden: ${p.id.split('-')[1]}` : `Factura: ${p.id}`}
+                                      {p.isPreviousPending && (
+                                        <span className="inline-flex items-center justify-center size-6 rounded-full bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 shrink-0 shadow-sm">
+                                          <Clock3 className="size-4 stroke-[2.5]" />
+                                        </span>
+                                      )}
                                     </span>
                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
                                   </div>
@@ -2045,17 +2125,18 @@ export default function RutasPage() {
 
                         <div className="flex items-center gap-2 shrink-0">
                           <Button
-                            variant={
-                              isAuthorized && canAuthorize
-                                ? "logistics-warning"
-                                : canAuthorize
-                                  ? "logistics-success"
-                                  : "logistics-action"
-                            }
+                            variant="outline"
                             onClick={() => handleAuthorizeBlock(blockName, !isAuthorized)}
                             disabled={!canAuthorize || isProcessing}
                             size="sm"
-                            className="h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest"
+                            className={cn(
+                              "h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest transition-all shadow-none ring-0",
+                              isAuthorized && canAuthorize
+                                ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                                : canAuthorize
+                                  ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                                  : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 opacity-60"
+                            )}
                           >
                             {isProcessing && (
                               <RefreshCw className="size-3.5 animate-spin" />
@@ -2162,10 +2243,15 @@ export default function RutasPage() {
                   <div key={`${p.id}-${p.logisticsBranchId || p.sucursal}`} className="relative">
                     <div className="absolute right-3 top-3 z-10">
                       <Button
-                        variant={hasInvoice ? "logistics-success" : "logistics-action"}
+                        variant="outline"
                         size="sm"
                         disabled={!!authorizingBranchPickupKey || !hasInvoice}
-                        className="h-8 px-3 text-[10px] font-black rounded-xl uppercase tracking-widest shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                        className={cn(
+                          "h-8 px-3 text-[10px] font-black rounded-xl uppercase tracking-widest flex items-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-none ring-0",
+                          hasInvoice
+                            ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 opacity-60"
+                        )}
                         onClick={(e) => {
                           e.stopPropagation();
                           if (!hasInvoice) return;

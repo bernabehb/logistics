@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, User, Package, Grid3x3, LayoutGrid, PaintbrushVertical } from "lucide-react";
+import { Calendar, User, Package, Grid3x3, LayoutGrid, PaintbrushVertical, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type RutaStatus = 'pending' | 'in-progress' | 'ready' | 'none';
@@ -27,6 +27,7 @@ export interface RutaPedido {
   sucursal?: string;
   logisticsBranchId?: number;
   direccionEnvio?: string;
+  isPreviousPending?: boolean;
 }
 
 interface RutaOrderCardProps {
@@ -48,8 +49,13 @@ export function RutaOrderCard({ pedido, activeStatusFilters, onClick }: RutaOrde
         {/* Header: ID and Anticipada Badge */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight uppercase">
+            <span className="inline-flex items-center gap-1.5 text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight uppercase">
               {pedido.id.startsWith('ORDER-') ? `Orden: ${pedido.id.split('-')[1]}` : `Factura: ${pedido.id}`}
+              {pedido.isPreviousPending && (
+                <span className="inline-flex items-center justify-center size-6 rounded-full bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 shrink-0 shadow-sm normal-case">
+                  <Clock3 className="size-4 stroke-[2.5]" />
+                </span>
+              )}
             </span>
           </div>
           {pedido.type === 'anticipada' && pedido.completedDeliveries !== undefined && (

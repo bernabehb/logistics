@@ -39,12 +39,6 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       roles: ["Logistica"],
     },
     {
-      name: "Cajas",
-      href: "/cajas",
-      icon: DollarSign,
-      roles: ["Cajas"],
-    },
-    {
       name: "Bloques",
       href: "/logistics/bloques",
       icon: Layers,
@@ -62,27 +56,15 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       icon: Truck,
       roles: ["Logistica"],
     },
-    {
-      name: "Panel de Control",
-      href: "/admin",
-      icon: ShieldCheck,
-      roles: ["Admin"],
-    },
-    {
-      name: "Mis entregas",
-      href: "/chofer",
-      icon: Truck,
-      roles: ["Chofer"],
-    },
   ].filter((item) => userRole && item.roles.includes(userRole));
 
   return (
     <aside className={cn(
-      "fixed left-0 top-0 bottom-0 w-[240px] bg-white dark:bg-[#0F172A] border-r border-slate-200 dark:border-slate-800 flex flex-col transition-transform duration-300 z-50",
+      "fixed left-0 top-0 bottom-0 w-[240px] bg-white/40 dark:bg-slate-950/45 backdrop-blur-2xl border-r border-white/20 dark:border-white/10 flex flex-col transition-transform duration-300 z-50 shadow-[0_8px_32px_0_rgba(0,0,0,0.06)]",
       isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
     )}>
       {/* Brand Header */}
-      <div className="flex items-center px-6 h-20 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex items-center px-6 h-20 border-b border-white/20 dark:border-white/10">
         <Image 
           src="/logo.png" 
           alt="COMPERS Logo" 
@@ -91,7 +73,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           className="object-contain dark:brightness-0 dark:invert" 
         />
       </div>
-
+ 
       {/* Navigation */}
       <div className="flex-1 px-4 py-6 overflow-y-auto">
         <nav className="flex flex-col gap-1.5">
@@ -105,15 +87,18 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
+                  "relative flex items-center gap-3 pl-5 pr-3 py-2.5 rounded-xl text-sm font-semibold transition-all group border overflow-hidden",
                   isActive
-                    ? "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#1E293B]/50 hover:text-slate-900 dark:hover:text-slate-200"
+                    ? "bg-white/20 dark:bg-white/5 text-slate-900 dark:text-white border-white/30 dark:border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-md"
+                    : "border-transparent text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-200"
                 )}
               >
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-6 bg-cyan-400 dark:bg-cyan-400 rounded-r-md" />
+                )}
                 <item.icon className={cn(
                   "size-5 transition-colors",
-                  isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400"
+                  isActive ? "text-cyan-500 dark:text-cyan-400" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400"
                 )} />
                 <span>
                   {item.name}
@@ -123,9 +108,9 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           })}
         </nav>
       </div>
-
+ 
       {/* Footer Profile / Theme Toggle */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-4">
+      <div className="p-4 border-t border-slate-200/40 dark:border-slate-800/40 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex flex-col">

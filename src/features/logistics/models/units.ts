@@ -63,10 +63,3 @@ export function mapApiUnitToUnit(apiUnit: ApiUnit, index: number): Unit {
   };
 }
 
-import unitsData from "@/lib/units.json";
-// Ensure mock units have numeric iId
-export const MOCK_UNITS: Unit[] = (unitsData as any[]).map((u, index) => ({
-  ...u,
-  iId: u.iId || index + 1
-}));
-

@@ -14,7 +14,11 @@ export default function AppLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#F8FAFC] dark:bg-[#0F172A]">
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#F8FAFC] dark:bg-[#0F172A] relative overflow-hidden">
+      {/* Background Glow Blobs for Glassmorphic Sidebar */}
+      <div className="absolute top-[-150px] left-[-150px] w-[500px] h-[500px] bg-blue-500/10 dark:bg-blue-600/10 rounded-full blur-[130px] pointer-events-none z-0" />
+      <div className="absolute bottom-[-100px] left-[100px] w-[400px] h-[400px] bg-indigo-400/5 dark:bg-indigo-600/5 rounded-full blur-[100px] pointer-events-none z-0" />
+
       <SessionExpiredHandler />
 
       {/* Mobile Header */}

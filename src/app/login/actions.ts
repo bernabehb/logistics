@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -46,6 +46,15 @@ function getClaimValue(payload: LoginTokenPayload | null, claim: string) {
   return typeof matchingValue === "string" && matchingValue.trim() ? matchingValue.trim() : undefined;
 }
 
+function getJwtMaxAgeSeconds(payload: LoginTokenPayload | null) {
+  const fallbackSeconds = 60 * 60 * 10;
+  const exp = payload?.exp;
+
+  if (typeof exp !== "number") return fallbackSeconds;
+
+  const secondsUntilExpiration = Math.floor(exp - Date.now() / 1000);
+  return Math.max(60, secondsUntilExpiration);
+}
 async function getBackendUser(apiBase: string, backendToken: string): Promise<BackendUser | null> {
   try {
     const response = await fetch(`${apiBase}/User/GetUsuarioActual`, {
@@ -150,7 +159,7 @@ export async function loginAction(formData: FormData) {
   cookieStore.set("auth_token", JSON.stringify(sessionData), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: getJwtMaxAgeSeconds(tokenPayload),
     path: "/",
   });
 
@@ -173,3 +182,4 @@ export async function getUserSession() {
     return null;
   }
 }
+

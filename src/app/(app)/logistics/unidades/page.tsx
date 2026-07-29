@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Unit, UnitStatus, ApiUnit, mapApiUnitToUnit, MOCK_UNITS } from "@/features/logistics/models/units";
+import { Unit, UnitStatus, ApiUnit, mapApiUnitToUnit } from "@/features/logistics/models/units";
 import { Search, Truck, Fuel, ShieldCheck, MapPin, Gauge, User, RefreshCw, Wrench, Check, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
