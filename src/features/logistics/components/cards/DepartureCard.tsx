@@ -341,7 +341,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         } catch (err) {
           console.error("Failed to start html5-qrcode scanner:", err);
           if (isMounted) {
-            setCameraError("No se pudo conectar a la cÃ¡mara");
+            setCameraError("No se pudo conectar a la cámara");
           }
         }
       };
@@ -800,10 +800,10 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       await new Promise(resolve => setTimeout(resolve, 50));
 
       await showSuccess({
-        title: "Direcciï¿½n actualizada",
+        title: "Dirección actualizada",
         text: invoiceNums.length > 1
-          ? `Se actualizï¿½ la direcciï¿½n para ${invoiceNums.length} facturas.`
-          : `Se actualizï¿½ la direcciï¿½n de la factura ${invoiceNums[0]}.`,
+          ? `Se actualizó la dirección para ${invoiceNums.length} facturas.`
+          : `Se actualizó la dirección de la factura ${invoiceNums[0]}.`,
         timer: 1700
       });
     } catch (err) {
@@ -1070,7 +1070,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingAddress(e.target.value)}
                 disabled={isSavingAddress}
                 className="h-11 rounded-xl text-xs font-bold"
-                placeholder="Escribe la direcciÃ³n de envÃ­o"
+                placeholder="Escribe la dirección de envío"
               />
             </div>
           </div>
