@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +28,10 @@ export interface RutaPedido {
   logisticsBranchId?: number;
   direccionEnvio?: string;
   isPreviousPending?: boolean;
+  isShippedWithoutInvoice?: boolean;
+  canAuthorizeRoute?: boolean;
+  routeDocumentType?: 'INVOICE' | 'ORDER' | string;
+  routeDocumentNum?: string;
 }
 
 interface RutaOrderCardProps {
@@ -38,7 +42,7 @@ interface RutaOrderCardProps {
 
 export function RutaOrderCard({ pedido, activeStatusFilters, onClick }: RutaOrderCardProps) {
   return (
-    <Card 
+    <Card
       onClick={onClick}
       className={cn(
         "group hover:shadow-lg transition-all duration-300 border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1E293B] overflow-hidden",
@@ -106,12 +110,12 @@ export function RutaOrderCard({ pedido, activeStatusFilters, onClick }: RutaOrde
           ].filter(wh => {
             const pwh = pedido.warehouses.find(p => p.id === wh.id);
             if (!pwh) return false;
-            
+
             // Apply status filter if active
             if (activeStatusFilters && activeStatusFilters.length > 0) {
               return activeStatusFilters.includes(pwh.status);
             }
-            
+
             return true;
           }).map(({ id, label, Icon }) => {
             const whInfo = pedido.warehouses.find(w => w.id === id)!;

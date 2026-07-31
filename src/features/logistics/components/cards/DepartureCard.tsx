@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw, Pencil, Save, Undo2, Trash2, ExternalLink, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,8 @@ interface WarehouseGroup {
 export interface Invoice {
   id: string;
   orderNum?: number;
+  routeDocumentType?: string | null;
+  routeDocumentNum?: string | null;
   amount?: number;
   groups: WarehouseGroup[];
   isNew?: boolean;
@@ -66,13 +68,20 @@ export interface ReadyDeparture {
   logisticsBranch?: string;
 }
 
+type RouteDocumentPayload = {
+  documentType: "INVOICE" | "ORDER";
+  documentNum: string;
+  invoiceNum?: string | null;
+  orderNum?: number | null;
+};
+
 interface DepartureCardProps {
   departure: ReadyDeparture;
   onAuthorize: (id: string) => void;
   onDelivered?: (id: string) => void;
   onSendScannedInRouteManual?: (id: string) => Promise<void>;
   onReturnToRoutes?: (id: string) => Promise<void>;
-  onReturnInvoiceToRoutes?: (invoiceNum: string) => Promise<void>;
+  onReturnInvoiceToRoutes?: (document: RouteDocumentPayload) => Promise<void>;
 }
 
 export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScannedInRouteManual, onReturnToRoutes, onReturnInvoiceToRoutes }: DepartureCardProps) {
@@ -117,8 +126,30 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     typeof amount === 'number'
       ? amount.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })
       : null;
+  const normalizeRouteDocumentType = (value?: string | null): "INVOICE" | "ORDER" => {
+    const normalized = (value || "").trim().toUpperCase();
+    return normalized === "ORDER" ? "ORDER" : "INVOICE";
+  };
 
-  // DetecciÃ³n de facturas agregadas posteriormente (desde el backend)
+  const getInvoiceRouteDocument = (invoice: Invoice): RouteDocumentPayload => {
+    const documentType = normalizeRouteDocumentType(invoice.routeDocumentType);
+    const invoiceNum = (invoice.id || "").trim();
+    const documentNum = String(invoice.routeDocumentNum || (documentType === "ORDER" ? invoice.orderNum : invoiceNum) || invoiceNum || "").trim();
+
+    return {
+      documentType,
+      documentNum,
+      invoiceNum: invoiceNum || null,
+      orderNum: invoice.orderNum ?? null,
+    };
+  };
+
+  const getRouteDocumentKey = (document: RouteDocumentPayload) => `${document.documentType}:${document.documentNum}`;
+
+  const getRouteDocumentLabel = (document: RouteDocumentPayload) =>
+    document.documentType === "ORDER" ? `orden ${document.documentNum}` : `factura ${document.documentNum}`;
+
+  // DetecciÃƒÂ³n de facturas agregadas posteriormente (desde el backend)
   const addedInvoicesCount = React.useMemo(() =>
     departure.invoices.filter(inv => inv.isNew).length,
     [departure.invoices]
@@ -310,7 +341,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         } catch (err) {
           console.error("Failed to start html5-qrcode scanner:", err);
           if (isMounted) {
-            setCameraError("No se pudo conectar a la cámara");
+            setCameraError("No se pudo conectar a la cÃ¡mara");
           }
         }
       };
@@ -547,7 +578,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
     const confirmed = await showConfirm({
       title: "Mandar en ruta manual",
-      html: `Se marcar�n como <b>En ruta</b> las facturas escaneadas de la unidad <b>${departure.unitName}</b>.`,
+      html: `Se marcarán como <b>En ruta</b> las facturas escaneadas de la unidad <b>${departure.unitName}</b>.`,
       icon: "question",
       iconColor: "#10b981",
       confirmButtonText: "Si, mandar en ruta",
@@ -614,12 +645,18 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       setIsReturningToRoutes(false);
     }
   };
-  const handleReturnInvoiceToRoutes = async (invoiceNum: string) => {
+  const handleReturnInvoiceToRoutes = async (invoice: Invoice) => {
     if (!onReturnInvoiceToRoutes || returningInvoiceNum) return;
 
+    const routeDocument = getInvoiceRouteDocument(invoice);
+    if (!routeDocument.documentNum) return;
+
+    const documentKey = getRouteDocumentKey(routeDocument);
+    const documentLabel = getRouteDocumentLabel(routeDocument);
+
     const confirmed = await showConfirm({
-      title: "Regresar factura a pendiente",
-      html: `La factura <b>${invoiceNum}</b> volverá a estar disponible en Rutas para armar una nueva ruta.`,
+      title: "Regresar a pendiente",
+      html: `La <b>${documentLabel}</b> volverá a estar disponible en Rutas para armar una nueva ruta.`,
       icon: "question",
       iconColor: "#f59e0b",
       confirmButtonText: "Sí, regresar",
@@ -629,20 +666,20 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
     if (!confirmed) return;
 
-    setReturningInvoiceNum(invoiceNum);
+    setReturningInvoiceNum(documentKey);
     try {
-      await onReturnInvoiceToRoutes(invoiceNum);
+      await onReturnInvoiceToRoutes(routeDocument);
 
       await showSuccess({
-        title: "Factura regresada",
-        html: `La factura <b>${invoiceNum}</b> volvió a Rutas correctamente.`,
+        title: "Documento regresado",
+        html: `La <b>${documentLabel}</b> volvió a Rutas correctamente.`,
         timer: 1600
       });
     } catch (err) {
       console.error(err);
       await showError({
         title: "No se pudo regresar",
-        text: err instanceof Error ? err.message : "Ocurrió un error al regresar la factura a Rutas."
+        text: err instanceof Error ? err.message : "Ocurrió un error al regresar el documento a Rutas."
       });
     } finally {
       setReturningInvoiceNum(null);
@@ -675,7 +712,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
       const data = await response.json().catch(() => null);
       if (!response.ok || data?.success === false || !data?.url) {
-        throw new Error(data?.message || data?.error || "No se encontr� una ruta de Samsara para esta salida.");
+        throw new Error(data?.message || data?.error || "No se encontró una ruta de Samsara para esta salida.");
       }
 
       if (samsaraTab) {
@@ -688,7 +725,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       console.error(err);
       await showError({
         title: "No se pudo abrir Samsara",
-        text: err instanceof Error ? err.message : "Ocurri� un error al buscar la ruta en Samsara."
+        text: err instanceof Error ? err.message : "Ocurrió un error al buscar la ruta en Samsara."
       });
     } finally {
       setIsOpeningSamsaraRoute(false);
@@ -713,8 +750,8 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       setEditingLocationIndex(null);
       await new Promise(resolve => setTimeout(resolve, 50));
       await showError({
-        title: "Direcci�n requerida",
-        text: "Escribe la nueva direcci�n de env�o antes de guardar."
+        title: "Dirección requerida",
+        text: "Escribe la nueva dirección de envío antes de guardar."
       });
       return;
     }
@@ -728,7 +765,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       await new Promise(resolve => setTimeout(resolve, 50));
       await showError({
         title: "Sin factura",
-        text: "No se encontr� una factura para actualizar esta direcci�n."
+        text: "No se encontró una factura para actualizar esta dirección."
       });
       return;
     }
@@ -763,10 +800,10 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       await new Promise(resolve => setTimeout(resolve, 50));
 
       await showSuccess({
-        title: "Direcci�n actualizada",
+        title: "Direcciï¿½n actualizada",
         text: invoiceNums.length > 1
-          ? `Se actualiz� la direcci�n para ${invoiceNums.length} facturas.`
-          : `Se actualiz� la direcci�n de la factura ${invoiceNums[0]}.`,
+          ? `Se actualizï¿½ la direcciï¿½n para ${invoiceNums.length} facturas.`
+          : `Se actualizï¿½ la direcciï¿½n de la factura ${invoiceNums[0]}.`,
         timer: 1700
       });
     } catch (err) {
@@ -775,7 +812,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       await new Promise(resolve => setTimeout(resolve, 50));
       await showError({
         title: "No se pudo actualizar",
-        text: err instanceof Error ? err.message : "Ocurri� un error al actualizar la direcci�n de env�o."
+        text: err instanceof Error ? err.message : "Ocurrió un error al actualizar la dirección de envío."
       });
     } finally {
       setIsSavingAddress(false);
@@ -847,6 +884,9 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                 const isNew = !!inv.isNew;
                 const isDelivered = !!inv.isDelivered;
                 const invoiceAmount = formatInvoiceAmount(inv.amount);
+                const routeDocument = getInvoiceRouteDocument(inv);
+                const routeDocumentKey = getRouteDocumentKey(routeDocument);
+                const routeDocumentLabel = getRouteDocumentLabel(routeDocument);
                 return (
                   <div
                     key={`${inv.id}-${idx}`}
@@ -870,15 +910,15 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                         <button
                           type="button"
                           title="Quitar de esta ruta y regresar a pendiente"
-                          aria-label={`Quitar factura ${inv.id} de esta ruta y regresar a pendiente`}
-                          disabled={returningInvoiceNum === inv.id}
+                          aria-label={`Quitar ${routeDocumentLabel} de esta ruta y regresar a pendiente`}
+                          disabled={returningInvoiceNum === routeDocumentKey}
                           onClick={(event) => {
                             event.stopPropagation();
-                            handleReturnInvoiceToRoutes(inv.id);
+                            handleReturnInvoiceToRoutes(inv);
                           }}
                           className="ml-0.5 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border border-red-400/70 bg-red-500/10 text-red-500 transition-all hover:bg-red-500/20 hover:text-red-600 disabled:cursor-wait disabled:opacity-60 dark:border-red-400/50 dark:bg-red-500/15 dark:text-red-400 dark:hover:text-red-300"
                         >
-                          {returningInvoiceNum === inv.id ? (
+                          {returningInvoiceNum === routeDocumentKey ? (
                             <RefreshCw className="size-3 animate-spin" />
                           ) : (
                             <Trash2 className="size-3" />
@@ -1023,14 +1063,14 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Nueva direcci�n
+                Nueva dirección
               </label>
               <Input
                 value={editingAddress}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingAddress(e.target.value)}
                 disabled={isSavingAddress}
                 className="h-11 rounded-xl text-xs font-bold"
-                placeholder="Escribe la dirección de envío"
+                placeholder="Escribe la direcciÃ³n de envÃ­o"
               />
             </div>
           </div>
@@ -1094,7 +1134,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                       <div className="space-y-4 animate-in fade-in duration-500">
                         <div className="flex justify-between items-end">
                           <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Progreso de ValidaciÃ³n</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Progreso de Validación</p>
                             <h4 className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100 uppercase leading-none">
                               {verifiedInvoiceIds.length} / {verifiableInvoices.length} <span className="text-[10px] sm:text-xs normal-case font-bold text-slate-400 ml-1 sm:ml-2">Facturas</span>
                             </h4>
@@ -1119,7 +1159,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                         <div className="text-center space-y-2 px-2 sm:px-0">
                           <DialogTitle className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Validar Carga</DialogTitle>
                           <DialogDescription className="text-slate-500 dark:text-slate-400">
-                            Selecciona un m�todo para validar las facturas de <strong>{departure.unitName}</strong>. Este m�todo se mantendr� para todo el viaje.
+                            Selecciona un método para validar las facturas de <strong>{departure.unitName}</strong>. Este método se mantendrá para todo el viaje.
                           </DialogDescription>
                         </div>
 
@@ -1147,7 +1187,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             <div className="p-3 sm:p-4 rounded-full bg-white dark:bg-slate-800 shadow-sm group-hover:scale-110 transition-transform text-emerald-500">
                               <QrCode className="size-6 sm:size-8" />
                             </div>
-                            <span className="font-black text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-[0.15em] sm:tracking-[0.2em] text-center">Escanear CÃ³digo</span>
+                            <span className="font-black text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-[0.15em] sm:tracking-[0.2em] text-center">Escanear CÃƒÂ³digo</span>
                           </button>
                         </div>
                       </div>
@@ -1159,12 +1199,12 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           <Button variant="ghost" size="icon" onClick={() => setAuthStep("method_select")} className="rounded-full">
                             <ArrowLeft className="size-5" />
                           </Button>
-                          <DialogTitle className="text-lg font-bold uppercase tracking-widest">Validaci�n Manual</DialogTitle>
+                          <DialogTitle className="text-lg font-bold uppercase tracking-widest">Validaciï¿½n Manual</DialogTitle>
                         </div>
 
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">N�mero de Factura</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nï¿½mero de Factura</label>
                             <Input
                               autoFocus
                               placeholder="Ej: 223899"
@@ -1243,7 +1283,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             {isError && scannedCode && (
                               <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl p-4 text-center animate-in fade-in duration-300">
                                 <p className="text-xs font-bold text-red-500">
-                                  C�digo le�do: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
+                                  Cï¿½digo leï¿½do: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
                                 </p>
                                 <p className="text-[10px] text-red-400 mt-1 font-semibold">
                                   No pertenece a las facturas pendientes de este viaje.
@@ -1252,7 +1292,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             )}
                             {/* Rotation helper tip */}
                             <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium text-center italic mt-1 leading-normal">
-                              Tip: Si el esc�ner en vivo tarda en leer en vertical, gira el tel�fono en horizontal (acostado).
+                              Tip: Si el escanear en vivo tarda en leer en vertical, gira el teléfono en horizontal (acostado).
                             </p>
                             {/* File Scanner Fallback for Mobile Devices */}
                             <div className="flex flex-col gap-2 mt-1">
@@ -1297,7 +1337,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                                   <QrCode className="size-10 text-emerald-500" />
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
-                                  Apunta al c�digo de barras de la orden de venta y presiona el gatillo para escanear de forma autom�tica.
+                                  Apunta al código de barras de la orden de venta y presiona el gatillo para escanear de forma automática.
                                 </p>
                               </div>
                             ) : (
@@ -1309,14 +1349,14 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                                   <X className="size-10 text-amber-500" />
                                 </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs font-medium">
-                                  La ventana del navegador perdi� el foco para capturar el lector.
+                                  La ventana del navegador perdió el foco para capturar el lector.
                                 </p>
                                 <Button
                                   variant="outline"
                                   onClick={() => scannerInputRef.current?.focus()}
                                   className="h-10 rounded-xl font-bold border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 transition-all text-xs"
                                 >
-                                  Haga clic aqu� para reactivar el lector
+                                  Haga clic aquí para reactivar el lector
                                 </Button>
                               </div>
                             )}
@@ -1341,7 +1381,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             fetchedInvoiceDetails.almacenes.map((group, gIdx) => (
                               <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                                 <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
-                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almac�n: {group.almacen}</span>
+                                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Almacén: {group.almacen}</span>
                                   <span className="text-[10px] font-bold text-slate-400 capitalize">{group.materiales.length} productos</span>
                                 </div>
                                 <table className="w-full text-left">
@@ -1392,12 +1432,6 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                         </div>
                       </div>
                     )}
-
-
-
-
-
-
                     {authStep === "trip_verified" && (
                       <div className="space-y-8 py-4 text-center">
                         {!isAuthorizedSuccess ? (
@@ -1409,7 +1443,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             </div>
 
                             <div className="space-y-2 px-2">
-                              <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">¡Carga Validada!</h3>
+                              <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Â¡Carga Validada!</h3>
                               <p className="text-slate-500 dark:text-slate-400 font-medium">
                                 Se han verificado las <span className="text-emerald-600 dark:text-emerald-400 font-black">{verifiableInvoices.length}</span> facturas correctamente.
                               </p>
@@ -1453,7 +1487,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             </div>
 
                             <div className="mt-12 text-center animate-in slide-in-from-bottom-4 duration-700 delay-200">
-                              <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">Â¡CARGA ESCANEADA!</h2>
+                              <h2 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-tighter">¡CARGA ESCANEADA!</h2>
                             </div>
                           </div>
                         )}

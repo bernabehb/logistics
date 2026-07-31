@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -365,6 +365,14 @@ interface ApiRutaInvoice {
   dDateRouteAuthorized?: string | null;
   isPreviousPending?: boolean | number | string;
   IsPreviousPending?: boolean | number | string;
+  isShippedWithoutInvoice?: boolean | number | string;
+  IsShippedWithoutInvoice?: boolean | number | string;
+  canAuthorizeRoute?: boolean | number | string;
+  CanAuthorizeRoute?: boolean | number | string;
+  routeDocumentType?: string | null;
+  RouteDocumentType?: string | null;
+  routeDocumentNum?: string | null;
+  RouteDocumentNum?: string | null;
 }
 
 interface AvailableUnit {
@@ -627,7 +635,7 @@ export default function RutasPage() {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catalogos y asignaciones más recientes de la BD
+      // para traer los catalogos y asignaciones mÃ¡s recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[routesCacheKey] && !!cachedRouteRowsByDriver[routesCacheKey]);
@@ -658,9 +666,50 @@ export default function RutasPage() {
     };
   }, [driverFilter, includePreviousPending]);
 
-  const getVisibleBlockInvoiceItems = (blockName: string) => {
+  type RouteDocumentPayload = {
+    documentType: string;
+    documentNum: string;
+    invoiceNum?: string | null;
+    orderNum?: number | null;
+  };
+
+  const normalizeRouteDocumentType = (value?: string | null) => {
+    const normalized = (value || "").trim().toUpperCase();
+    return normalized === "ORDER" ? "ORDER" : "INVOICE";
+  };
+
+  const getPedidoRouteDocument = (pedido: RutaPedido): RouteDocumentPayload | null => {
+    const documentType = normalizeRouteDocumentType(
+      pedido.routeDocumentType || (pedido.id.startsWith('ORDER-') ? 'ORDER' : 'INVOICE')
+    );
+    const fallbackDocumentNum = documentType === 'ORDER'
+      ? String(pedido.orderNum || pedido.id.replace(/^ORDER-/i, ''))
+      : pedido.id;
+    const documentNum = String(pedido.routeDocumentNum || fallbackDocumentNum || '').trim().toUpperCase();
+
+    if (!documentNum) return null;
+
+    return {
+      documentType,
+      documentNum,
+      invoiceNum: documentType === 'INVOICE' ? documentNum : null,
+      orderNum: documentType === 'ORDER' ? Number(documentNum) || pedido.orderNum || null : pedido.orderNum || null
+    };
+  };
+
+  const getRouteDocumentSelectionKey = (pedido: RutaPedido) => {
+    const document = getPedidoRouteDocument(pedido);
+    return document ? `${document.documentType}:${document.documentNum}` : '';
+  };
+
+  const getVisibleBlockRouteItems = (blockName: string) => {
     return (groupedData[blockName] || [])
-      .filter(p => !p.id.startsWith('ORDER-'));
+      .filter(p => !!getPedidoRouteDocument(p));
+  };
+
+  const getVisibleBlockInvoiceItems = (blockName: string) => {
+    return getVisibleBlockRouteItems(blockName)
+      .filter(p => normalizeRouteDocumentType(p.routeDocumentType) === 'INVOICE');
   };
 
   const getVisibleBlockInvoiceNums = (blockName: string) => {
@@ -670,58 +719,107 @@ export default function RutasPage() {
       .filter((value, index, array) => array.indexOf(value) === index);
   };
 
-  const getVisibleBlockWeightKg = (blockName: string) => {
-    return getVisibleBlockInvoiceItems(blockName)
-      .reduce((sum, p) => sum + (Number(p.totalWeightKg) || 0), 0);
+  const getDistinctRouteDocumentsFromItems = (items: RutaPedido[]) => {
+    const seen = new Set<string>();
+    return items
+      .map(getPedidoRouteDocument)
+      .filter((document): document is RouteDocumentPayload => !!document)
+      .filter(document => {
+        const key = `${document.documentType}:${document.documentNum}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  };
+
+  const getVisibleBlockRouteDocuments = (blockName: string) => {
+    return getDistinctRouteDocumentsFromItems(getVisibleBlockRouteItems(blockName));
   };
 
   const isInvoiceSelectableForPartialRoute = (pedido: RutaPedido) => {
-    return !pedido.id.startsWith('ORDER-') && pedido.estadoGeneral === 'ready';
+    return !!getPedidoRouteDocument(pedido) && (pedido.canAuthorizeRoute === true || pedido.estadoGeneral === 'ready');
   };
 
-  const getSelectableBlockInvoiceNums = (blockName: string) => {
-    return getVisibleBlockInvoiceItems(blockName)
-      .filter(isInvoiceSelectableForPartialRoute)
-      .map(p => p.id.trim().toUpperCase())
+  const getSelectableBlockRouteItems = (blockName: string) => {
+    return getVisibleBlockRouteItems(blockName)
+      .filter(isInvoiceSelectableForPartialRoute);
+  };
+
+  const getSelectableBlockRouteDocuments = (blockName: string) => {
+    return getDistinctRouteDocumentsFromItems(getSelectableBlockRouteItems(blockName));
+  };
+
+  const getVisibleBlockWeightKg = (blockName: string) => {
+    return getSelectableBlockRouteItems(blockName)
+      .reduce((sum, p) => sum + (Number(p.totalWeightKg) || 0), 0);
+  };
+
+  const getSelectableBlockDocumentKeys = (blockName: string) => {
+    return getSelectableBlockRouteItems(blockName)
+      .map(getRouteDocumentSelectionKey)
       .filter(Boolean)
       .filter((value, index, array) => array.indexOf(value) === index);
   };
 
-  const getSelectedBlockInvoiceNums = (blockName: string) => {
+  const getSelectedBlockDocumentKeys = (blockName: string) => {
     const selected = selectedInvoicesByBlock[currentBlockScopeKey(blockName)] || [];
-    const selectable = new Set(getSelectableBlockInvoiceNums(blockName));
+    const selectable = new Set(getSelectableBlockDocumentKeys(blockName));
 
     return selected
       .map(x => x.trim().toUpperCase())
-      .filter(invoice => selectable.has(invoice))
+      .filter(documentKey => selectable.has(documentKey))
+      .filter((value, index, array) => array.indexOf(value) === index);
+  };
+
+  const getSelectedBlockRouteItems = (blockName: string) => {
+    const selected = new Set(getSelectedBlockDocumentKeys(blockName));
+    if (selected.size === 0) return [];
+
+    return getVisibleBlockRouteItems(blockName)
+      .filter(p => selected.has(getRouteDocumentSelectionKey(p)));
+  };
+
+  const getSelectedBlockRouteDocuments = (blockName: string) => {
+    const selected = new Set(getSelectedBlockDocumentKeys(blockName));
+    if (selected.size === 0) return [];
+
+    return getVisibleBlockRouteDocuments(blockName)
+      .filter(document => selected.has(`${document.documentType}:${document.documentNum}`));
+  };
+
+  const getSelectedBlockInvoiceNums = (blockName: string) => {
+    return getSelectedBlockRouteDocuments(blockName)
+      .filter(document => document.documentType === 'INVOICE')
+      .map(document => String(document.invoiceNum || document.documentNum).trim().toUpperCase())
+      .filter(Boolean)
       .filter((value, index, array) => array.indexOf(value) === index);
   };
 
   const getSelectedBlockWeightKg = (blockName: string) => {
-    const selected = new Set(getSelectedBlockInvoiceNums(blockName));
-    if (selected.size === 0) return 0;
+    const selectedItems = getSelectedBlockRouteItems(blockName);
+    if (selectedItems.length === 0) return 0;
 
-    return getVisibleBlockInvoiceItems(blockName)
-      .filter(p => selected.has(p.id.trim().toUpperCase()))
-      .reduce((sum, p) => sum + (Number(p.totalWeightKg) || 0), 0);
+    return selectedItems.reduce((sum, p) => sum + (Number(p.totalWeightKg) || 0), 0);
   };
 
-  const isBlockInvoiceSelected = (blockName: string, invoiceId: string) => {
-    return getSelectedBlockInvoiceNums(blockName).includes(invoiceId.trim().toUpperCase());
+  const isBlockInvoiceSelected = (blockName: string, pedido: RutaPedido) => {
+    return getSelectedBlockDocumentKeys(blockName).includes(getRouteDocumentSelectionKey(pedido));
   };
 
   const toggleBlockInvoiceSelection = (blockName: string, pedido: RutaPedido) => {
     if (!isInvoiceSelectableForPartialRoute(pedido)) return;
 
-    const invoiceNum = pedido.id.trim().toUpperCase();
+    const documentKey = getRouteDocumentSelectionKey(pedido);
+    if (!documentKey) return;
+
     const blockScopeKey = currentBlockScopeKey(blockName);
 
     setSelectedInvoicesByBlock(prev => {
       const current = prev[blockScopeKey] || [];
-      const exists = current.includes(invoiceNum);
+      const exists = current.includes(documentKey);
       const nextInvoices = exists
-        ? current.filter(x => x !== invoiceNum)
-        : [...current, invoiceNum];
+        ? current.filter(x => x !== documentKey)
+        : [...current, documentKey];
       const next = { ...prev };
 
       if (nextInvoices.length > 0) {
@@ -863,16 +961,15 @@ export default function RutasPage() {
   };
 
   const renderInvoiceSelectionButton = (blockName: string, pedido: RutaPedido, className?: string) => {
-    if (pedido.id.startsWith('ORDER-')) return null;
-
     const isSelectable = isInvoiceSelectableForPartialRoute(pedido);
-    const isSelected = isBlockInvoiceSelected(blockName, pedido.id);
+    const isSelected = isBlockInvoiceSelected(blockName, pedido);
+    const documentLabel = pedido.id.startsWith('ORDER-') ? 'orden' : 'factura';
 
     return (
       <button
         type="button"
-        title={isSelectable ? "Seleccionar factura" : "Factura no lista para salida"}
-        aria-label={isSelectable ? `Seleccionar factura ${pedido.id}` : `Factura ${pedido.id} no lista para salida`}
+        title={isSelectable ? `Seleccionar ${documentLabel}` : `${documentLabel.charAt(0).toUpperCase() + documentLabel.slice(1)} no lista para salida`}
+        aria-label={isSelectable ? `Seleccionar ${documentLabel} ${pedido.id}` : `${documentLabel} ${pedido.id} no lista para salida`}
         aria-pressed={isSelected}
         disabled={!isSelectable}
         onClick={(e) => {
@@ -1032,10 +1129,18 @@ export default function RutasPage() {
       const useInvoiceAuthorization = branchFilter !== 'all';
       const authorizedInvoiceNums = parseInvoiceCsv(apiBlock.sAuthorizedInvoices);
       const visibleInvoiceNums = getVisibleBlockInvoiceNums(blockName);
-      const selectedInvoiceNums = getSelectedBlockInvoiceNums(blockName);
+      const visibleRouteDocuments = getSelectableBlockRouteDocuments(blockName);
+      const selectedRouteDocuments = getSelectedBlockRouteDocuments(blockName);
+      const routeDocuments = useInvoiceAuthorization && authorize
+        ? (selectedRouteDocuments.length > 0 ? selectedRouteDocuments : visibleRouteDocuments)
+        : [];
       const invoiceNums = useInvoiceAuthorization
         ? authorize
-          ? (selectedInvoiceNums.length > 0 ? selectedInvoiceNums : visibleInvoiceNums)
+          ? routeDocuments
+            .filter(document => document.documentType === 'INVOICE')
+            .map(document => String(document.invoiceNum || document.documentNum).trim().toUpperCase())
+            .filter(Boolean)
+            .filter((value, index, array) => array.indexOf(value) === index)
           : (authorizedInvoiceNums.length > 0 ? authorizedInvoiceNums : visibleInvoiceNums)
         : [];
 
@@ -1049,16 +1154,25 @@ export default function RutasPage() {
         return;
       }
 
-      if (useInvoiceAuthorization && invoiceNums.length === 0) {
+      if (useInvoiceAuthorization && authorize && routeDocuments.length === 0) {
         closeSwal();
         await showError({
-          title: "Sin facturas visibles",
-          text: `No hay facturas visibles del bloque ${blockName} para autorizar en la sucursal seleccionada.`
+          title: "Sin documentos visibles",
+          text: `No hay facturas u ordenes embarcadas visibles del bloque ${blockName} para autorizar en la sucursal seleccionada.`
         });
         return;
       }
 
-      const ticketsToPrint = authorize ? buildRouteTickets(blockName, invoiceNums) : [];
+      if (useInvoiceAuthorization && !authorize && invoiceNums.length === 0) {
+        closeSwal();
+        await showError({
+          title: "Sin facturas visibles",
+          text: `No hay facturas visibles del bloque ${blockName} para regresar en la sucursal seleccionada.`
+        });
+        return;
+      }
+
+      const ticketsToPrint = authorize && invoiceNums.length > 0 ? buildRouteTickets(blockName, invoiceNums) : [];
 
       const response = await fetch(
         useInvoiceAuthorization
@@ -1075,7 +1189,8 @@ export default function RutasPage() {
                 iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
                 iIdLogisticsBranch: logisticsBranchId,
                 bAuthorize: authorize,
-                invoiceNums
+                invoiceNums,
+                routeDocuments: authorize ? routeDocuments : undefined
               }
               : {
                 iIdDeliveryBlock: Number(apiBlock.iIdDeliveryBlock),
@@ -1096,7 +1211,7 @@ export default function RutasPage() {
       await showSuccess({
         title: authorize ? "Ruta sincronizada" : "Bloque regresado",
         html: authorize
-          ? `El bloque <b>${blockName}</b> fue autorizado y la ruta quedo lista en Samsara.`
+          ? `El bloque <b>${blockName}</b> fue autorizado y la ruta quedó lista en Samsara.`
           : `Las facturas del bloque <b>${blockName}</b> regresaron correctamente.`,
         timer: 1800
       });
@@ -1130,8 +1245,8 @@ export default function RutasPage() {
   };
 
   const handleAuthorizeBlock = async (blockName: string, authorize: boolean) => {
-    const selectedInvoiceNums = getSelectedBlockInvoiceNums(blockName);
-    const selectedCount = selectedInvoiceNums.length;
+    const selectedDocumentKeys = getSelectedBlockDocumentKeys(blockName);
+    const selectedCount = selectedDocumentKeys.length;
 
     if (authorize) {
       if (branchFilter === 'all') {
@@ -1172,8 +1287,8 @@ export default function RutasPage() {
       title: authorize ? "¿Autorizar bloque?" : "¿Regresar bloque?",
       html: authorize
         ? selectedCount > 0
-          ? `Se creara la ruta en Samsara y se autorizaran <b>${selectedCount}</b> facturas seleccionadas del bloque <b>${blockName}</b>.`
-          : `Se creara la ruta en Samsara y se autorizaran solo las facturas visibles de la sucursal seleccionada para el bloque <b>${blockName}</b>.`
+          ? `Se creara la ruta en Samsara y se autorizaran <b>${selectedCount}</b> documentos seleccionados del bloque <b>${blockName}</b>.`
+          : `Se creara la ruta en Samsara y se autorizaran solo las facturas u ordenes embarcadas visibles de la sucursal seleccionada para el bloque <b>${blockName}</b>.`
         : `Se regresaran las facturas del bloque <b>${blockName}</b> para incluir nuevas facturas y volver a autorizar.`,
       confirmButtonText: authorize ? "Si, autorizar" : "Si, regresar",
       confirmButtonColor: authorize ? "#2563eb" : "#f59e0b"
@@ -1302,6 +1417,15 @@ export default function RutasPage() {
       activeRouteRows.forEach((row) => {
         const isFactura = row.factura && row.factura.trim() !== "";
         const displayId = isFactura ? row.factura : `ORDER-${row.orderNum}`;
+        const rowRouteDocumentType = normalizeRouteDocumentType(row.routeDocumentType || row.RouteDocumentType || (isFactura ? 'INVOICE' : 'ORDER'));
+        const rowRouteDocumentNum = String(row.routeDocumentNum || row.RouteDocumentNum || (rowRouteDocumentType === 'ORDER' ? row.orderNum : row.factura) || '').trim();
+        const isShippedWithoutInvoiceRow =
+          isTruthyPreviousPending(row.isShippedWithoutInvoice) ||
+          isTruthyPreviousPending(row.IsShippedWithoutInvoice);
+        const canAuthorizeRouteRow =
+          isTruthyPreviousPending(row.canAuthorizeRoute) ||
+          isTruthyPreviousPending(row.CanAuthorizeRoute) ||
+          (rowRouteDocumentType === 'INVOICE' && !!isFactura);
         const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
         const mappedSucursal = rawSucursal === "SIN SUCURSAL" ? "SANTA CATARINA" : rawSucursal;
         const logisticsBranchId = row.iIdLogisticsBranch ?? getLogisticsBranchId(mappedSucursal);
@@ -1319,7 +1443,8 @@ export default function RutasPage() {
 
           let status: RutaStatus = 'pending';
           const rawStatus = (row.estatusEmbarque || "").toLowerCase();
-          if (rawStatus === 'listo') status = 'ready';
+          if (isShippedWithoutInvoiceRow && canAuthorizeRouteRow) status = 'ready';
+          else if (rawStatus === 'listo') status = 'ready';
           else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') status = 'in-progress';
           else status = 'pending';
 
@@ -1341,7 +1466,11 @@ export default function RutasPage() {
             sucursal: mappedSucursal,
             logisticsBranchId,
             direccionEnvio: row.direccionEnvio,
-            isPreviousPending: isPreviousPendingRow
+            isPreviousPending: isPreviousPendingRow,
+            isShippedWithoutInvoice: isShippedWithoutInvoiceRow,
+            canAuthorizeRoute: canAuthorizeRouteRow,
+            routeDocumentType: rowRouteDocumentType,
+            routeDocumentNum: rowRouteDocumentNum
           });
         }
 
@@ -1351,7 +1480,7 @@ export default function RutasPage() {
           current.totalWeightKg = (current.totalWeightKg || 0) + rowWeightKg;
         }
 
-        let warehouseName = (row.almacen || "").trim().toUpperCase();
+        const warehouseName = (row.almacen || "").trim().toUpperCase();
         let warehouseId: string | null = null;
 
         if (warehouseName.includes("ALUMINIO")) warehouseId = "Aluminio";
@@ -1361,7 +1490,8 @@ export default function RutasPage() {
         if (warehouseId) {
           let itemStatus: RutaStatus = 'pending';
           const rawStatus = (row.estatusEmbarque || "").toLowerCase();
-          if (rawStatus === 'listo') itemStatus = 'ready';
+          if (isShippedWithoutInvoiceRow && canAuthorizeRouteRow) itemStatus = 'ready';
+          else if (rawStatus === 'listo') itemStatus = 'ready';
           else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') itemStatus = 'in-progress';
           else itemStatus = 'pending';
           if (!current.warehouses.some(w => w.id === warehouseId)) {
@@ -1766,7 +1896,7 @@ export default function RutasPage() {
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aluminio</th>
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Vidrio</th>
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Herrajes</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{deliveryTypeFilter === 'sucursal' ? 'Acción' : 'Estado General'}</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{deliveryTypeFilter === 'sucursal' ? 'AcciÃ³n' : 'Estado General'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1778,7 +1908,7 @@ export default function RutasPage() {
                           <Truck className="size-8 text-slate-300 dark:text-slate-600" />
                         </div>
                         <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de bÃºsqueda, estatus o fecha</p>
                       </div>
                     </td>
                   </tr>
@@ -1878,9 +2008,9 @@ export default function RutasPage() {
                     const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
                     const isAllBranches = branchFilter === 'all';
                     const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
-                    const selectedInvoiceNums = getSelectedBlockInvoiceNums(blockName);
-                    const selectedCount = selectedInvoiceNums.length;
-                    const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-')));
+                    const selectedDocumentKeys = getSelectedBlockDocumentKeys(blockName);
+                    const selectedCount = selectedDocumentKeys.length;
+                    const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(isInvoiceSelectableForPartialRoute));
                     const isProcessing = authorizingBlockName === blockScopeKey;
                     const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
                     const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
@@ -2102,9 +2232,9 @@ export default function RutasPage() {
               const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
               const isAllBranches = branchFilter === 'all';
               const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
-              const selectedInvoiceNums = getSelectedBlockInvoiceNums(blockName);
-              const selectedCount = selectedInvoiceNums.length;
-              const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(item => item.estadoGeneral === 'ready' && !item.id.startsWith('ORDER-')));
+              const selectedDocumentKeys = getSelectedBlockDocumentKeys(blockName);
+              const selectedCount = selectedDocumentKeys.length;
+              const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(isInvoiceSelectableForPartialRoute));
               const isProcessing = authorizingBlockName === blockScopeKey;
               const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
               const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
@@ -2192,7 +2322,7 @@ export default function RutasPage() {
                           : "h-auto overflow-visible pr-0"
                       )}>
                         {items.map(p => {
-                          const isSelected = isBlockInvoiceSelected(blockName, p.id);
+                          const isSelected = isBlockInvoiceSelected(blockName, p);
 
                           return (
                             <div
@@ -2306,7 +2436,7 @@ export default function RutasPage() {
                   <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                     <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
                       <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                        Almacén: {group.almacen}
+                        AlmacÃ©n: {group.almacen}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 capitalize">
                         {group.materiales.length} productos
@@ -2356,5 +2486,3 @@ export default function RutasPage() {
     </div>
   );
 }
-
-

@@ -24,6 +24,10 @@ interface FacturaObj {
   Entregada?: boolean;
   delivered?: boolean;
   Delivered?: boolean;
+  routeDocumentType?: string | null;
+  RouteDocumentType?: string | null;
+  routeDocumentNum?: string | null;
+  RouteDocumentNum?: string | null;
   esNueva?: boolean;
   EsNueva?: boolean;
 }
@@ -40,6 +44,13 @@ interface ApiDepartureHome {
   direccionesEntrega: string[];
 }
 
+
+type RouteDocumentPayload = {
+  documentType: "INVOICE" | "ORDER";
+  documentNum: string;
+  invoiceNum?: string | null;
+  orderNum?: number | null;
+};
 interface ApiDepartureBranch {
   cliente: string;
   sucursalLogistica?: string;
@@ -84,6 +95,45 @@ const getInvoiceAmount = (invoice: FacturaObj | string) => {
   const amount = typeof invoice.monto === 'number' ? invoice.monto : invoice.Monto;
   return typeof amount === 'number' ? amount : undefined;
 };
+const normalizeRouteDocumentType = (value?: string | null): "INVOICE" | "ORDER" => {
+  const normalized = (value || "").trim().toUpperCase();
+  return normalized === "ORDER" ? "ORDER" : "INVOICE";
+};
+
+const getRouteDocumentType = (invoice: FacturaObj | string): "INVOICE" | "ORDER" => {
+  if (typeof invoice === 'string') return "INVOICE";
+  const explicitType = invoice.routeDocumentType || invoice.RouteDocumentType;
+  if (explicitType) return normalizeRouteDocumentType(explicitType);
+  return getInvoiceId(invoice) ? "INVOICE" : "ORDER";
+};
+
+const getRouteDocumentNum = (invoice: FacturaObj | string) => {
+  if (typeof invoice === 'string') return invoice;
+  const explicitNum = (invoice.routeDocumentNum || invoice.RouteDocumentNum || "").trim();
+  if (explicitNum) return explicitNum;
+
+  const invoiceNum = getInvoiceId(invoice);
+  const orderNum = getOrderNum(invoice);
+  return getRouteDocumentType(invoice) === "ORDER" ? String(orderNum || invoiceNum || "") : invoiceNum;
+};
+
+const toRouteDocumentPayload = (invoice: ReadyDeparture["invoices"][number]): RouteDocumentPayload | null => {
+  const documentType = normalizeRouteDocumentType(invoice.routeDocumentType);
+  const invoiceNum = (invoice.id || "").trim();
+  const documentNum = String(invoice.routeDocumentNum || (documentType === "ORDER" ? invoice.orderNum : invoiceNum) || invoiceNum || "").trim();
+  if (!documentNum) return null;
+
+  return {
+    documentType,
+    documentNum,
+    invoiceNum: invoiceNum || null,
+    orderNum: invoice.orderNum ?? null,
+  };
+};
+
+const getDepartureRouteDocuments = (departure?: ReadyDeparture | null) => (
+  departure?.invoices.map(toRouteDocumentPayload).filter((doc): doc is RouteDocumentPayload => !!doc) || []
+);
 
 export default function AutorizarSalidaPage() {
   const [departures, setDepartures] = useState<ReadyDeparture[]>(cachedDepartures || []);
@@ -119,6 +169,8 @@ export default function AutorizarSalidaPage() {
           const mappedInvoices = invoicesToMap.map(f => ({
             id: getInvoiceId(f),
             orderNum: getOrderNum(f),
+            routeDocumentType: getRouteDocumentType(f),
+            routeDocumentNum: getRouteDocumentNum(f),
             amount: getInvoiceAmount(f),
             groups: [],
             isNew: typeof f === 'string' ? false : (!!f.esNueva || !!f.EsNueva),
@@ -133,7 +185,7 @@ export default function AutorizarSalidaPage() {
             unitName: d.unidad,
             type: "Reparto",
             driverName: d.chofer,
-            destination: d.direccionesEntrega?.[0] || "Destinos mÃºltiples",
+            destination: d.direccionesEntrega?.[0] || "Destinos múltiples",
             invoices: mappedInvoices,
             totalWeightTons: d.pesoTotal,
             totalAmount: d.montoTotal,
@@ -164,6 +216,8 @@ export default function AutorizarSalidaPage() {
           const mappedInvoices = invoicesToMap.map(f => ({
             id: getInvoiceId(f),
             orderNum: getOrderNum(f),
+            routeDocumentType: getRouteDocumentType(f),
+            routeDocumentNum: getRouteDocumentNum(f),
             amount: getInvoiceAmount(f),
             groups: [],
             isScanned: isScannedInvoice(f),
@@ -332,16 +386,19 @@ export default function AutorizarSalidaPage() {
 
   const handleSendScannedInRouteManual = async (id: string) => {
     const departure = departures.find(dep => dep.id === id);
-    const invoiceNums = departure?.invoices.map(inv => inv.id).filter(Boolean) || [];
+    const routeDocuments = getDepartureRouteDocuments(departure);
+    const invoiceNums = routeDocuments
+      .map(doc => doc.invoiceNum || (doc.documentType === "INVOICE" ? doc.documentNum : ""))
+      .filter(Boolean);
 
-    if (!departure || invoiceNums.length === 0) {
-      throw new Error("No hay facturas escaneadas para mandar en ruta.");
+    if (!departure || routeDocuments.length === 0) {
+      throw new Error("No hay documentos escaneados para mandar en ruta.");
     }
 
     const response = await fetch("/api/logistics/mark-scanned-invoices-in-route-manual", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ invoiceNums }),
+      body: JSON.stringify({ invoiceNums, routeDocuments }),
     });
 
     const data = await response.json().catch(() => null);
@@ -395,25 +452,33 @@ export default function AutorizarSalidaPage() {
     }, 600);
   };
 
-  const handleReturnInvoiceToRoutes = async (invoiceNum: string) => {
-    const response = await fetch(`/api/logistics/return-invoice-to-routes/${encodeURIComponent(invoiceNum)}`, {
+  const handleReturnInvoiceToRoutes = async (document: RouteDocumentPayload) => {
+    const response = await fetch("/api/logistics/return-document-to-routes", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(document),
     });
 
     const data = await response.json().catch(() => null);
 
     if (!response.ok || data?.success === false) {
-      throw new Error(data?.message || data?.error || "No se pudo regresar la factura a Rutas.");
+      throw new Error(data?.message || data?.error || "No se pudo regresar el documento a Rutas.");
     }
 
-    const invoiceKey = invoiceNum.trim();
+    const documentKey = `${document.documentType}:${document.documentNum.trim()}`;
     setDepartures(prev => {
       const updated = prev
         .map(dep => {
-          const removedIndex = dep.invoices.findIndex(inv => inv.id.trim() === invoiceKey);
+          const removedIndex = dep.invoices.findIndex(inv => {
+            const invDocument = toRouteDocumentPayload(inv);
+            return invDocument && `${invDocument.documentType}:${invDocument.documentNum.trim()}` === documentKey;
+          });
           if (removedIndex < 0) return dep;
 
-          const remainingInvoices = dep.invoices.filter(inv => inv.id.trim() !== invoiceKey);
+          const remainingInvoices = dep.invoices.filter(inv => {
+            const invDocument = toRouteDocumentPayload(inv);
+            return !invDocument || `${invDocument.documentType}:${invDocument.documentNum.trim()}` !== documentKey;
+          });
           const allRemainingHaveAmount = remainingInvoices.every(inv => typeof inv.amount === "number");
           const nextLocations = dep.locations.length === dep.invoices.length
             ? dep.locations.filter((_, index) => index !== removedIndex)
@@ -594,9 +659,9 @@ export default function AutorizarSalidaPage() {
                 ? "No hay salidas pendientes"
                 : statusFilter === "Escaneada"
                   ? "No hay cargas escaneadas"
-                : deliveryTypeFilter === "sucursal"
-                  ? "No hay recolecciones autorizadas actualmente"
-                  : "No hay unidades en ruta actualmente"}
+                  : deliveryTypeFilter === "sucursal"
+                    ? "No hay recolecciones autorizadas actualmente"
+                    : "No hay unidades en ruta actualmente"}
             </p>
           </div>
         ) : (
@@ -618,7 +683,3 @@ export default function AutorizarSalidaPage() {
     </div>
   );
 }
-
-
-
-
