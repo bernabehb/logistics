@@ -547,16 +547,18 @@ export default function AutorizarSalidaPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSyncMaterialDeliveries}
-            disabled={isSyncingDeliveries || isRefreshing}
-            className="h-9 rounded-xl font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/70 dark:text-emerald-300 dark:hover:bg-emerald-950/30 transition-all shadow-sm"
-          >
-            <CheckCircle2 className={cn("size-3.5 mr-2", isSyncingDeliveries && "animate-pulse")} />
-            Sincronizar entregas
-          </Button>
+          {deliveryTypeFilter === "domicilio" && statusFilter === "En ruta" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncMaterialDeliveries}
+              disabled={isSyncingDeliveries || isRefreshing}
+              className="h-9 rounded-xl font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/70 dark:text-emerald-300 dark:hover:bg-emerald-950/30 transition-all shadow-sm"
+            >
+              <CheckCircle2 className={cn("size-3.5 mr-2", isSyncingDeliveries && "animate-pulse")} />
+              Sincronizar entregas
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
