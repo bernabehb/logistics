@@ -1187,7 +1187,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             <div className="p-3 sm:p-4 rounded-full bg-white dark:bg-slate-800 shadow-sm group-hover:scale-110 transition-transform text-emerald-500">
                               <QrCode className="size-6 sm:size-8" />
                             </div>
-                            <span className="font-black text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-[0.15em] sm:tracking-[0.2em] text-center">Escanear CÃƒÂ³digo</span>
+                            <span className="font-black text-[9px] sm:text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-[0.15em] sm:tracking-[0.2em] text-center">Escanear Código</span>
                           </button>
                         </div>
                       </div>
@@ -1199,12 +1199,12 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           <Button variant="ghost" size="icon" onClick={() => setAuthStep("method_select")} className="rounded-full">
                             <ArrowLeft className="size-5" />
                           </Button>
-                          <DialogTitle className="text-lg font-bold uppercase tracking-widest">Validaciï¿½n Manual</DialogTitle>
+                          <DialogTitle className="text-lg font-bold uppercase tracking-widest">Validación Manual</DialogTitle>
                         </div>
 
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nï¿½mero de Factura</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Número de Factura</label>
                             <Input
                               autoFocus
                               placeholder="Ej: 223899"
@@ -1283,7 +1283,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             {isError && scannedCode && (
                               <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl p-4 text-center animate-in fade-in duration-300">
                                 <p className="text-xs font-bold text-red-500">
-                                  Cï¿½digo leï¿½do: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
+                                  Código leído: <span className="font-mono bg-red-100 dark:bg-red-950/50 px-1.5 py-0.5 rounded">{scannedCode}</span>
                                 </p>
                                 <p className="text-[10px] text-red-400 mt-1 font-semibold">
                                   No pertenece a las facturas pendientes de este viaje.
@@ -1443,7 +1443,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                             </div>
 
                             <div className="space-y-2 px-2">
-                              <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Â¡Carga Validada!</h3>
+                              <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">¡Carga Validada!</h3>
                               <p className="text-slate-500 dark:text-slate-400 font-medium">
                                 Se han verificado las <span className="text-emerald-600 dark:text-emerald-400 font-black">{verifiableInvoices.length}</span> facturas correctamente.
                               </p>

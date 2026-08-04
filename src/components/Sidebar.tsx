@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Truck, LogOut, ClipboardList, DollarSign, ShieldCheck, Map, Layers } from "lucide-react";
+import { Package, Truck, LogOut, ClipboardList, DollarSign, ShieldCheck, Map, Layers, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -111,10 +111,32 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
  
       {/* Footer Profile / Theme Toggle */}
       <div className="p-4 border-t border-slate-200/40 dark:border-slate-800/40 flex flex-col gap-4">
+        <Link
+          href="/logistics/ayuda"
+          onClick={onClose}
+          className={cn(
+            "relative flex items-center gap-3 pl-5 pr-3 py-2.5 rounded-xl text-sm font-semibold transition-all group border overflow-hidden",
+            pathname.startsWith("/logistics/ayuda")
+              ? "bg-white/20 dark:bg-white/5 text-slate-900 dark:text-white border-white/30 dark:border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.03)] backdrop-blur-md"
+              : "border-transparent text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-200"
+          )}
+        >
+          {pathname.startsWith("/logistics/ayuda") && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-6 bg-cyan-400 dark:bg-cyan-400 rounded-r-md" />
+          )}
+          <HelpCircle className={cn(
+            "size-5 transition-colors",
+            pathname.startsWith("/logistics/ayuda") ? "text-cyan-500 dark:text-cyan-400" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400"
+          )} />
+          <span>Manual de Usuario</span>
+        </Link>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex flex-col">
-              <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 capitalize">{userRole || "Cargando..."}</span>
+              <span className="text-sm font-bold text-slate-850 dark:text-slate-200 capitalize">{userName || "Cargando..."}</span>
+              {userRole && (
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 capitalize">{userRole}</span>
+              )}
             </div>
           </div>
           <ThemeToggle />
