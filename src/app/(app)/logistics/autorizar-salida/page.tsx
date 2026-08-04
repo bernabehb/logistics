@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { Search, CheckCircle2, FileText } from "lucide-react";
@@ -602,12 +602,17 @@ export default function AutorizarSalidaPage() {
             ] as const).map((btn) => (
               <button
                 key={btn.id}
-                onClick={() => setDeliveryTypeFilter(btn.id)}
+                onClick={() => {
+                  setDeliveryTypeFilter(btn.id);
+                  if (btn.id === 'sucursal') {
+                    setStatusFilter(prev => prev === 'En ruta' ? 'Pendiente' : prev);
+                  }
+                }}
                 className={cn(
-                  "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap text-center flex items-center justify-center cursor-pointer",
+                  "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap text-center flex items-center justify-center cursor-pointer border",
                   deliveryTypeFilter === btn.id
-                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    ? "bg-blue-100/70 text-blue-800 border-blue-300 shadow-sm dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40 hover:bg-blue-100 dark:hover:bg-blue-500/30"
+                    : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 )}
               >
                 {btn.label}
@@ -622,23 +627,25 @@ export default function AutorizarSalidaPage() {
             {([
               { id: "Pendiente", label: "Pendientes", count: pendingCount },
               { id: "Escaneada", label: "Escaneadas", count: scannedCount },
-              { id: "En ruta", label: deliveryTypeFilter === "sucursal" ? "Autorizadas" : "En Ruta", count: enRutaCount }
+              ...(deliveryTypeFilter === "sucursal"
+                ? []
+                : [{ id: "En ruta", label: "En Ruta", count: enRutaCount }])
             ] as const).map((status) => (
               <button
                 key={status.id}
-                onClick={() => setStatusFilter(status.id)}
+                onClick={() => setStatusFilter(status.id as any)}
                 className={cn(
-                  "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer",
+                  "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer border",
                   statusFilter === status.id
-                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    ? "bg-blue-100/70 text-blue-800 border-blue-300 shadow-sm dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40 hover:bg-blue-100 dark:hover:bg-blue-500/30"
+                    : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 )}
               >
                 {status.label}
                 <span className={cn(
                   "px-1.5 py-0.5 rounded-md text-[9px] min-w-[1.2rem] text-center",
                   statusFilter === status.id
-                    ? "bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300"
+                    ? "bg-blue-200/60 dark:bg-blue-500/30 text-blue-800 dark:text-blue-200"
                     : "bg-slate-200 dark:bg-slate-800 text-slate-500"
                 )}>
                   {status.count}

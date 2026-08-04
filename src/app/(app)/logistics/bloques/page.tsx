@@ -419,8 +419,8 @@ export default function BloquesPage() {
                 className={cn(
                   "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center justify-center cursor-pointer",
                   statusFilter === status.id
-                    ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    ? "bg-blue-100/70 text-blue-800 border border-blue-300 shadow-sm dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40 hover:bg-blue-100 dark:hover:bg-blue-500/30"
+                    : "border border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 )}
               >
                 {status.label}

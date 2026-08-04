@@ -213,7 +213,7 @@ export default function UnidadesPage() {
                 className={cn(
                   "flex-1 sm:flex-initial text-[9px] min-[370px]:text-[10px] sm:text-xs px-1 sm:px-3 py-1.5 rounded-xl font-bold uppercase tracking-wider border transition-all active:scale-95 whitespace-nowrap text-center flex items-center justify-center cursor-pointer",
                   isActive
-                    ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-sm"
+                    ? "bg-blue-100/70 text-blue-800 border-blue-300 shadow-sm dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40 hover:bg-blue-100 dark:hover:bg-blue-500/30"
                     : "bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
                 )}
               >

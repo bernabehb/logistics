@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  KeyRound, 
-  LayoutDashboard, 
-  Workflow, 
-  Layers, 
-  Map, 
-  ClipboardCheck, 
-  Truck, 
-  MapPin, 
-  ShieldCheck, 
-  HelpCircle, 
+import {
+  KeyRound,
+  LayoutDashboard,
+  Workflow,
+  Layers,
+  Map,
+  ClipboardCheck,
+  Truck,
+  MapPin,
+  ShieldCheck,
+  HelpCircle,
   Search,
   ExternalLink,
   ArrowRight,
@@ -244,7 +244,7 @@ export default function AyudaPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200/60 dark:border-slate-800/60">
         <div className="space-y-1 max-w-2xl">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Manual de Usuario
+            Manual de usuario
           </h1>
           <p className="text-slate-550 dark:text-slate-400 text-sm md:text-base">
             Selecciona el tema de tu interés para abrir la documentación detallada o consulta las preguntas frecuentes.
@@ -280,7 +280,7 @@ export default function AyudaPage() {
                 >
                   {/* Visual Accent Hover Effect */}
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/[0.03] dark:from-blue-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                  
+
                   <div>
                     <div className="flex items-start justify-between mb-5">
                       {/* Icon container */}
@@ -296,7 +296,7 @@ export default function AyudaPage() {
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-blue-900 dark:group-hover:text-blue-400 transition-colors mb-2.5 flex items-center gap-1.5">
                       {topic.title}
                     </h3>
-                    
+
                     <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                       {topic.description}
                     </p>
@@ -343,7 +343,7 @@ export default function AyudaPage() {
             {filteredFaqs.map((faq) => {
               const isOpen = expandedFaqId === faq.id;
               return (
-                <div 
+                <div
                   key={faq.id}
                   className="border border-slate-200 dark:border-slate-800 bg-white/40 dark:bg-[#1E293B]/30 rounded-xl overflow-hidden transition-all duration-350 shadow-sm hover:border-slate-300 dark:hover:border-slate-700"
                 >
@@ -359,7 +359,7 @@ export default function AyudaPage() {
                     )}
                   </button>
 
-                  <div 
+                  <div
                     className={`transition-all duration-300 ease-in-out ${isOpen ? "max-h-[500px] border-t border-slate-200/50 dark:border-slate-800/50" : "max-h-0"} overflow-hidden`}
                   >
                     <div className="p-5 text-sm text-slate-600 dark:text-slate-400 bg-white/20 dark:bg-[#1E293B]/10 leading-relaxed whitespace-pre-wrap">

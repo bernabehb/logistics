@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -1848,6 +1848,7 @@ export default function RutasPage() {
         <LogisticsTypeFilters
           invoiceTypeFilter={invoiceTypeFilter as any}
           onInvoiceTypeChange={setInvoiceTypeFilter as any}
+          showOnlyNormal={deliveryTypeFilter === 'sucursal'}
         />
 
         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
@@ -1858,12 +1859,17 @@ export default function RutasPage() {
           ].map((btn) => (
             <button
               key={btn.id}
-              onClick={() => setDeliveryTypeFilter(btn.id as any)}
+              onClick={() => {
+                setDeliveryTypeFilter(btn.id as any);
+                if (btn.id === 'sucursal') {
+                  setInvoiceTypeFilter('normal');
+                }
+              }}
               className={cn(
-                "flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex-1 md:flex-initial",
+                "flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex-1 md:flex-initial border",
                 deliveryTypeFilter === btn.id
-                  ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-slate-600"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  ? "bg-blue-100/70 text-blue-800 border-blue-300 shadow-sm dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40 hover:bg-blue-100 dark:hover:bg-blue-500/30"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               )}
             >
               {btn.Icon && <btn.Icon className="size-3" />}

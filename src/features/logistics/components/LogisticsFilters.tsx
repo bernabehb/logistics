@@ -148,21 +148,23 @@ export function LogisticsDateFilters({
 interface TypeFiltersProps {
   invoiceTypeFilter: InvoiceType;
   onInvoiceTypeChange: (type: InvoiceType) => void;
+  showOnlyNormal?: boolean;
 }
 
-export function LogisticsTypeFilters({ invoiceTypeFilter, onInvoiceTypeChange }: TypeFiltersProps) {
+export function LogisticsTypeFilters({ invoiceTypeFilter, onInvoiceTypeChange, showOnlyNormal }: TypeFiltersProps) {
+  const types = showOnlyNormal ? (['normal'] as const) : (['normal', 'anticipada'] as const);
   return (
     <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200 dark:border-slate-700/50 h-9 flex-nowrap w-full md:w-auto">
-      {(['normal', 'anticipada'] as const).map((type) => (
+      {types.map((type) => (
         <Button
           variant="ghost"
           key={type}
           onClick={() => onInvoiceTypeChange(type)}
           className={cn(
-            "h-auto px-4 py-1.5 text-[13px] font-semibold rounded-lg transition-all flex-1 md:flex-initial",
+            "h-auto px-4 py-1.5 text-[13px] font-bold rounded-lg transition-all flex-1 md:flex-initial",
             invoiceTypeFilter === type
-              ? "bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-600 hover:bg-white dark:hover:bg-[#1E293B]"
-              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-transparent"
+              ? "bg-blue-100/70 text-blue-800 border border-blue-300 shadow-sm dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/40 hover:bg-blue-100 dark:hover:bg-blue-500/30"
+              : "border border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-transparent"
           )}
         >
           {type === 'normal' ? 'Normales' : 'Anticipadas'}
@@ -190,13 +192,17 @@ export function LogisticsStatusFilters({ activeStatusFilters, onToggleStatusFilt
           variant="ghost"
           onClick={() => onToggleStatusFilter(status)}
           className={cn(
-            "h-auto flex items-center justify-center transition-all border border-transparent rounded-lg flex-1 md:flex-none",
+            "h-auto flex items-center justify-center transition-all border rounded-lg flex-1 md:flex-none",
             compact 
               ? "gap-1.5 px-2.5 py-1 text-[11px]" 
               : "gap-1.5 md:gap-2.5 text-[12px] md:text-[14px] px-2 md:px-4 py-1 md:py-1.5 md:flex-none",
             activeStatusFilters.includes(status)
-              ? "bg-slate-100 dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 shadow-sm border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-[#1E293B]"
-              : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+              ? status === 'pending'
+                ? "bg-red-100/70 text-red-800 border-red-300 shadow-sm dark:bg-red-500/20 dark:text-red-300 dark:border-red-500/40 hover:bg-red-100 dark:hover:bg-red-500/30 font-bold"
+                : status === 'in-progress'
+                ? "bg-amber-100/70 text-amber-800 border-amber-300 shadow-sm dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40 hover:bg-amber-100 dark:hover:bg-amber-500/30 font-bold"
+                : "bg-emerald-100/70 text-emerald-800 border-emerald-300 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/40 hover:bg-emerald-100 dark:hover:bg-emerald-500/30 font-bold"
+              : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50"
           )}
         >
           <StatusCircle status={status} />

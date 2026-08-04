@@ -65,15 +65,15 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     )}>
       {/* Brand Header */}
       <div className="flex items-center px-6 h-20 border-b border-white/20 dark:border-white/10">
-        <Image 
-          src="/logo.png" 
-          alt="COMPERS Logo" 
-          width={160} 
-          height={60} 
-          className="object-contain dark:brightness-0 dark:invert" 
+        <Image
+          src="/logo.png"
+          alt="COMPERS Logo"
+          width={160}
+          height={60}
+          className="object-contain dark:brightness-0 dark:invert"
         />
       </div>
- 
+
       {/* Navigation */}
       <div className="flex-1 px-4 py-6 overflow-y-auto">
         <nav className="flex flex-col gap-1.5">
@@ -108,7 +108,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           })}
         </nav>
       </div>
- 
+
       {/* Footer Profile / Theme Toggle */}
       <div className="p-4 border-t border-slate-200/40 dark:border-slate-800/40 flex flex-col gap-4">
         <Link
@@ -128,7 +128,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             "size-5 transition-colors",
             pathname.startsWith("/logistics/ayuda") ? "text-cyan-500 dark:text-cyan-400" : "text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400"
           )} />
-          <span>Manual de Usuario</span>
+          <span>Manual de usuario</span>
         </Link>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
