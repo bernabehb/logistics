@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, User, Check, MapPin, Printer, History, Clock3 } from "lucide-react";
+import { Building2, Home, Search as SearchIcon, Truck, ChevronDown, RefreshCw, LayoutGrid, List, Check, MapPin, Printer, History, Clock3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RutaOrderCard, RutaPedido, RutaStatus, RutaInvoiceType } from "@/features/logistics/components/cards/RutaOrderCard";
-import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
+
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -449,8 +449,8 @@ const getActiveRouteBlock = (blocks: ApiBlockStatus[], blockName: string, logist
 };
 
 const DEFAULT_PREVIOUS_PENDING_DAYS = 7;
-const getRoutesCacheKey = (driverFilter: string, includePreviousPending: boolean) =>
-  `${driverFilter || 'all'}|previous:${includePreviousPending ? '1' : '0'}`;
+const getRoutesCacheKey = (includePreviousPending: boolean) =>
+  `all|previous:${includePreviousPending ? '1' : '0'}`;
 
 const isTruthyPreviousPending = (value: unknown) => {
   if (value === true || value === 1) return true;
@@ -477,17 +477,15 @@ let cachedInvoices: RutaPedido[] | null = null;
 let cachedUnidades: AvailableUnit[] | null = null;
 let cachedUnitCatalog: AvailableUnit[] | null = null;
 let cachedAssignedUnits: Record<string, AvailableUnit> | null = null;
-let cachedDrivers: Driver[] | null = null;
 let cachedBlocks: ApiBlockStatus[] | null = null;
 const cachedInvoicesByDriver: Record<string, RutaPedido[]> = {};
 const cachedRouteRowsByDriver: Record<string, ApiRutaInvoice[]> = {};
-let lastDriverFilter: string = 'all';
 let lastBranchFilter: string = 'all';
 let lastIncludePreviousPending = false;
 let lastViewMode: 'cards' | 'table' = 'cards';
 
 export default function RutasPage() {
-  const initialRoutesCacheKey = getRoutesCacheKey(lastDriverFilter, lastIncludePreviousPending);
+  const initialRoutesCacheKey = getRoutesCacheKey(lastIncludePreviousPending);
   const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[initialRoutesCacheKey] || []);
   const [routeTicketRows, setRouteTicketRows] = useState<ApiRutaInvoice[]>(cachedRouteRowsByDriver[initialRoutesCacheKey] || []);
   const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
@@ -502,12 +500,12 @@ export default function RutasPage() {
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<RutaInvoiceType>('normal');
   const [assignedUnits, setAssignedUnits] = useState<Record<string, AvailableUnit>>(cachedAssignedUnits || {});
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(lastViewMode);
-  const [driverFilter, setDriverFilter] = useState<string>(lastDriverFilter);
+
   const [branchFilter, setBranchFilter] = useState<string>(lastBranchFilter);
   const [includePreviousPending, setIncludePreviousPending] = useState(lastIncludePreviousPending);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
-  const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
+
   const [apiBlocks, setApiBlocks] = useState<ApiBlockStatus[]>(cachedBlocks || []);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
@@ -600,7 +598,7 @@ export default function RutasPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [deliveryTypeFilter, searchQuery, fromDate, statusFilters, invoiceTypeFilter, branchFilter, driverFilter, viewMode]);
+  }, [deliveryTypeFilter, searchQuery, fromDate, statusFilters, invoiceTypeFilter, branchFilter, viewMode]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -629,18 +627,17 @@ export default function RutasPage() {
   const isInitialMount = useRef(true);
 
   useEffect(() => {
-    lastDriverFilter = driverFilter;
     lastIncludePreviousPending = includePreviousPending;
-    const routesCacheKey = getRoutesCacheKey(driverFilter, includePreviousPending);
+    const routesCacheKey = getRoutesCacheKey(includePreviousPending);
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catalogos y asignaciones mÃ¡s recientes de la BD
+      // para traer los catalogos y asignaciones más recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[routesCacheKey] && !!cachedRouteRowsByDriver[routesCacheKey]);
     }
-  }, [driverFilter, includePreviousPending]);
+  }, [includePreviousPending]);
 
   useEffect(() => {
     lastBranchFilter = branchFilter;
@@ -664,7 +661,7 @@ export default function RutasPage() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [driverFilter, includePreviousPending]);
+  }, [includePreviousPending]);
 
   type RouteDocumentPayload = {
     documentType: string;
@@ -1306,7 +1303,7 @@ export default function RutasPage() {
     }
     isFetchingRef.current = true;
     const requestId = ++lastRequestRef.current;
-    const routesCacheKey = getRoutesCacheKey(driverFilter, includePreviousPending);
+    const routesCacheKey = getRoutesCacheKey(includePreviousPending);
 
     if (!forceRefresh && !silent && cachedInvoicesByDriver[routesCacheKey] && cachedRouteRowsByDriver[routesCacheKey]) {
       setInvoices(cachedInvoicesByDriver[routesCacheKey]);
@@ -1321,12 +1318,9 @@ export default function RutasPage() {
       if (!silent) setIsLoading(true);
       setError(null);
 
-      const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedUnitCatalog || !cachedDrivers || !cachedBlocks;
+      const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedUnitCatalog || !cachedBlocks;
 
       const routesParams = new URLSearchParams();
-      if (driverFilter && driverFilter !== 'all') {
-        routesParams.set('iIdDriver', driverFilter);
-      }
       if (includePreviousPending) {
         routesParams.set('includePreviousPending', 'true');
         routesParams.set('previousPendingDays', DEFAULT_PREVIOUS_PENDING_DAYS.toString());
@@ -1338,15 +1332,14 @@ export default function RutasPage() {
         catalogsNeeded
           ? Promise.all([
             fetch('/api/logistics/blocks-status'),
-            fetch('/api/units'),
-            fetch('/api/logistics/assigned-drivers')
+            fetch('/api/units')
           ])
           : Promise.resolve(null),
         fetch(routesUrl)
       ]);
 
       if (catalogsResults) {
-        const [blocksRes, unitsRes, driversRes] = catalogsResults;
+        const [blocksRes, unitsRes] = catalogsResults;
 
         if (blocksRes.ok) {
           const blocksData: ApiBlockStatus[] = await blocksRes.json();
@@ -1393,12 +1386,6 @@ export default function RutasPage() {
           cachedUnidades = availableUnits;
         }
 
-        if (driversRes.ok) {
-          const driversData = await driversRes.json();
-          const mappedDrivers = driversData.map((d: ApiDriver) => mapApiDriverToDriver(d));
-          setDrivers(mappedDrivers);
-          cachedDrivers = mappedDrivers;
-        }
       }
 
       if (requestId !== lastRequestRef.current) return;
@@ -1702,68 +1689,7 @@ export default function RutasPage() {
             </PopoverContent>
           </Popover>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-2 w-auto md:px-3 md:min-w-[180px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all hover:bg-white dark:hover:bg-slate-900 shadow-sm flex items-center justify-center gap-1.5 md:justify-between group shrink-0"
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <User className="size-3.5 text-slate-400 group-hover:text-blue-500 transition-colors shrink-0" />
-                  <span className="truncate inline md:hidden">
-                    CHOFER
-                  </span>
-                  <span className="truncate max-w-[200px] hidden md:inline">
-                    {driverFilter === 'all' ? 'TODOS LOS CHOFERES' : drivers.find(d => d.id === driverFilter)?.name || 'TODOS LOS CHOFERES'}
-                  </span>
-                </div>
-                <ChevronDown className="size-3 text-slate-400 shrink-0 ml-0.5 md:ml-2" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[280px] p-2 rounded-2xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl" align="end">
-              <div className="flex flex-col gap-1">
-                <p className="px-3 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
-                  Filtrar por Chofer
-                </p>
-                <button
-                  onClick={() => setDriverFilter('all')}
-                  className={cn(
-                    "w-full text-left px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
-                    driverFilter === 'all'
-                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                  )}
-                >
-                  <div className={cn("size-2 rounded-full", driverFilter === 'all' ? "bg-white animate-pulse" : "bg-blue-500")} />
-                  TODOS LOS CHOFERES
-                </button>
-                <div className="h-px bg-slate-100 dark:bg-slate-800 my-1 mx-2" />
-                <div className="max-h-[320px] overflow-y-auto pr-1 no-scrollbar flex flex-col gap-0.5">
-                  {drivers.map(driver => (
-                    <button
-                      key={driver.id}
-                      onClick={() => setDriverFilter(driver.id)}
-                      className={cn(
-                        "w-full text-left px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 group",
-                        driverFilter === driver.id
-                          ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                      )}
-                    >
-                      <div className={cn(
-                        "size-6 rounded-lg flex items-center justify-center text-[10px] shrink-0",
-                        driverFilter === driver.id ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600"
-                      )}>
-                        {driver.name.substring(0, 1)}
-                      </div>
-                      <span className="truncate">{driver.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+
 
           <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1 hidden md:block"></div>
           <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9">
