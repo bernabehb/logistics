@@ -229,7 +229,7 @@ export default function AutorizarSalidaPage() {
           return {
             id: `branch-${d.cliente.trim()}-${computedStatus}-${invoiceIds}-${i}`,
             unitName: "SUCURSAL",
-            type: "RecolecciÃ³n",
+            type: "Recolección",
             driverName: "Cliente",
             clientName: d.cliente,
             destination: "Sucursal",
@@ -260,7 +260,7 @@ export default function AutorizarSalidaPage() {
       const data = await response.json().catch(() => null);
       setMaterialReviewAutoCreateEnabled(response.ok && data?.enabled === true);
     } catch (err) {
-      console.warn("Error consultando estado de documento automÃ¡tico:", err);
+      console.warn("Error consultando estado de documento automático:", err);
       setMaterialReviewAutoCreateEnabled(false);
     }
   };

@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, type MouseEvent } from "react";
 import { Block, BlockStatus } from "@/features/logistics/models/blocks";
 import { Driver, ApiDriver, mapApiDriverToDriver } from "@/features/logistics/models/drivers";
 import { Helper, AssignmentHelperPayload } from "@/features/logistics/models/helpers";
 import { BlockCard } from "@/features/logistics/components/cards/BlockCard";
-import { Search, Layers, RefreshCw } from "lucide-react";
+import { Search, Layers, RefreshCw, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,9 @@ let cachedBlocks: Block[] | null = null;
 let cachedDrivers: Driver[] | null = null;
 let cachedHelpers: Helper[] | null = null;
 let cachedBranchFilter: string = "all";
+let cachedIncludePreviousPending = false;
+let cachedBlocksIncludePreviousPending = false;
+const DEFAULT_PREVIOUS_PENDING_DAYS = 7;
 
 const branchPriority: Record<string, number> = {
   MONTERREY: 0,
@@ -53,12 +56,14 @@ const getBlockBranchPriority = (block: Block) => {
 };
 
 export default function BloquesPage() {
-  const [blocks, setBlocks] = useState<Block[]>(cachedBlocks || []);
+  const initialCachedBlocks = cachedBlocksIncludePreviousPending === cachedIncludePreviousPending ? cachedBlocks : null;
+  const [blocks, setBlocks] = useState<Block[]>(initialCachedBlocks || []);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<BlockStatus>("Disponible");
   const [branchFilter, setBranchFilter] = useState<string>(cachedBranchFilter);
+  const [includePreviousPending, setIncludePreviousPending] = useState(cachedIncludePreviousPending);
 
-  const [isLoadingBlocks, setIsLoadingBlocks] = useState(!cachedBlocks);
+  const [isLoadingBlocks, setIsLoadingBlocks] = useState(!initialCachedBlocks);
 
   const [drivers, setDrivers] = useState<Driver[]>(cachedDrivers || []);
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(!cachedDrivers);
@@ -70,6 +75,7 @@ export default function BloquesPage() {
   const blocksRef = useRef<Block[]>(blocks);
   const lastLocalUpdatesRef = useRef<Record<string, number>>({});
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previousPendingFilterMountedRef = useRef(false);
 
   useEffect(() => {
     blocksRef.current = blocks;
@@ -78,6 +84,10 @@ export default function BloquesPage() {
   useEffect(() => {
     cachedBranchFilter = branchFilter;
   }, [branchFilter]);
+
+  useEffect(() => {
+    cachedIncludePreviousPending = includePreviousPending;
+  }, [includePreviousPending]);
 
   // Limpiar temporizadores al desmontar el componente
   useEffect(() => {
@@ -101,8 +111,12 @@ export default function BloquesPage() {
     setDriverError(null);
 
     try {
+      const blocksStatusUrl = includePreviousPending
+        ? `/api/logistics/blocks-status?includePreviousPending=true&previousPendingDays=${DEFAULT_PREVIOUS_PENDING_DAYS}`
+        : '/api/logistics/blocks-status';
+
       const [blocksRes, driversRes, helpersRes] = await Promise.all([
-        fetch('/api/logistics/blocks-status'),
+        fetch(blocksStatusUrl),
         fetch('/api/drivers'),
         fetch('/api/logistics/helpers'),
       ]);
@@ -161,6 +175,7 @@ export default function BloquesPage() {
       const mappedBlocks = Array.from(mappedBlocksById.values());
       setBlocks(mappedBlocks);
       cachedBlocks = mappedBlocks;
+      cachedBlocksIncludePreviousPending = includePreviousPending;
 
       // Map & Sort Drivers by Branch Priority
       const branchPriority: Record<string, number> = {
@@ -199,8 +214,19 @@ export default function BloquesPage() {
   useEffect(() => {
     // Carga inicial: Si no hay caché, se muestra el spinner.
     // Si hay caché, se usa el estado inicial (que ya tiene cachedBlocks) y se refresca en silencio.
-    fetchAllData(!!cachedBlocks);
+    fetchAllData(!!initialCachedBlocks);
   }, []);
+
+  useEffect(() => {
+    if (!previousPendingFilterMountedRef.current) {
+      previousPendingFilterMountedRef.current = true;
+      return;
+    }
+
+    cachedBlocks = null;
+    setBlocks([]);
+    fetchAllData(false);
+  }, [includePreviousPending]);
 
   // Polling para actualizaciones silenciosas cada 10 segundos
   useEffect(() => {
@@ -221,7 +247,7 @@ export default function BloquesPage() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [includePreviousPending]);
 
   const getAssignedDriverName = (block: Block) => {
     return block.apiDriverName;
@@ -411,6 +437,21 @@ export default function BloquesPage() {
             className="h-8 w-full sm:w-auto justify-between"
           />
 
+          <button
+            type="button"
+            onClick={() => setIncludePreviousPending((prev) => !prev)}
+            title={includePreviousPending ? "Ocultar pendientes anteriores" : "Mostrar pendientes anteriores"}
+            className={cn(
+              "inline-flex h-9 items-center justify-center gap-2 rounded-xl border px-3 text-[10px] font-black uppercase tracking-widest transition-all shrink-0 cursor-pointer",
+              includePreviousPending
+                ? "border-amber-300 bg-amber-50 text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+                : "border-slate-200 bg-white/70 text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-slate-200"
+            )}
+          >
+            <History className="size-3.5" />
+            Anteriores
+          </button>
+
           <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
             {blockStatusOptions.map((status) => (
               <button
@@ -473,3 +514,4 @@ export default function BloquesPage() {
     </div>
   );
 }
+

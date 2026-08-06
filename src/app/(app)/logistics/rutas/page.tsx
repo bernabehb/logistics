@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -1145,7 +1145,7 @@ export default function RutasPage() {
         closeSwal();
         await showError({
           title: "Selecciona una sucursal",
-          text: "Para autorizar debes filtrar por una sucursal específica.",
+          text: "Para autorizar debes filtrar por una sucursal especí­fica.",
           timer: 2600
         });
         return;
@@ -1327,11 +1327,14 @@ export default function RutasPage() {
       }
       const routesQuery = routesParams.toString();
       const routesUrl = routesQuery ? `/api/routes?${routesQuery}` : '/api/routes';
+      const blocksStatusUrl = includePreviousPending
+        ? `/api/logistics/blocks-status?includePreviousPending=true&previousPendingDays=${DEFAULT_PREVIOUS_PENDING_DAYS}`
+        : '/api/logistics/blocks-status';
 
       const [catalogsResults, routesResponse] = await Promise.all([
         catalogsNeeded
           ? Promise.all([
-            fetch('/api/logistics/blocks-status'),
+            fetch(blocksStatusUrl),
             fetch('/api/units')
           ])
           : Promise.resolve(null),
@@ -1828,7 +1831,7 @@ export default function RutasPage() {
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aluminio</th>
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Vidrio</th>
                   <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Herrajes</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{deliveryTypeFilter === 'sucursal' ? 'AcciÃ³n' : 'Estado General'}</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{deliveryTypeFilter === 'sucursal' ? 'Acción' : 'Estado General'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1840,7 +1843,7 @@ export default function RutasPage() {
                           <Truck className="size-8 text-slate-300 dark:text-slate-600" />
                         </div>
                         <span className="text-sm font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">No se encontraron resultados</span>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de bÃºsqueda, estatus o fecha</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Prueba cambiando los filtros de búsqueda, estatus o fecha</p>
                       </div>
                     </td>
                   </tr>
@@ -2368,7 +2371,7 @@ export default function RutasPage() {
                   <div key={gIdx} className="bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
                     <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
                       <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                        AlmacÃ©n: {group.almacen}
+                        Almacén: {group.almacen}
                       </span>
                       <span className="text-[10px] font-bold text-slate-400 capitalize">
                         {group.materiales.length} productos

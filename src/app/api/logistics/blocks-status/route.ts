@@ -2,9 +2,24 @@ import { NextResponse } from 'next/server';
 import { API_ENDPOINTS } from '@/lib/apiConfig';
 import { getServerApiHeaders } from '@/lib/serverApiHeaders';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const response = await fetch(API_ENDPOINTS.blocksStatus, {
+    const { searchParams } = new URL(request.url);
+    const params = new URLSearchParams();
+    const includePreviousPending = searchParams.get('includePreviousPending');
+    const previousPendingDays = searchParams.get('previousPendingDays');
+
+    if (includePreviousPending === 'true') {
+      params.set('includePreviousPending', 'true');
+      if (previousPendingDays) {
+        params.set('previousPendingDays', previousPendingDays);
+      }
+    }
+
+    const query = params.toString();
+    const url = query ? `${API_ENDPOINTS.blocksStatus}?${query}` : API_ENDPOINTS.blocksStatus;
+
+    const response = await fetch(url, {
       headers: await getServerApiHeaders(),
       next: { revalidate: 0 }
     });

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { MapPin, Truck, FileText, Weight, QrCode, Keyboard, ArrowLeft, CheckCircle, ScanLine, X, User, CircleDollarSign, RefreshCw, Pencil, Save, Undo2, Trash2, ExternalLink, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -149,7 +149,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   const getRouteDocumentLabel = (document: RouteDocumentPayload) =>
     document.documentType === "ORDER" ? `orden ${document.documentNum}` : `factura ${document.documentNum}`;
 
-  // DetecciÃƒÂ³n de facturas agregadas posteriormente (desde el backend)
+  // Detección de facturas agregadas posteriormente (desde el backend)
   const addedInvoicesCount = React.useMemo(() =>
     departure.invoices.filter(inv => inv.isNew).length,
     [departure.invoices]
@@ -879,7 +879,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                 Facturas ({departure.invoices.length})
               </span>
             </div>
-            <div className="flex max-h-28 flex-col gap-1.5 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-1.5">
               {departure.invoices.map((inv, idx) => {
                 const isNew = !!inv.isNew;
                 const isDelivered = !!inv.isDelivered;
