@@ -537,6 +537,7 @@ export default function RutasPage() {
 
   const lastRequestRef = useRef<number>(0);
   const isFetchingRef = useRef<boolean>(false);
+  const lastSilentRoutesFetchRef = useRef<{ key: string; at: number } | null>(null);
 
   const currentLogisticsBranchId = () => {
     return branchFilter !== 'all' ? getLogisticsBranchId(branchFilter) : 0;
@@ -1297,13 +1298,18 @@ export default function RutasPage() {
   };
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
+    const routesCacheKey = getRoutesCacheKey(includePreviousPending, branchFilter);
+    const lastSilentFetch = lastSilentRoutesFetchRef.current;
+    if (silent && lastSilentFetch?.key === routesCacheKey && Date.now() - lastSilentFetch.at < 5000) {
+      console.log("Fetch silencioso reciente, omitiendo petición duplicada.");
+      return;
+    }
     if (isFetchingRef.current) {
       console.log("Fetch en progreso, omitiendo petición concurrente.");
       return;
     }
     isFetchingRef.current = true;
     const requestId = ++lastRequestRef.current;
-    const routesCacheKey = getRoutesCacheKey(includePreviousPending, branchFilter);
 
     if (!forceRefresh && !silent && cachedInvoicesByDriver[routesCacheKey] && cachedRouteRowsByDriver[routesCacheKey]) {
       setInvoices(cachedInvoicesByDriver[routesCacheKey]);
@@ -1509,6 +1515,9 @@ export default function RutasPage() {
       cachedInvoicesByDriver[routesCacheKey] = allData;
       cachedInvoices = allData;
       setInvoices(allData);
+      if (silent) {
+        lastSilentRoutesFetchRef.current = { key: routesCacheKey, at: Date.now() };
+      }
       setError(null);
     } catch (err) {
       console.error("Error fetching routes:", err);
