@@ -449,8 +449,8 @@ const getActiveRouteBlock = (blocks: ApiBlockStatus[], blockName: string, logist
 };
 
 const DEFAULT_PREVIOUS_PENDING_DAYS = 7;
-const getRoutesCacheKey = (includePreviousPending: boolean) =>
-  `all|previous:${includePreviousPending ? '1' : '0'}`;
+const getRoutesCacheKey = (includePreviousPending: boolean, branchFilter: string) =>
+  `branch:${branchFilter || 'all'}|previous:${includePreviousPending ? '1' : '0'}`;
 
 const isTruthyPreviousPending = (value: unknown) => {
   if (value === true || value === 1) return true;
@@ -485,7 +485,7 @@ let lastIncludePreviousPending = false;
 let lastViewMode: 'cards' | 'table' = 'cards';
 
 export default function RutasPage() {
-  const initialRoutesCacheKey = getRoutesCacheKey(lastIncludePreviousPending);
+  const initialRoutesCacheKey = getRoutesCacheKey(lastIncludePreviousPending, lastBranchFilter);
   const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[initialRoutesCacheKey] || []);
   const [routeTicketRows, setRouteTicketRows] = useState<ApiRutaInvoice[]>(cachedRouteRowsByDriver[initialRoutesCacheKey] || []);
   const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
@@ -628,7 +628,7 @@ export default function RutasPage() {
 
   useEffect(() => {
     lastIncludePreviousPending = includePreviousPending;
-    const routesCacheKey = getRoutesCacheKey(includePreviousPending);
+    const routesCacheKey = getRoutesCacheKey(includePreviousPending, branchFilter);
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
@@ -637,7 +637,7 @@ export default function RutasPage() {
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[routesCacheKey] && !!cachedRouteRowsByDriver[routesCacheKey]);
     }
-  }, [includePreviousPending]);
+  }, [includePreviousPending, branchFilter]);
 
   useEffect(() => {
     lastBranchFilter = branchFilter;
@@ -661,7 +661,7 @@ export default function RutasPage() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [includePreviousPending]);
+  }, [includePreviousPending, branchFilter]);
 
   type RouteDocumentPayload = {
     documentType: string;
@@ -1145,7 +1145,7 @@ export default function RutasPage() {
         closeSwal();
         await showError({
           title: "Selecciona una sucursal",
-          text: "Para autorizar debes filtrar por una sucursal especí­fica.",
+          text: "Para autorizar debes filtrar por una sucursal específica.",
           timer: 2600
         });
         return;
@@ -1303,7 +1303,7 @@ export default function RutasPage() {
     }
     isFetchingRef.current = true;
     const requestId = ++lastRequestRef.current;
-    const routesCacheKey = getRoutesCacheKey(includePreviousPending);
+    const routesCacheKey = getRoutesCacheKey(includePreviousPending, branchFilter);
 
     if (!forceRefresh && !silent && cachedInvoicesByDriver[routesCacheKey] && cachedRouteRowsByDriver[routesCacheKey]) {
       setInvoices(cachedInvoicesByDriver[routesCacheKey]);
@@ -1321,6 +1321,10 @@ export default function RutasPage() {
       const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedUnitCatalog || !cachedBlocks;
 
       const routesParams = new URLSearchParams();
+      const selectedBranchId = currentLogisticsBranchId();
+      if (selectedBranchId > 0) {
+        routesParams.set('iIdBranch', selectedBranchId.toString());
+      }
       if (includePreviousPending) {
         routesParams.set('includePreviousPending', 'true');
         routesParams.set('previousPendingDays', DEFAULT_PREVIOUS_PENDING_DAYS.toString());
@@ -2421,3 +2425,4 @@ export default function RutasPage() {
     </div>
   );
 }
+

@@ -8,10 +8,14 @@ export async function GET(request: Request) {
     const iIdDriver = searchParams.get('iIdDriver');
     const includePreviousPending = searchParams.get('includePreviousPending');
     const previousPendingDays = searchParams.get('previousPendingDays');
+    const iIdBranch = searchParams.get('iIdBranch');
 
     const params = new URLSearchParams();
     if (iIdDriver && iIdDriver !== 'all') {
       params.set('iIdDriver', iIdDriver);
+    }
+    if (iIdBranch && iIdBranch !== 'all') {
+      params.set('iIdBranch', iIdBranch);
     }
     if (includePreviousPending === 'true') {
       params.set('includePreviousPending', 'true');
