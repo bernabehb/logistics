@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -539,6 +539,8 @@ export default function RutasPage() {
   const lastRequestRef = useRef<number>(0);
   const isFetchingRef = useRef<boolean>(false);
   const lastSilentRoutesFetchRef = useRef<{ key: string; at: number } | null>(null);
+  const activeRoutesCacheKeyRef = useRef<string>(initialRoutesCacheKey);
+  const pendingRoutesFetchRef = useRef<{ forceRefresh: boolean; silent: boolean } | null>(null);
 
   const currentLogisticsBranchId = () => {
     return branchFilter !== 'all' ? getLogisticsBranchId(branchFilter) : 0;
@@ -546,6 +548,24 @@ export default function RutasPage() {
 
   const canUsePreviousPending = branchFilter !== 'all';
   const effectiveIncludePreviousPending = canUsePreviousPending && includePreviousPending;
+
+  const getActiveRoutesCacheKey = (forceRefresh = false) => {
+    const requestedCacheKey = getRoutesCacheKey(effectiveIncludePreviousPending, branchFilter);
+    const allBranchesNormalCacheKey = getRoutesCacheKey(false, 'all');
+
+    if (
+      !forceRefresh &&
+      !effectiveIncludePreviousPending &&
+      branchFilter !== 'all' &&
+      cachedInvoicesByDriver[allBranchesNormalCacheKey] &&
+      cachedRouteRowsByDriver[allBranchesNormalCacheKey]
+    ) {
+      return allBranchesNormalCacheKey;
+    }
+
+    return requestedCacheKey;
+  };
+
   const currentBlockScopeKey = (blockName: string) => {
     return getBlockScopeKey(blockName, currentLogisticsBranchId());
   };
@@ -639,7 +659,8 @@ export default function RutasPage() {
 
   useEffect(() => {
     lastIncludePreviousPending = effectiveIncludePreviousPending;
-    const routesCacheKey = getRoutesCacheKey(effectiveIncludePreviousPending, branchFilter);
+    const routesCacheKey = getActiveRoutesCacheKey();
+    activeRoutesCacheKeyRef.current = routesCacheKey;
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
@@ -1308,26 +1329,34 @@ export default function RutasPage() {
   };
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
-    const routesCacheKey = getRoutesCacheKey(effectiveIncludePreviousPending, branchFilter);
+    const routesCacheKey = getActiveRoutesCacheKey(forceRefresh);
+    activeRoutesCacheKeyRef.current = routesCacheKey;
+
     const lastSilentFetch = lastSilentRoutesFetchRef.current;
     if (silent && lastSilentFetch?.key === routesCacheKey && Date.now() - lastSilentFetch.at < 5000) {
       console.log("Fetch silencioso reciente, omitiendo petición duplicada.");
       return;
     }
-    if (isFetchingRef.current) {
-      console.log("Fetch en progreso, omitiendo petición concurrente.");
-      return;
-    }
-    isFetchingRef.current = true;
-    const requestId = ++lastRequestRef.current;
 
-    if (!forceRefresh && !silent && cachedInvoicesByDriver[routesCacheKey] && cachedRouteRowsByDriver[routesCacheKey]) {
+    if (!forceRefresh && cachedInvoicesByDriver[routesCacheKey] && cachedRouteRowsByDriver[routesCacheKey]) {
       setInvoices(cachedInvoicesByDriver[routesCacheKey]);
       setRouteTicketRows(cachedRouteRowsByDriver[routesCacheKey]);
       setIsLoading(false);
-      isFetchingRef.current = false;
+      setIsRefreshing(false);
       return;
     }
+
+    if (isFetchingRef.current) {
+      pendingRoutesFetchRef.current = { forceRefresh, silent };
+      lastRequestRef.current++;
+      console.log("Fetch en progreso, invalidando respuesta anterior y agendando la petición más reciente.");
+      return;
+    }
+
+    isFetchingRef.current = true;
+    const requestId = ++lastRequestRef.current;
+    const isCurrentRoutesRequest = () =>
+      requestId === lastRequestRef.current && routesCacheKey === activeRoutesCacheKeyRef.current;
 
     try {
       setIsRefreshing(true);
@@ -1411,7 +1440,7 @@ export default function RutasPage() {
 
       }
 
-      if (requestId !== lastRequestRef.current) return;
+      if (!isCurrentRoutesRequest()) return;
 
       if (!routesResponse.ok) throw new Error('No se pudo conectar con el servidor de rutas');
       const data: ApiRutaInvoice[] = await routesResponse.json();
@@ -1420,7 +1449,9 @@ export default function RutasPage() {
         return !(isBranchPickup && row.dDateRouteAuthorized);
       });
       cachedRouteRowsByDriver[routesCacheKey] = activeRouteRows;
-      setRouteTicketRows(activeRouteRows);
+      if (isCurrentRoutesRequest()) {
+        setRouteTicketRows(activeRouteRows);
+      }
 
       const groupedMap = new Map<string, RutaPedido & { block: string }>();
 
@@ -1524,19 +1555,31 @@ export default function RutasPage() {
 
       cachedInvoicesByDriver[routesCacheKey] = allData;
       cachedInvoices = allData;
-      setInvoices(allData);
+      if (isCurrentRoutesRequest()) {
+        setInvoices(allData);
+      }
       if (silent) {
         lastSilentRoutesFetchRef.current = { key: routesCacheKey, at: Date.now() };
       }
-      setError(null);
+      if (isCurrentRoutesRequest()) {
+        setError(null);
+      }
     } catch (err) {
       console.error("Error fetching routes:", err);
-      setError("Error al cargar la información de rutas dinámica");
+      if (isCurrentRoutesRequest()) {
+        setError("Error al cargar la información de rutas dinámica");
+      }
     } finally {
       isFetchingRef.current = false;
       setIsRefreshing(false);
-      if (requestId === lastRequestRef.current) {
+      if (isCurrentRoutesRequest()) {
         setIsLoading(false);
+      }
+
+      const pendingFetch = pendingRoutesFetchRef.current;
+      if (pendingFetch) {
+        pendingRoutesFetchRef.current = null;
+        window.setTimeout(() => fetchAllData(pendingFetch.forceRefresh, pendingFetch.silent), 0);
       }
     }
   };
