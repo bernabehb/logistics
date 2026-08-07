@@ -485,7 +485,8 @@ let lastIncludePreviousPending = false;
 let lastViewMode: 'cards' | 'table' = 'cards';
 
 export default function RutasPage() {
-  const initialRoutesCacheKey = getRoutesCacheKey(lastIncludePreviousPending, lastBranchFilter);
+  const initialIncludePreviousPending = lastBranchFilter !== 'all' && lastIncludePreviousPending;
+  const initialRoutesCacheKey = getRoutesCacheKey(initialIncludePreviousPending, lastBranchFilter);
   const [invoices, setInvoices] = useState<RutaPedido[]>(cachedInvoicesByDriver[initialRoutesCacheKey] || []);
   const [routeTicketRows, setRouteTicketRows] = useState<ApiRutaInvoice[]>(cachedRouteRowsByDriver[initialRoutesCacheKey] || []);
   const [unidadesDisponibles, setUnidadesDisponibles] = useState<AvailableUnit[]>(cachedUnidades || []);
@@ -502,7 +503,7 @@ export default function RutasPage() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(lastViewMode);
 
   const [branchFilter, setBranchFilter] = useState<string>(lastBranchFilter);
-  const [includePreviousPending, setIncludePreviousPending] = useState(lastIncludePreviousPending);
+  const [includePreviousPending, setIncludePreviousPending] = useState(initialIncludePreviousPending);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
 
@@ -543,6 +544,8 @@ export default function RutasPage() {
     return branchFilter !== 'all' ? getLogisticsBranchId(branchFilter) : 0;
   };
 
+  const canUsePreviousPending = branchFilter !== 'all';
+  const effectiveIncludePreviousPending = canUsePreviousPending && includePreviousPending;
   const currentBlockScopeKey = (blockName: string) => {
     return getBlockScopeKey(blockName, currentLogisticsBranchId());
   };
@@ -628,8 +631,15 @@ export default function RutasPage() {
   const isInitialMount = useRef(true);
 
   useEffect(() => {
-    lastIncludePreviousPending = includePreviousPending;
-    const routesCacheKey = getRoutesCacheKey(includePreviousPending, branchFilter);
+    if (!canUsePreviousPending && includePreviousPending) {
+      setIncludePreviousPending(false);
+      lastIncludePreviousPending = false;
+    }
+  }, [canUsePreviousPending, includePreviousPending]);
+
+  useEffect(() => {
+    lastIncludePreviousPending = effectiveIncludePreviousPending;
+    const routesCacheKey = getRoutesCacheKey(effectiveIncludePreviousPending, branchFilter);
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
@@ -638,7 +648,7 @@ export default function RutasPage() {
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[routesCacheKey] && !!cachedRouteRowsByDriver[routesCacheKey]);
     }
-  }, [includePreviousPending, branchFilter]);
+  }, [effectiveIncludePreviousPending, branchFilter]);
 
   useEffect(() => {
     lastBranchFilter = branchFilter;
@@ -662,7 +672,7 @@ export default function RutasPage() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [includePreviousPending, branchFilter]);
+  }, [effectiveIncludePreviousPending, branchFilter]);
 
   type RouteDocumentPayload = {
     documentType: string;
@@ -1298,7 +1308,7 @@ export default function RutasPage() {
   };
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
-    const routesCacheKey = getRoutesCacheKey(includePreviousPending, branchFilter);
+    const routesCacheKey = getRoutesCacheKey(effectiveIncludePreviousPending, branchFilter);
     const lastSilentFetch = lastSilentRoutesFetchRef.current;
     if (silent && lastSilentFetch?.key === routesCacheKey && Date.now() - lastSilentFetch.at < 5000) {
       console.log("Fetch silencioso reciente, omitiendo petición duplicada.");
@@ -1331,13 +1341,13 @@ export default function RutasPage() {
       if (selectedBranchId > 0) {
         routesParams.set('iIdBranch', selectedBranchId.toString());
       }
-      if (includePreviousPending) {
+      if (effectiveIncludePreviousPending) {
         routesParams.set('includePreviousPending', 'true');
         routesParams.set('previousPendingDays', DEFAULT_PREVIOUS_PENDING_DAYS.toString());
       }
       const routesQuery = routesParams.toString();
       const routesUrl = routesQuery ? `/api/routes?${routesQuery}` : '/api/routes';
-      const blocksStatusUrl = includePreviousPending
+      const blocksStatusUrl = effectiveIncludePreviousPending
         ? `/api/logistics/blocks-status?includePreviousPending=true&previousPendingDays=${DEFAULT_PREVIOUS_PENDING_DAYS}`
         : '/api/logistics/blocks-status';
 
@@ -1439,7 +1449,7 @@ export default function RutasPage() {
           const isPreviousPendingRow =
             isTruthyPreviousPending(row.isPreviousPending) ||
             isTruthyPreviousPending(row.IsPreviousPending) ||
-            (includePreviousPending && isBeforeToday(displayDate));
+            (effectiveIncludePreviousPending && isBeforeToday(displayDate));
 
           let status: RutaStatus = 'pending';
           const rawStatus = (row.estatusEmbarque || "").toLowerCase();
@@ -1770,16 +1780,20 @@ export default function RutasPage() {
         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden md:block"></div>
         <button
           type="button"
+          disabled={!canUsePreviousPending}
           onClick={() => {
+            if (!canUsePreviousPending) return;
             setIncludePreviousPending((prev) => !prev);
             setCurrentPage(1);
           }}
-          title={includePreviousPending ? "Ocultar pendientes anteriores" : "Mostrar pendientes anteriores"}
+          title={!canUsePreviousPending ? "Selecciona una sucursal para consultar pendientes anteriores" : effectiveIncludePreviousPending ? "Ocultar pendientes anteriores" : "Mostrar pendientes anteriores"}
           className={cn(
-            "inline-flex h-9 items-center justify-center gap-2 rounded-xl border px-3 text-[10px] font-black uppercase tracking-widest transition-all shrink-0 cursor-pointer",
-            includePreviousPending
-              ? "border-amber-300 bg-amber-50 text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
-              : "border-slate-200 bg-white/70 text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-slate-200"
+            "inline-flex h-9 items-center justify-center gap-2 rounded-xl border px-3 text-[10px] font-black uppercase tracking-widest transition-all shrink-0",
+            !canUsePreviousPending
+              ? "cursor-not-allowed border-slate-200 bg-slate-100/60 text-slate-400 opacity-60 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-600"
+              : effectiveIncludePreviousPending
+                ? "cursor-pointer border-amber-300 bg-amber-50 text-amber-700 shadow-sm dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+                : "cursor-pointer border-slate-200 bg-white/70 text-slate-500 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 dark:hover:text-slate-200"
           )}
         >
           <History className="size-3.5" />
