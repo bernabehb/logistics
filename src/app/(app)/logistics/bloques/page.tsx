@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, type MouseEvent } from "react";
 import { Block, BlockStatus } from "@/features/logistics/models/blocks";
@@ -38,6 +38,13 @@ let cachedBranchFilter: string = "all";
 let cachedIncludePreviousPending = false;
 let cachedBlocksIncludePreviousPending = false;
 const DEFAULT_PREVIOUS_PENDING_DAYS = 7;
+const ROUTES_CACHE_BUST_STORAGE_KEY = "logistics_routes_cache_bust";
+
+const notifyRoutesCacheInvalidated = () => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ROUTES_CACHE_BUST_STORAGE_KEY, String(Date.now()));
+  window.dispatchEvent(new CustomEvent("logistics-routes-cache-bust"));
+};
 
 const branchPriority: Record<string, number> = {
   MONTERREY: 0,
@@ -309,6 +316,8 @@ export default function BloquesPage() {
           throw new Error(errorMsg);
         }
 
+        notifyRoutesCacheInvalidated();
+
         await showSuccess({
           title: "Bloque liberado",
           html: `El bloque <b>${block.name}</b> quedó libre correctamente.`
@@ -356,6 +365,8 @@ export default function BloquesPage() {
       });
 
       if (!response.ok) throw new Error("Error en la respuesta del servidor");
+
+      notifyRoutesCacheInvalidated();
 
       await showSuccess({
         title: "Chofer asignado",

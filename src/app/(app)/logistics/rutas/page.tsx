@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -357,6 +357,7 @@ interface ApiRutaInvoice {
   corte: number;
   vendedor: string;
   metodo: string;
+  montoTotalOrden?: number;
   monto_Factura: number;
   sucursal: string;
   bloque: string;
@@ -480,9 +481,21 @@ let cachedAssignedUnits: Record<string, AvailableUnit> | null = null;
 let cachedBlocks: ApiBlockStatus[] | null = null;
 const cachedInvoicesByDriver: Record<string, RutaPedido[]> = {};
 const cachedRouteRowsByDriver: Record<string, ApiRutaInvoice[]> = {};
+const recentlyAuthorizedRouteDocumentKeys = new Set<string>();
 let lastBranchFilter: string = 'all';
 let lastIncludePreviousPending = false;
 let lastViewMode: 'cards' | 'table' = 'cards';
+const ROUTES_CACHE_BUST_STORAGE_KEY = "logistics_routes_cache_bust";
+let lastProcessedRoutesCacheBustValue: string | null = null;
+
+const clearRoutesModuleCache = () => {
+  Object.keys(cachedInvoicesByDriver).forEach(key => delete cachedInvoicesByDriver[key]);
+  Object.keys(cachedRouteRowsByDriver).forEach(key => delete cachedRouteRowsByDriver[key]);
+  cachedInvoices = null;
+  cachedBlocks = null;
+  cachedAssignedUnits = null;
+  recentlyAuthorizedRouteDocumentKeys.clear();
+};
 
 export default function RutasPage() {
   const initialIncludePreviousPending = lastBranchFilter !== 'all' && lastIncludePreviousPending;
@@ -541,6 +554,7 @@ export default function RutasPage() {
   const lastSilentRoutesFetchRef = useRef<{ key: string; at: number } | null>(null);
   const activeRoutesCacheKeyRef = useRef<string>(initialRoutesCacheKey);
   const pendingRoutesFetchRef = useRef<{ forceRefresh: boolean; silent: boolean } | null>(null);
+  const lastRoutesCacheBustRef = useRef<string | null>(lastProcessedRoutesCacheBustValue);
 
   const currentLogisticsBranchId = () => {
     return branchFilter !== 'all' ? getLogisticsBranchId(branchFilter) : 0;
@@ -566,6 +580,50 @@ export default function RutasPage() {
     return requestedCacheKey;
   };
 
+  const invalidateRoutesCacheForCurrentScope = () => {
+    const branchKeys = branchFilter === 'all'
+      ? ['all', 'MONTERREY', 'APODACA', 'GUADALUPE', 'SANTA CATARINA']
+      : ['all', branchFilter];
+
+    branchKeys.forEach(branchKey => {
+      [false, true].forEach(includePrevious => {
+        const cacheKey = getRoutesCacheKey(includePrevious, branchKey);
+        delete cachedInvoicesByDriver[cacheKey];
+        delete cachedRouteRowsByDriver[cacheKey];
+      });
+    });
+
+    cachedInvoices = null;
+    lastSilentRoutesFetchRef.current = null;
+  };
+
+  const invalidateRoutesCacheForAllScopes = () => {
+    clearRoutesModuleCache();
+    lastSilentRoutesFetchRef.current = null;
+  };
+
+  const syncExternalRoutesCacheBust = () => {
+    if (typeof window === "undefined") return false;
+
+    const cacheBustValue = window.localStorage.getItem(ROUTES_CACHE_BUST_STORAGE_KEY);
+    if (!cacheBustValue || cacheBustValue === lastRoutesCacheBustRef.current) return false;
+
+    lastRoutesCacheBustRef.current = cacheBustValue;
+    lastProcessedRoutesCacheBustValue = cacheBustValue;
+    invalidateRoutesCacheForAllScopes();
+    return true;
+  };
+  const refreshRoutesAfterMutation = async () => {
+    invalidateRoutesCacheForCurrentScope();
+    pendingRoutesFetchRef.current = null;
+
+    if (isFetchingRef.current) {
+      lastRequestRef.current++;
+      isFetchingRef.current = false;
+    }
+
+    await fetchAllData(true, true);
+  };
   const currentBlockScopeKey = (blockName: string) => {
     return getBlockScopeKey(blockName, currentLogisticsBranchId());
   };
@@ -664,7 +722,6 @@ export default function RutasPage() {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
-      // para traer los catalogos y asignaciones más recientes de la BD
       fetchAllData(true, true);
     } else {
       fetchAllData(false, !!cachedInvoicesByDriver[routesCacheKey] && !!cachedRouteRowsByDriver[routesCacheKey]);
@@ -676,22 +733,33 @@ export default function RutasPage() {
   }, [branchFilter]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchAllData(true, true);
-      }
-    }, 30000);
-
-    const handleVisibilityChange = () => {
+    const refreshSilently = () => {
       if (document.visibilityState === 'visible') {
         fetchAllData(true, true);
       }
     };
+
+    const interval = setInterval(refreshSilently, 30000);
+
+    const handleVisibilityChange = () => {
+      refreshSilently();
+    };
+
+    const handleRoutesCacheBust = () => {
+      refreshSilently();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', refreshSilently);
+    window.addEventListener('pageshow', refreshSilently);
+    window.addEventListener('logistics-routes-cache-bust', handleRoutesCacheBust);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', refreshSilently);
+      window.removeEventListener('pageshow', refreshSilently);
+      window.removeEventListener('logistics-routes-cache-bust', handleRoutesCacheBust);
     };
   }, [effectiveIncludePreviousPending, branchFilter]);
 
@@ -790,6 +858,39 @@ export default function RutasPage() {
       .filter((value, index, array) => array.indexOf(value) === index);
   };
 
+  const getAuthorizedBlockDocumentKeys = (apiBlock?: ApiBlockStatus) => {
+    return new Set(
+      parseInvoiceCsv(apiBlock?.sAuthorizedInvoices)
+        .map(invoiceNum => `INVOICE:${invoiceNum}`)
+    );
+  };
+
+  const getRouteRowDocumentKey = (row: ApiRutaInvoice) => {
+    const isFactura = row.factura && row.factura.trim() !== '';
+    const documentType = normalizeRouteDocumentType(row.routeDocumentType || row.RouteDocumentType || (isFactura ? 'INVOICE' : 'ORDER'));
+    const documentNum = String(row.routeDocumentNum || row.RouteDocumentNum || (documentType === 'ORDER' ? row.orderNum : row.factura) || '').trim().toUpperCase();
+    return documentNum ? `${documentType}:${documentNum}` : '';
+  };
+
+  const buildAuthorizedRouteDocumentKeys = (blocks: ApiBlockStatus[] | null | undefined) => {
+    const keys = new Set<string>();
+    (blocks || []).forEach(block => {
+      parseInvoiceCsv(block.sAuthorizedInvoices).forEach(invoiceNum => {
+        keys.add(`INVOICE:${invoiceNum}`);
+      });
+    });
+    return keys;
+  };
+  const hasVisibleDocumentsToAuthorize = (blockName: string, apiBlock?: ApiBlockStatus) => {
+    const authorizedDocumentKeys = getAuthorizedBlockDocumentKeys(apiBlock);
+    return getSelectableBlockDocumentKeys(blockName)
+      .some(documentKey => !authorizedDocumentKeys.has(documentKey));
+  };
+
+  const shouldAuthorizeCurrentBlockView = (blockName: string, apiBlock: ApiBlockStatus | undefined, isAuthorized: boolean) => {
+    return !isAuthorized || hasVisibleDocumentsToAuthorize(blockName, apiBlock);
+  };
+
   const getSelectedBlockDocumentKeys = (blockName: string) => {
     const selected = selectedInvoicesByBlock[currentBlockScopeKey(blockName)] || [];
     const selectable = new Set(getSelectableBlockDocumentKeys(blockName));
@@ -822,6 +923,45 @@ export default function RutasPage() {
       .map(document => String(document.invoiceNum || document.documentNum).trim().toUpperCase())
       .filter(Boolean)
       .filter((value, index, array) => array.indexOf(value) === index);
+  };
+
+  const getRouteItemsAmount = (items: RutaPedido[]) => {
+    const seen = new Set<string>();
+
+    return items.reduce((sum, pedido) => {
+      const documentKey = getRouteDocumentSelectionKey(pedido);
+      if (!documentKey || seen.has(documentKey)) return sum;
+
+      seen.add(documentKey);
+      const amount = Number(pedido.montoTotal);
+      return Number.isFinite(amount) ? sum + amount : sum;
+    }, 0);
+  };
+
+  const hasRouteItemsAmount = (items: RutaPedido[]) => {
+    return items.some(pedido => {
+      const amount = Number(pedido.montoTotal);
+      return pedido.montoTotal !== undefined && pedido.montoTotal !== null && Number.isFinite(amount);
+    });
+  };
+
+  const getVisibleBlockAmount = (blockName: string) => {
+    return getRouteItemsAmount(getSelectableBlockRouteItems(blockName));
+  };
+
+  const getSelectedBlockAmount = (blockName: string) => {
+    const selectedItems = getSelectedBlockRouteItems(blockName);
+    if (selectedItems.length === 0) return 0;
+
+    return getRouteItemsAmount(selectedItems);
+  };
+
+  const hasVisibleBlockAmount = (blockName: string) => {
+    return hasRouteItemsAmount(getSelectableBlockRouteItems(blockName));
+  };
+
+  const hasSelectedBlockAmount = (blockName: string) => {
+    return hasRouteItemsAmount(getSelectedBlockRouteItems(blockName));
   };
 
   const getSelectedBlockWeightKg = (blockName: string) => {
@@ -908,6 +1048,53 @@ export default function RutasPage() {
     Object.keys(cachedRouteRowsByDriver).forEach(key => {
       cachedRouteRowsByDriver[key] = cachedRouteRowsByDriver[key].filter(row => !shouldRemoveRow(row));
     });
+  };
+
+  const removeAuthorizedRouteDocumentsFromRoutes = (routeDocuments: RouteDocumentPayload[]) => {
+    const authorizedDocumentKeys = new Set(
+      routeDocuments
+        .map(document => `${normalizeRouteDocumentType(document.documentType)}:${String(document.documentNum || '').trim().toUpperCase()}`)
+        .filter(key => !key.endsWith(':'))
+    );
+
+    if (authorizedDocumentKeys.size === 0) return;
+    authorizedDocumentKeys.forEach(key => recentlyAuthorizedRouteDocumentKeys.add(key));
+
+    const shouldRemovePedido = (pedido: RutaPedido) => {
+      if (pedido.deliveryType !== 'domicilio') return false;
+      return authorizedDocumentKeys.has(getRouteDocumentSelectionKey(pedido));
+    };
+
+    const shouldRemoveRow = (row: ApiRutaInvoice) => {
+      const isFactura = row.factura && row.factura.trim() !== '';
+      const documentType = normalizeRouteDocumentType(row.routeDocumentType || row.RouteDocumentType || (isFactura ? 'INVOICE' : 'ORDER'));
+      const documentNum = String(row.routeDocumentNum || row.RouteDocumentNum || (documentType === 'ORDER' ? row.orderNum : row.factura) || '').trim().toUpperCase();
+      if (!documentNum) return false;
+
+      const isBranchPickup = row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'));
+      return !isBranchPickup && authorizedDocumentKeys.has(`${documentType}:${documentNum}`);
+    };
+
+    setInvoices(prev => prev.filter(pedido => !shouldRemovePedido(pedido)));
+    setRouteTicketRows(prev => prev.filter(row => !shouldRemoveRow(row)));
+
+    cachedInvoices = cachedInvoices ? cachedInvoices.filter(pedido => !shouldRemovePedido(pedido)) : cachedInvoices;
+    Object.keys(cachedInvoicesByDriver).forEach(key => {
+      cachedInvoicesByDriver[key] = cachedInvoicesByDriver[key].filter(pedido => !shouldRemovePedido(pedido));
+    });
+
+    Object.keys(cachedRouteRowsByDriver).forEach(key => {
+      cachedRouteRowsByDriver[key] = cachedRouteRowsByDriver[key].filter(row => !shouldRemoveRow(row));
+    });
+  };
+
+  const restoreAuthorizedRouteDocumentsForInvoices = (invoiceNums: string[]) => {
+    invoiceNums
+      .map(invoice => String(invoice || '').trim().toUpperCase())
+      .filter(Boolean)
+      .forEach(invoice => recentlyAuthorizedRouteDocumentKeys.delete(`INVOICE:${invoice}`));
+
+    recentlyAuthorizedRouteDocumentKeys.clear();
   };
 
   const handleAuthorizeBranchPickup = async (items: RutaPedido[], blockName?: string) => {
@@ -1021,6 +1208,14 @@ export default function RutasPage() {
 
   const formatKg = (value: number) =>
     `${value.toLocaleString("es-MX", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
+
+  const formatCurrency = (value: number) =>
+    value.toLocaleString("es-MX", {
+      style: "currency",
+      currency: "MXN",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   const buildRouteTickets = (blockName: string, invoiceNums: string[]) => {
     const invoiceSet = new Set(invoiceNums.map(invoice => invoice.trim().toUpperCase()).filter(Boolean));
     const selectedBranchId = currentLogisticsBranchId();
@@ -1139,7 +1334,7 @@ export default function RutasPage() {
     if (!apiBlock) {
       await showError({
         title: "Bloque no encontrado",
-        text: `No se pudo encontrar el ID del bloque "${blockName}" en el catálogo.`
+        text: `No se pudo encontrar el ID del bloque "${blockName}" en el catalogo.`
       });
       return;
     }
@@ -1177,7 +1372,7 @@ export default function RutasPage() {
         closeSwal();
         await showError({
           title: "Selecciona una sucursal",
-          text: "Para autorizar debes filtrar por una sucursal específica.",
+          text: "Para autorizar debes filtrar por una sucursal especifica.",
           timer: 2600
         });
         return;
@@ -1236,11 +1431,24 @@ export default function RutasPage() {
         );
         throw new Error(errorMessage);
       }
+      if (authorize && routeDocuments.length > 0) {
+        removeAuthorizedRouteDocumentsFromRoutes(routeDocuments);
+      }
+
+      if (!authorize) {
+        restoreAuthorizedRouteDocumentsForInvoices(invoiceNums);
+      }
+
+      clearBlockInvoiceSelection(blockScopeKey);
+
+      if (!authorize) {
+        await refreshRoutesAfterMutation();
+      }
 
       await showSuccess({
         title: authorize ? "Ruta sincronizada" : "Bloque regresado",
         html: authorize
-          ? `El bloque <b>${blockName}</b> fue autorizado y la ruta quedó lista en Samsara.`
+          ? `El bloque <b>${blockName}</b> fue autorizado y la ruta quedo lista en Samsara.`
           : `Las facturas del bloque <b>${blockName}</b> regresaron correctamente.`,
         timer: 1800
       });
@@ -1250,8 +1458,9 @@ export default function RutasPage() {
         setIsTicketDialogOpen(true);
       }
 
-      clearBlockInvoiceSelection(blockScopeKey);
-      await fetchAllData(true, true);
+      if (authorize) {
+        await refreshRoutesAfterMutation();
+      }
     } catch (err: unknown) {
       console.error("Error authorizing block:", err);
       closeSwal();
@@ -1316,8 +1525,8 @@ export default function RutasPage() {
       title: authorize ? "¿Autorizar bloque?" : "¿Regresar bloque?",
       html: authorize
         ? selectedCount > 0
-          ? `Se creara la ruta en Samsara y se autorizaran <b>${selectedCount}</b> documentos seleccionados del bloque <b>${blockName}</b>.`
-          : `Se creara la ruta en Samsara y se autorizaran solo las facturas u ordenes embarcadas visibles de la sucursal seleccionada para el bloque <b>${blockName}</b>.`
+          ? `Se creara o actualizara la ruta en Samsara y se autorizaran <b>${selectedCount}</b> documentos seleccionados del bloque <b>${blockName}</b>.`
+          : `Se creara o actualizara la ruta en Samsara y se autorizaran solo las facturas u ordenes embarcadas visibles de la sucursal seleccionada para el bloque <b>${blockName}</b>.`
         : `Se regresaran las facturas del bloque <b>${blockName}</b> para incluir nuevas facturas y volver a autorizar.`,
       confirmButtonText: authorize ? "Si, autorizar" : "Si, regresar",
       confirmButtonColor: authorize ? "#2563eb" : "#f59e0b"
@@ -1329,16 +1538,18 @@ export default function RutasPage() {
   };
 
   const fetchAllData = async (forceRefresh = false, silent = false) => {
-    const routesCacheKey = getActiveRoutesCacheKey(forceRefresh);
+    const externalCacheInvalidated = syncExternalRoutesCacheBust();
+    const effectiveForceRefresh = forceRefresh || externalCacheInvalidated;
+    const routesCacheKey = getActiveRoutesCacheKey(effectiveForceRefresh);
     activeRoutesCacheKeyRef.current = routesCacheKey;
 
     const lastSilentFetch = lastSilentRoutesFetchRef.current;
-    if (silent && lastSilentFetch?.key === routesCacheKey && Date.now() - lastSilentFetch.at < 5000) {
+    if (!effectiveForceRefresh && silent && lastSilentFetch?.key === routesCacheKey && Date.now() - lastSilentFetch.at < 5000) {
       console.log("Fetch silencioso reciente, omitiendo petición duplicada.");
       return;
     }
 
-    if (!forceRefresh && cachedInvoicesByDriver[routesCacheKey] && cachedRouteRowsByDriver[routesCacheKey]) {
+    if (!effectiveForceRefresh && cachedInvoicesByDriver[routesCacheKey] && cachedRouteRowsByDriver[routesCacheKey]) {
       setInvoices(cachedInvoicesByDriver[routesCacheKey]);
       setRouteTicketRows(cachedRouteRowsByDriver[routesCacheKey]);
       setIsLoading(false);
@@ -1347,7 +1558,7 @@ export default function RutasPage() {
     }
 
     if (isFetchingRef.current) {
-      pendingRoutesFetchRef.current = { forceRefresh, silent };
+      pendingRoutesFetchRef.current = { forceRefresh: effectiveForceRefresh, silent };
       lastRequestRef.current++;
       console.log("Fetch en progreso, invalidando respuesta anterior y agendando la petición más reciente.");
       return;
@@ -1363,7 +1574,7 @@ export default function RutasPage() {
       if (!silent) setIsLoading(true);
       setError(null);
 
-      const catalogsNeeded = forceRefresh || !cachedUnidades || !cachedUnitCatalog || !cachedBlocks;
+      const catalogsNeeded = effectiveForceRefresh || !cachedUnidades || !cachedUnitCatalog || !cachedBlocks;
 
       const routesParams = new URLSearchParams();
       const selectedBranchId = currentLogisticsBranchId();
@@ -1379,6 +1590,8 @@ export default function RutasPage() {
       const blocksStatusUrl = effectiveIncludePreviousPending
         ? `/api/logistics/blocks-status?includePreviousPending=true&previousPendingDays=${DEFAULT_PREVIOUS_PENDING_DAYS}`
         : '/api/logistics/blocks-status';
+
+      let latestBlocksData = cachedBlocks;
 
       const [catalogsResults, routesResponse] = await Promise.all([
         catalogsNeeded
@@ -1397,6 +1610,7 @@ export default function RutasPage() {
           const blocksData: ApiBlockStatus[] = await blocksRes.json();
           setApiBlocks(blocksData);
           cachedBlocks = blocksData;
+          latestBlocksData = blocksData;
 
           const initialAssignments: Record<string, AvailableUnit> = {};
           blocksData.forEach(b => {
@@ -1444,9 +1658,17 @@ export default function RutasPage() {
 
       if (!routesResponse.ok) throw new Error('No se pudo conectar con el servidor de rutas');
       const data: ApiRutaInvoice[] = await routesResponse.json();
+      const authorizedRouteDocumentKeys = buildAuthorizedRouteDocumentKeys(latestBlocksData);
       const activeRouteRows = data.filter(row => {
         const isBranchPickup = row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'));
-        return !(isBranchPickup && row.dDateRouteAuthorized);
+        if (isBranchPickup && row.dDateRouteAuthorized) return false;
+        if (!isBranchPickup && row.dDateRouteAuthorized) return false;
+        if (!isBranchPickup) {
+          const documentKey = getRouteRowDocumentKey(row);
+          if (documentKey && recentlyAuthorizedRouteDocumentKeys.has(documentKey)) return false;
+          if (documentKey && authorizedRouteDocumentKeys.has(documentKey)) return false;
+        }
+        return true;
       });
       cachedRouteRowsByDriver[routesCacheKey] = activeRouteRows;
       if (isCurrentRoutesRequest()) {
@@ -1489,6 +1711,12 @@ export default function RutasPage() {
           else if (rawStatus === 'en proceso' || rawStatus === 'embarcado') status = 'in-progress';
           else status = 'pending';
 
+          const invoiceAmount = Number(row.monto_Factura);
+          const orderAmount = Number(row.montoTotalOrden);
+          const documentAmount = isFactura
+            ? (Number.isFinite(invoiceAmount) && invoiceAmount !== 0 ? invoiceAmount : orderAmount)
+            : orderAmount;
+
           groupedMap.set(groupKey, {
             id: displayId,
             clientName: row.cliente,
@@ -1501,7 +1729,7 @@ export default function RutasPage() {
             type: type,
             completedDeliveries: type === 'anticipada' ? (row.montoAnticipado > 0 ? 1 : 0) : undefined,
             hasGlassCut: false,
-            montoTotal: row.monto_Factura,
+            montoTotal: Number.isFinite(documentAmount) ? documentAmount : 0,
             totalWeightKg: 0,
             orderNum: row.orderNum,
             sucursal: mappedSucursal,
@@ -1945,6 +2173,11 @@ export default function RutasPage() {
                                     <Clock3 className="size-4 stroke-[2.5]" />
                                   </span>
                                 )}
+                                {p.montoTotal !== undefined && p.montoTotal !== null && Number.isFinite(Number(p.montoTotal)) && (
+                                  <span className="inline-flex items-center rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black tracking-normal text-emerald-700 dark:text-emerald-300 normal-case shadow-sm">
+                                    {formatCurrency(Number(p.montoTotal))}
+                                  </span>
+                                )}
                               </span>
                               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-0.5">{p.date}</span>
                             </div>
@@ -2013,13 +2246,20 @@ export default function RutasPage() {
                     const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
                     const isAllBranches = branchFilter === 'all';
                     const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
+                    const shouldAuthorize = shouldAuthorizeCurrentBlockView(blockName, apiBlock, isAuthorized);
                     const selectedDocumentKeys = getSelectedBlockDocumentKeys(blockName);
                     const selectedCount = selectedDocumentKeys.length;
+                    const shouldAuthorizeOnClick = isAuthorized ? selectedCount > 0 : shouldAuthorize;
                     const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(isInvoiceSelectableForPartialRoute));
+                    const canRunBlockAction = shouldAuthorizeOnClick ? canAuthorize : isAuthorized;
                     const isProcessing = authorizingBlockName === blockScopeKey;
                     const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
                     const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
                     const displayBlockWeightKg = selectedCount > 0 ? selectedBlockWeightKg : totalBlockWeightKg;
+                    const totalBlockAmount = getVisibleBlockAmount(blockName);
+                    const selectedBlockAmount = getSelectedBlockAmount(blockName);
+                    const displayBlockAmount = selectedCount > 0 ? selectedBlockAmount : totalBlockAmount;
+                    const hasDisplayBlockAmount = selectedCount > 0 ? hasSelectedBlockAmount(blockName) : hasVisibleBlockAmount(blockName);
                     return (
                       <Fragment key={blockName}>
                         <tr className="bg-slate-100/90 dark:bg-slate-800/70 border-y border-slate-300/80 dark:border-slate-700/80">
@@ -2035,6 +2275,11 @@ export default function RutasPage() {
                                     {formatKg(displayBlockWeightKg)}
                                   </span>
                                 )}
+                                {hasDisplayBlockAmount && (
+                                  <span className="rounded-full border border-cyan-200 dark:border-cyan-500/30 bg-cyan-50 dark:bg-cyan-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-cyan-700 dark:text-cyan-300 whitespace-nowrap shrink-0">
+                                    {formatCurrency(displayBlockAmount)}
+                                  </span>
+                                )}
                                 {selectedCount > 0 && (
                                   <span className="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-blue-700 dark:text-blue-300 whitespace-nowrap shrink-0">
                                     {selectedCount} sel.
@@ -2047,15 +2292,15 @@ export default function RutasPage() {
                                   variant="outline"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleAuthorizeBlock(blockName, !isAuthorized);
+                                    handleAuthorizeBlock(blockName, shouldAuthorizeOnClick);
                                   }}
-                                  disabled={!canAuthorize || isProcessing}
+                                  disabled={!canRunBlockAction || isProcessing}
                                   size="sm"
                                   className={cn(
                                     "h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest transition-all shadow-none ring-0",
-                                    isAuthorized && canAuthorize
+                                    isAuthorized && !shouldAuthorizeOnClick && canRunBlockAction
                                       ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                                      : canAuthorize
+                                      : canRunBlockAction
                                         ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
                                         : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 opacity-60"
                                   )}
@@ -2065,7 +2310,7 @@ export default function RutasPage() {
                                   )}
                                   {isProcessing
                                     ? "Procesando..."
-                                    : isAuthorized && canAuthorize
+                                    : isAuthorized && !shouldAuthorizeOnClick && canRunBlockAction
                                       ? "Regresar"
                                       : "Autorizar"}
                                 </Button>
@@ -2106,6 +2351,11 @@ export default function RutasPage() {
                                       {p.isPreviousPending && (
                                         <span className="inline-flex items-center justify-center size-6 rounded-full bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 shrink-0 shadow-sm">
                                           <Clock3 className="size-4 stroke-[2.5]" />
+                                        </span>
+                                      )}
+                                      {p.montoTotal !== undefined && p.montoTotal !== null && Number.isFinite(Number(p.montoTotal)) && (
+                                        <span className="inline-flex items-center rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black tracking-normal text-emerald-700 dark:text-emerald-300 normal-case shadow-sm">
+                                          {formatCurrency(Number(p.montoTotal))}
                                         </span>
                                       )}
                                     </span>
@@ -2237,13 +2487,20 @@ export default function RutasPage() {
               const assignedUnit = getAssignedUnitForDisplay(blockName, apiBlock);
               const isAllBranches = branchFilter === 'all';
               const isAuthorized = !isAllBranches && isBlockAuthorizedForCurrentTrip(apiBlock);
+              const shouldAuthorize = shouldAuthorizeCurrentBlockView(blockName, apiBlock, isAuthorized);
               const selectedDocumentKeys = getSelectedBlockDocumentKeys(blockName);
               const selectedCount = selectedDocumentKeys.length;
+              const shouldAuthorizeOnClick = isAuthorized ? selectedCount > 0 : shouldAuthorize;
               const canAuthorize = !!assignedUnit && (selectedCount > 0 || items.some(isInvoiceSelectableForPartialRoute));
+              const canRunBlockAction = shouldAuthorizeOnClick ? canAuthorize : isAuthorized;
               const isProcessing = authorizingBlockName === blockScopeKey;
               const totalBlockWeightKg = getVisibleBlockWeightKg(blockName);
               const selectedBlockWeightKg = getSelectedBlockWeightKg(blockName);
               const displayBlockWeightKg = selectedCount > 0 ? selectedBlockWeightKg : totalBlockWeightKg;
+              const totalBlockAmount = getVisibleBlockAmount(blockName);
+              const selectedBlockAmount = getSelectedBlockAmount(blockName);
+              const displayBlockAmount = selectedCount > 0 ? selectedBlockAmount : totalBlockAmount;
+              const hasDisplayBlockAmount = selectedCount > 0 ? hasSelectedBlockAmount(blockName) : hasVisibleBlockAmount(blockName);
               return (
                 <Card key={blockName} className="border-2 border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-md transition-all hover:shadow-lg">
                   <CardHeader className="p-4 pb-0">
@@ -2261,14 +2518,14 @@ export default function RutasPage() {
                         <div className="flex items-center gap-2 shrink-0">
                           <Button
                             variant="outline"
-                            onClick={() => handleAuthorizeBlock(blockName, !isAuthorized)}
-                            disabled={!canAuthorize || isProcessing}
+                            onClick={() => handleAuthorizeBlock(blockName, shouldAuthorizeOnClick)}
+                            disabled={!canRunBlockAction || isProcessing}
                             size="sm"
                             className={cn(
                               "h-8 px-3 text-[10px] font-black rounded-xl flex items-center gap-1.5 uppercase tracking-widest transition-all shadow-none ring-0",
-                              isAuthorized && canAuthorize
+                              isAuthorized && !shouldAuthorizeOnClick && canRunBlockAction
                                 ? "bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                                : canAuthorize
+                                : canRunBlockAction
                                   ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
                                   : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 opacity-60"
                             )}
@@ -2278,7 +2535,7 @@ export default function RutasPage() {
                             )}
                             {isProcessing
                               ? "Procesando..."
-                              : isAuthorized && canAuthorize
+                              : isAuthorized && !shouldAuthorizeOnClick && canRunBlockAction
                                 ? "Regresar"
                                 : "Autorizar"}
                           </Button>
@@ -2301,11 +2558,18 @@ export default function RutasPage() {
                         </div>
                       </div>
 
-                      {displayBlockWeightKg > 0 ? (
-                        <div className="flex items-center gap-1.5 h-5">
-                          <span className="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">
-                            {formatKg(displayBlockWeightKg)}
-                          </span>
+                      {(displayBlockWeightKg > 0 || hasDisplayBlockAmount || selectedCount > 0) ? (
+                        <div className="flex items-center gap-1.5 h-5 flex-wrap overflow-hidden">
+                          {displayBlockWeightKg > 0 && (
+                            <span className="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">
+                              {formatKg(displayBlockWeightKg)}
+                            </span>
+                          )}
+                          {hasDisplayBlockAmount && (
+                            <span className="rounded-full border border-cyan-200 dark:border-cyan-500/30 bg-cyan-50 dark:bg-cyan-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cyan-700 dark:text-cyan-300 whitespace-nowrap shrink-0">
+                              {formatCurrency(displayBlockAmount)}
+                            </span>
+                          )}
                           {selectedCount > 0 && (
                             <span className="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-blue-700 dark:text-blue-300 whitespace-nowrap shrink-0">
                               {selectedCount} sel.
@@ -2491,4 +2755,3 @@ export default function RutasPage() {
     </div>
   );
 }
-
