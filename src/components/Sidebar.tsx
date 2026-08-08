@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { logoutAction } from "@/app/login/actions";
 
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { getUserSession } from "@/app/login/actions";
 
 interface SidebarProps {
@@ -21,6 +21,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("Usuario");
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     getUserSession().then((session) => {
@@ -30,6 +31,13 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       }
     });
   }, []);
+
+  const handleLogout = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      await logoutAction();
+    });
+  };
 
   const navItems = [
     {
@@ -141,13 +149,27 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           </div>
           <ThemeToggle />
         </div>
-        <form action={logoutAction}>
+        <form onSubmit={handleLogout}>
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+            disabled={isPending}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             <LogOut className="size-4" />
-            Cerrar Sesión
+            <span className="flex items-center gap-0.5">
+              {isPending ? (
+                <>
+                  Cerrando Sesión
+                  <span className="inline-flex gap-0.5 ml-0.5">
+                    <span className="animate-bounce delay-100">.</span>
+                    <span className="animate-bounce delay-200">.</span>
+                    <span className="animate-bounce delay-300">.</span>
+                  </span>
+                </>
+              ) : (
+                "Cerrar Sesión"
+              )}
+            </span>
           </button>
         </form>
       </div>

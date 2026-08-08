@@ -192,11 +192,22 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full h-[52px] bg-blue-600 hover:bg-blue-700 dark:bg-[#2257D5] dark:hover:bg-[#2563EB] text-white rounded-xl text-[14px] font-medium flex items-center justify-center gap-2 group transition-all active:scale-[0.98] mt-4 shadow-[0_4px_14px_0_rgba(37,99,235,0.25)] dark:shadow-[0_4px_14px_0_rgba(37,99,235,0.2)]"
+              className="w-full h-[52px] bg-blue-600 hover:bg-blue-700 dark:bg-[#2257D5] dark:hover:bg-[#2563EB] disabled:bg-blue-600/50 dark:disabled:bg-[#2257D5]/50 disabled:cursor-not-allowed text-white rounded-xl text-[14px] font-medium flex items-center justify-center gap-2 group transition-all active:scale-[0.98] mt-4 shadow-[0_4px_14px_0_rgba(37,99,235,0.25)] dark:shadow-[0_4px_14px_0_rgba(37,99,235,0.2)]"
               disabled={isPending}
             >
-              <span className="group-hover:-translate-x-1 transition-transform duration-300">
-                {isPending ? "Iniciando..." : "Ingresar"}
+              <span className="flex items-center gap-1 group-hover:-translate-x-1 transition-transform duration-300">
+                {isPending ? (
+                  <>
+                    Iniciando
+                    <span className="inline-flex gap-0.5">
+                      <span className="animate-bounce delay-100">.</span>
+                      <span className="animate-bounce delay-200">.</span>
+                      <span className="animate-bounce delay-300">.</span>
+                    </span>
+                  </>
+                ) : (
+                  "Ingresar"
+                )}
               </span>
               {!isPending && (
                 <ArrowRight className="w-4 h-4 opacity-70 group-hover:translate-x-1 group-hover:opacity-100 transition-all duration-300" />
