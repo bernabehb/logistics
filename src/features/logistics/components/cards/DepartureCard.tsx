@@ -1102,6 +1102,16 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
         <div className="w-full shrink-0 space-y-3">
           {departure.status === "Pendiente" ? (
             <>
+              <Button
+                variant="outline"
+                size="logistics-card"
+                onClick={handleOpenSamsaraRoute}
+                disabled={isOpeningSamsaraRoute}
+                className="cursor-pointer border-blue-400/60 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/40 dark:text-blue-300 dark:hover:bg-blue-500/10"
+              >
+                {isOpeningSamsaraRoute ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <ExternalLink className="size-4 mr-2" />}
+                Ver ruta Samsara
+              </Button>
               {departure.deliveryType === "sucursal" && onReturnToRoutes && (
                 <Button
                   type="button"
@@ -1498,16 +1508,28 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
               </Dialog>
             </>
           ) : departure.status === "Escaneada" ? (
-            <Button
-              variant="logistics-action"
-              size="logistics-card"
-              onClick={handleSendScannedInRouteManual}
-              disabled={isSendingManualRoute || !onSendScannedInRouteManual}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30 shadow-emerald-500/20"
-            >
-              {isSendingManualRoute ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <Truck className="size-4 mr-2" />}
-              Mandar en ruta manual
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="logistics-card"
+                onClick={handleOpenSamsaraRoute}
+                disabled={isOpeningSamsaraRoute}
+                className="cursor-pointer border-blue-400/60 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/40 dark:text-blue-300 dark:hover:bg-blue-500/10"
+              >
+                {isOpeningSamsaraRoute ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <ExternalLink className="size-4 mr-2" />}
+                Ver ruta Samsara
+              </Button>
+              <Button
+                variant="logistics-action"
+                size="logistics-card"
+                onClick={handleSendScannedInRouteManual}
+                disabled={isSendingManualRoute || !onSendScannedInRouteManual}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/30 shadow-emerald-500/20"
+              >
+                {isSendingManualRoute ? <RefreshCw className="size-4 mr-2 animate-spin" /> : <Truck className="size-4 mr-2" />}
+                Mandar en ruta manual
+              </Button>
+            </>
           ) : departure.status === "En ruta" ? (
             <>
               <Button
