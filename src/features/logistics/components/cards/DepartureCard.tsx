@@ -135,12 +135,15 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
     const documentType = normalizeRouteDocumentType(invoice.routeDocumentType);
     const invoiceNum = (invoice.id || "").trim();
     const documentNum = String(invoice.routeDocumentNum || (documentType === "ORDER" ? invoice.orderNum : invoiceNum) || invoiceNum || "").trim();
+    const parsedOrderNum = documentType === "ORDER" && /^\d+$/.test(documentNum)
+      ? Number(documentNum)
+      : invoice.orderNum ?? null;
 
     return {
       documentType,
       documentNum,
-      invoiceNum: invoiceNum || null,
-      orderNum: invoice.orderNum ?? null,
+      invoiceNum: documentType === "INVOICE" ? (invoiceNum || documentNum) : null,
+      orderNum: documentType === "ORDER" ? parsedOrderNum : invoice.orderNum ?? null,
     };
   };
 
@@ -148,6 +151,11 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
   const getRouteDocumentLabel = (document: RouteDocumentPayload) =>
     document.documentType === "ORDER" ? `orden ${document.documentNum}` : `factura ${document.documentNum}`;
+
+  const getRouteDocumentDisplayText = (invoice: Invoice) => {
+    const document = getInvoiceRouteDocument(invoice);
+    return document.documentType === "ORDER" ? `Orden: ${document.documentNum}` : `Factura: ${document.documentNum}`;
+  };
 
   // Detección de facturas agregadas posteriormente (desde el backend)
   const addedInvoicesCount = React.useMemo(() =>
@@ -876,7 +884,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
             <div className="flex items-center gap-1.5 w-full">
               <FileText className="size-4 text-slate-500 dark:text-slate-400 shrink-0" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                Facturas ({departure.invoices.length})
+                Documentos ({departure.invoices.length})
               </span>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -887,9 +895,11 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                 const routeDocument = getInvoiceRouteDocument(inv);
                 const routeDocumentKey = getRouteDocumentKey(routeDocument);
                 const routeDocumentLabel = getRouteDocumentLabel(routeDocument);
+                const routeDocumentPrefix = routeDocument.documentType === "ORDER" ? "Orden:" : "Factura:";
+                const routeDocumentNumber = routeDocument.documentNum;
                 return (
                   <div
-                    key={`${inv.id}-${idx}`}
+                    key={`${routeDocumentKey}-${idx}`}
                     className={cn(
                       "flex min-w-0 items-center justify-between gap-2 rounded-lg border px-2 py-1 transition-all duration-300 select-none",
                       isDelivered
@@ -899,8 +909,9 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                           : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                     )}
                   >
-                    <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-black select-text">
-                      <span className="min-w-0 truncate">{inv.id}</span>
+                    <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-black">
+                      <span className="shrink-0 select-none">{routeDocumentPrefix}</span>
+                      <span className="min-w-0 truncate select-text">{routeDocumentNumber}</span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
                       {invoiceAmount && <span>{invoiceAmount}</span>}
@@ -1045,7 +1056,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
           <div className="space-y-3">
             <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-3">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                Facturas
+                Documentos
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {(displayedLocations.length <= 1
@@ -1054,8 +1065,11 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
                     ? [departure.invoices[editingLocationIndex ?? 0]]
                     : []
                 ).map((inv) => (
-                  <span key={inv.id} className="text-xs font-black px-2.5 py-0.5 border rounded-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 shadow-sm">
-                    {inv.id}
+                  <span
+                    key={getRouteDocumentKey(getInvoiceRouteDocument(inv))}
+                    className="text-xs font-black px-2.5 py-0.5 border rounded-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                  >
+                    {getRouteDocumentDisplayText(inv)}
                   </span>
                 ))}
               </div>

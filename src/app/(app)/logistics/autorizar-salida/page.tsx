@@ -45,6 +45,8 @@ interface ApiDepartureHome {
 }
 
 
+type DepartureStatusFilter = "Pendiente" | "Escaneada" | "En ruta";
+
 type RouteDocumentPayload = {
   documentType: "INVOICE" | "ORDER";
   documentNum: string;
@@ -117,17 +119,28 @@ const getRouteDocumentNum = (invoice: FacturaObj | string) => {
   return getRouteDocumentType(invoice) === "ORDER" ? String(orderNum || invoiceNum || "") : invoiceNum;
 };
 
+const getRouteDocumentDisplayId = (invoice: FacturaObj | string) => {
+  const invoiceNum = getInvoiceId(invoice).trim();
+  if (invoiceNum) return invoiceNum;
+
+  return getRouteDocumentType(invoice) === "ORDER" ? getRouteDocumentNum(invoice).trim() : "";
+};
+
 const toRouteDocumentPayload = (invoice: ReadyDeparture["invoices"][number]): RouteDocumentPayload | null => {
   const documentType = normalizeRouteDocumentType(invoice.routeDocumentType);
   const invoiceNum = (invoice.id || "").trim();
   const documentNum = String(invoice.routeDocumentNum || (documentType === "ORDER" ? invoice.orderNum : invoiceNum) || invoiceNum || "").trim();
   if (!documentNum) return null;
 
+  const parsedOrderNum = documentType === "ORDER" && /^\d+$/.test(documentNum)
+    ? Number(documentNum)
+    : invoice.orderNum ?? null;
+
   return {
     documentType,
     documentNum,
-    invoiceNum: invoiceNum || null,
-    orderNum: invoice.orderNum ?? null,
+    invoiceNum: documentType === "INVOICE" ? (invoiceNum || documentNum) : null,
+    orderNum: documentType === "ORDER" ? parsedOrderNum : invoice.orderNum ?? null,
   };
 };
 
@@ -165,9 +178,13 @@ export default function AutorizarSalidaPage() {
           if (isFullyAuthorized) computedStatus = "En ruta";
           else if (isFullyScanned) computedStatus = "Escaneada";
 
-          const invoicesToMap = computedStatus === "En ruta" ? allInvoices : computedStatus === "Escaneada" ? scannedInvoices : pendingInvoices;
+          const invoicesToMap = computedStatus === "En ruta"
+            ? allInvoices
+            : computedStatus === "Escaneada"
+              ? scannedInvoices
+              : activeInvoices;
           const mappedInvoices = invoicesToMap.map(f => ({
-            id: getInvoiceId(f),
+            id: getRouteDocumentDisplayId(f),
             orderNum: getOrderNum(f),
             routeDocumentType: getRouteDocumentType(f),
             routeDocumentNum: getRouteDocumentNum(f),
@@ -212,9 +229,13 @@ export default function AutorizarSalidaPage() {
           if (isFullyAuthorized) computedStatus = "En ruta";
           else if (isFullyScanned) computedStatus = "Escaneada";
 
-          const invoicesToMap = computedStatus === "En ruta" ? allInvoices : computedStatus === "Escaneada" ? scannedInvoices : pendingInvoices;
+          const invoicesToMap = computedStatus === "En ruta"
+            ? allInvoices
+            : computedStatus === "Escaneada"
+              ? scannedInvoices
+              : activeInvoices;
           const mappedInvoices = invoicesToMap.map(f => ({
-            id: getInvoiceId(f),
+            id: getRouteDocumentDisplayId(f),
             orderNum: getOrderNum(f),
             routeDocumentType: getRouteDocumentType(f),
             routeDocumentNum: getRouteDocumentNum(f),
@@ -348,7 +369,7 @@ export default function AutorizarSalidaPage() {
     }
   };
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"Pendiente" | "Escaneada" | "En ruta">("Pendiente");
+  const [statusFilter, setStatusFilter] = useState<DepartureStatusFilter>("Pendiente");
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<"domicilio" | "sucursal">("domicilio");
   const [branchFilter, setBranchFilter] = useState<string>(cachedBranchFilter);
 
@@ -521,6 +542,13 @@ export default function AutorizarSalidaPage() {
   const pendingCount = branchFilteredDepartures.filter(d => d.status === "Pendiente" && d.deliveryType === deliveryTypeFilter).length;
   const scannedCount = branchFilteredDepartures.filter(d => d.status === "Escaneada" && d.deliveryType === deliveryTypeFilter).length;
   const enRutaCount = branchFilteredDepartures.filter(d => d.status === "En ruta" && d.deliveryType === deliveryTypeFilter).length;
+  const statusOptions: Array<{ id: DepartureStatusFilter; label: string; count: number }> = [
+    { id: "Pendiente", label: "Pendientes", count: pendingCount },
+    { id: "Escaneada", label: "Escaneadas", count: scannedCount },
+    ...(deliveryTypeFilter === "sucursal"
+      ? []
+      : [{ id: "En ruta" as DepartureStatusFilter, label: "En Ruta", count: enRutaCount }]),
+  ];
 
   return (
     <div className="w-full flex flex-col gap-4 min-h-full pb-12 -mt-2 md:-mt-4">
@@ -626,16 +654,10 @@ export default function AutorizarSalidaPage() {
 
           {/* Status Filter (Pendientes/Escaneadas/En Ruta) */}
           <div className="flex items-center justify-center gap-1 bg-slate-100/50 dark:bg-[#1E293B] p-1 rounded-xl border border-slate-200/60 dark:border-slate-800 h-9 w-full sm:w-auto shrink-0">
-            {([
-              { id: "Pendiente", label: "Pendientes", count: pendingCount },
-              { id: "Escaneada", label: "Escaneadas", count: scannedCount },
-              ...(deliveryTypeFilter === "sucursal"
-                ? []
-                : [{ id: "En ruta", label: "En Ruta", count: enRutaCount }])
-            ] as const).map((status) => (
+            {statusOptions.map((status) => (
               <button
                 key={status.id}
-                onClick={() => setStatusFilter(status.id as any)}
+                onClick={() => setStatusFilter(status.id)}
                 className={cn(
                   "flex-1 h-full px-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer border",
                   statusFilter === status.id

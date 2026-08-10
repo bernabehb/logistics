@@ -1216,14 +1216,33 @@ export default function RutasPage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-  const buildRouteTickets = (blockName: string, invoiceNums: string[]) => {
-    const invoiceSet = new Set(invoiceNums.map(invoice => invoice.trim().toUpperCase()).filter(Boolean));
+  const buildRouteTickets = (blockName: string, routeDocumentsOrInvoices: Array<RouteDocumentPayload | string>) => {
+    const documentSet = new Set(
+      routeDocumentsOrInvoices
+        .map(document => {
+          if (typeof document === "string") {
+            const invoiceNum = document.trim().toUpperCase();
+            return invoiceNum ? `INVOICE:${invoiceNum}` : "";
+          }
+
+          const documentType = normalizeRouteDocumentType(document.documentType);
+          const documentNum = String(document.documentNum || document.invoiceNum || document.orderNum || "").trim().toUpperCase();
+          return documentNum ? `${documentType}:${documentNum}` : "";
+        })
+        .filter(Boolean)
+    );
     const selectedBranchId = currentLogisticsBranchId();
     const dateLabel = formatTicketDate();
 
     const rows = routeTicketRows.filter(row => {
       const rowInvoice = (row.factura || "").trim().toUpperCase();
-      if (!rowInvoice || !invoiceSet.has(rowInvoice)) return false;
+      const rowDocumentType = normalizeRouteDocumentType(
+        row.routeDocumentType || row.RouteDocumentType || (rowInvoice ? "INVOICE" : "ORDER")
+      );
+      const rowDocumentNum = String(
+        row.routeDocumentNum || row.RouteDocumentNum || (rowDocumentType === "ORDER" ? row.orderNum : rowInvoice) || ""
+      ).trim().toUpperCase();
+      if (!rowDocumentNum || !documentSet.has(`${rowDocumentType}:${rowDocumentNum}`)) return false;
       if (normalizeBlockName(row.bloque || "") !== normalizeBlockName(blockName)) return false;
 
       const rawSucursal = row.sucursal?.trim().toUpperCase() || "";
@@ -1396,7 +1415,7 @@ export default function RutasPage() {
         return;
       }
 
-      const ticketsToPrint = authorize && invoiceNums.length > 0 ? buildRouteTickets(blockName, invoiceNums) : [];
+      const ticketsToPrint = authorize && routeDocuments.length > 0 ? buildRouteTickets(blockName, routeDocuments) : [];
 
       const response = await fetch(
         useInvoiceAuthorization
@@ -2755,3 +2774,4 @@ export default function RutasPage() {
     </div>
   );
 }
+
