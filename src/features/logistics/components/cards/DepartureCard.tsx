@@ -542,19 +542,29 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
 
   const handleDeliverTrip = async () => {
     const invoiceNums = verifiableInvoices.map(inv => inv.id).filter(Boolean);
+    const documentLabels = verifiableInvoices
+      .map(inv => getInvoiceRouteDocument(inv).documentNum)
+      .filter(Boolean);
+
     if (invoiceNums.length === 0) {
       onDelivered?.(departure.id);
       await showSuccess({
         title: "Todo entregado",
-        html: "Todas las facturas de esta unidad ya estaban marcadas como entregadas.",
+        html: "Todos los documentos de esta unidad ya estaban marcados como entregados.",
         timer: 1600
       });
       return;
     }
 
-    const confirmed = window.confirm(
-      `¿Deseas marcar como entregadas las facturas ${invoiceNums.join(", ")}?`
-    );
+    const confirmed = await showConfirm({
+      title: "Marcar entregado",
+      html: `Se marcaran como <b>entregados</b> los documentos <b>${documentLabels.join(", ")}</b>.`,
+      icon: "question",
+      iconColor: "#10b981",
+      confirmButtonText: "Si, marcar entregado",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#059669"
+    });
     if (!confirmed) return;
 
     setIsDelivering(true);
@@ -573,14 +583,21 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       }
 
       onDelivered?.(departure.id);
+      await showSuccess({
+        title: "Entregado",
+        html: `Se marcaron como entregados los documentos <b>${documentLabels.join(", ")}</b>.`,
+        timer: 1600
+      });
     } catch (err) {
       console.error(err);
-      alert('No se pudieron marcar las facturas como entregadas.');
+      await showError({
+        title: "No se pudo marcar entregado",
+        text: "No se pudieron marcar los documentos como entregados."
+      });
     } finally {
       setIsDelivering(false);
     }
   };
-
   const handleSendScannedInRouteManual = async () => {
     if (!onSendScannedInRouteManual || departure.invoices.length === 0) return;
 
