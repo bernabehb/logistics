@@ -541,12 +541,15 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
   };
 
   const handleDeliverTrip = async () => {
-    const invoiceNums = verifiableInvoices.map(inv => inv.id).filter(Boolean);
-    const documentLabels = verifiableInvoices
-      .map(inv => getInvoiceRouteDocument(inv).documentNum)
+    const routeDocuments = verifiableInvoices.map(inv => getInvoiceRouteDocument(inv));
+    const invoiceNums = routeDocuments
+      .map(doc => doc.invoiceNum || (doc.documentType === "INVOICE" ? doc.documentNum : ""))
+      .filter(Boolean);
+    const documentLabels = routeDocuments
+      .map(doc => doc.documentNum)
       .filter(Boolean);
 
-    if (invoiceNums.length === 0) {
+    if (routeDocuments.length === 0) {
       onDelivered?.(departure.id);
       await showSuccess({
         title: "Todo entregado",
@@ -572,7 +575,7 @@ export function DepartureCard({ departure, onAuthorize, onDelivered, onSendScann
       const res = await fetch('/api/logistics/deliver-invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceNums }),
+        body: JSON.stringify({ invoiceNums, routeDocuments }),
       });
 
       if (!res.ok) throw new Error('Failed to deliver invoices');
