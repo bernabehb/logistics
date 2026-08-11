@@ -47,6 +47,8 @@ interface ApiDepartureHome {
 
 type DepartureStatusFilter = "Pendiente" | "Escaneada" | "En ruta";
 
+const ROUTES_CACHE_BUST_STORAGE_KEY = "logistics_routes_cache_bust";
+
 type RouteDocumentPayload = {
   documentType: "INVOICE" | "ORDER";
   documentNum: string;
@@ -465,6 +467,11 @@ export default function AutorizarSalidaPage() {
       throw new Error(data?.message || data?.error || "No se pudo regresar la factura a Rutas.");
     }
 
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ROUTES_CACHE_BUST_STORAGE_KEY, String(Date.now()));
+      window.dispatchEvent(new Event("logistics-routes-cache-bust"));
+    }
+
     const updated = departures.filter(dep => dep.id !== id);
     setDepartures(updated);
     cachedDepartures = updated;
@@ -519,6 +526,11 @@ export default function AutorizarSalidaPage() {
       cachedDepartures = updated;
       return updated;
     });
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ROUTES_CACHE_BUST_STORAGE_KEY, String(Date.now()));
+      window.dispatchEvent(new Event("logistics-routes-cache-bust"));
+    }
 
     await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
     window.setTimeout(() => {
