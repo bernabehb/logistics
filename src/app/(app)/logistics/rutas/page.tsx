@@ -459,6 +459,9 @@ const isTruthyPreviousPending = (value: unknown) => {
   const normalized = value.trim().toLowerCase();
   return normalized === '1' || normalized === 'true';
 };
+const isDomicilioDelivery = (metodo?: string | null) =>
+  (metodo || "").trim().toUpperCase() === "EAD";
+
 
 const getTodayDateKey = () => {
   const now = new Date();
@@ -1071,7 +1074,7 @@ export default function RutasPage() {
       const documentNum = String(row.routeDocumentNum || row.RouteDocumentNum || (documentType === 'ORDER' ? row.orderNum : row.factura) || '').trim().toUpperCase();
       if (!documentNum) return false;
 
-      const isBranchPickup = row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'));
+      const isBranchPickup = !isDomicilioDelivery(row.metodo);
       return !isBranchPickup && authorizedDocumentKeys.has(`${documentType}:${documentNum}`);
     };
 
@@ -1679,7 +1682,7 @@ export default function RutasPage() {
       const data: ApiRutaInvoice[] = await routesResponse.json();
       const authorizedRouteDocumentKeys = buildAuthorizedRouteDocumentKeys(latestBlocksData);
       const activeRouteRows = data.filter(row => {
-        const isBranchPickup = row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'));
+        const isBranchPickup = !isDomicilioDelivery(row.metodo);
         if (isBranchPickup && row.dDateRouteAuthorized) return false;
         if (!isBranchPickup && row.dDateRouteAuthorized) return false;
         if (!isBranchPickup) {
@@ -1742,7 +1745,7 @@ export default function RutasPage() {
             date: displayDate,
             warehouses: [],
             vendedor: row.vendedor,
-            deliveryType: (row.metodo === 'RES' || (row.metodo && row.metodo.includes('M01'))) ? 'sucursal' : 'domicilio',
+            deliveryType: isDomicilioDelivery(row.metodo) ? 'domicilio' : 'sucursal',
             block: (row.bloque || "GENERAL").trim().toUpperCase(),
             estadoGeneral: status,
             type: type,
