@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo, useEffect, Fragment, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -1615,11 +1615,11 @@ export default function RutasPage() {
       const [catalogsResults, routesResponse] = await Promise.all([
         catalogsNeeded
           ? Promise.all([
-            fetch(blocksStatusUrl),
-            fetch('/api/units')
+            fetch(`${blocksStatusUrl}${blocksStatusUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`, { cache: 'no-store' }),
+            fetch(`/api/units?_t=${Date.now()}`, { cache: 'no-store' })
           ])
           : Promise.resolve(null),
-        fetch(routesUrl)
+        fetch(`${routesUrl}${routesUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`, { cache: 'no-store' })
       ]);
 
       if (catalogsResults) {
