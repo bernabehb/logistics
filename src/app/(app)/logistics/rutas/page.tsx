@@ -567,20 +567,7 @@ export default function RutasPage() {
   const effectiveIncludePreviousPending = canUsePreviousPending && includePreviousPending;
 
   const getActiveRoutesCacheKey = (forceRefresh = false) => {
-    const requestedCacheKey = getRoutesCacheKey(effectiveIncludePreviousPending, branchFilter);
-    const allBranchesNormalCacheKey = getRoutesCacheKey(false, 'all');
-
-    if (
-      !forceRefresh &&
-      !effectiveIncludePreviousPending &&
-      branchFilter !== 'all' &&
-      cachedInvoicesByDriver[allBranchesNormalCacheKey] &&
-      cachedRouteRowsByDriver[allBranchesNormalCacheKey]
-    ) {
-      return allBranchesNormalCacheKey;
-    }
-
-    return requestedCacheKey;
+    return getRoutesCacheKey(effectiveIncludePreviousPending, branchFilter);
   };
 
   const invalidateRoutesCacheForCurrentScope = () => {
@@ -727,7 +714,7 @@ export default function RutasPage() {
       // Al montar por primera vez, forzar un refresco silencioso en segundo plano
       fetchAllData(true, true);
     } else {
-      fetchAllData(false, !!cachedInvoicesByDriver[routesCacheKey] && !!cachedRouteRowsByDriver[routesCacheKey]);
+      fetchAllData(true, false);
     }
   }, [effectiveIncludePreviousPending, branchFilter]);
 
